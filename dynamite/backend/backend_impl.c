@@ -88,14 +88,14 @@ PetscErrorCode BuildMat_Shell(PetscInt L,PetscInt nterms,PetscInt* masks,PetscIn
 
   N = 1<<L;
 
-  nrows = PETSC_DECIDE;
-  PetscSplitOwnership(PETSC_COMM_WORLD,&nrows,&N);
+  n = PETSC_DECIDE;
+  PetscSplitOwnership(PETSC_COMM_WORLD,&n,&N);
 
   ierr = BuildContext(L,nterms,masks,signs,coeffs,&ctx);CHKERRQ(ierr);
 
-  ierr = MatCreateShell(PETSC_COMM_WORLD,m,n,N,N,ctx,&A);CHKERRQ(ierr);
-  ierr = MatShellSetOperation(H,MATOP_MULT,(void(*)(void))MatMult_Shell);
-  ierr = MatShellSetOperation(H,MATOP_NORM,(void(*)(void))MatNorm_Shell);
+  ierr = MatCreateShell(PETSC_COMM_WORLD,n,n,N,N,ctx,A);CHKERRQ(ierr);
+  ierr = MatShellSetOperation(*A,MATOP_MULT,(void(*)(void))MatMult_Shell);
+  ierr = MatShellSetOperation(*A,MATOP_NORM,(void(*)(void))MatNorm_Shell);
 
   return ierr;
 
@@ -106,8 +106,9 @@ PetscErrorCode BuildMat_Shell(PetscInt L,PetscInt nterms,PetscInt* masks,PetscIn
 PetscErrorCode MatMult_Shell(Mat A,Vec x,Vec b)
 {
   PetscErrorCode ierr;
-  PetscInt state,lstate,i,sign;
-  PetscScalar tmp_val,*x_array;
+  PetscInt state,i,Istart,Iend,sign;
+  PetscScalar tmp_val;
+  const PetscScalar *x_array;
   shell_context *ctx;
 
   /* cache */
@@ -150,6 +151,8 @@ PetscErrorCode MatMult_Shell(Mat A,Vec x,Vec b)
       }
     }
   }
+  /* set the final few values */
+  ierr = VecSetValues(b,cache_index,indices,values,ADD_VALUES);CHKERRQ(ierr);
 
   ierr = VecRestoreArrayRead(x,&x_array);CHKERRQ(ierr);
 
@@ -168,7 +171,7 @@ PetscErrorCode MatMult_Shell(Mat A,Vec x,Vec b)
 PetscErrorCode MatNorm_Shell(Mat A,NormType type,PetscReal *nrm)
 {
   PetscErrorCode ierr;
-  PetscInt state,N;
+  PetscInt state,N,i,sign;
   PetscScalar csum;
   PetscReal sum,max_sum;
   shell_context *ctx;
@@ -195,8 +198,8 @@ PetscErrorCode MatNorm_Shell(Mat A,NormType type,PetscReal *nrm)
 
   N = 1<<ctx->L;
   max_sum = 0;
-  for (state=0;state<;++state) {
-    sum = 0
+  for (state=0;state<N;++state) {
+    sum = 0;
     for (i=0;i<ctx->nterms;) {
       csum = 0;
       /* sum all terms for this matrix element */
@@ -229,16 +232,16 @@ PetscErrorCode BuildContext(PetscInt L,PetscInt nterms,PetscInt* masks,PetscInt*
   PetscInt i;
 
   ierr = PetscMalloc(sizeof(shell_context),ctx_p);CHKERRQ(ierr);
-  ctx = (*ctx_p)
+  ctx = (*ctx_p);
 
   ctx->L = L;
   ctx->nterms = nterms;
   ctx->nrm = -1;
 
   /* we need to keep track of this stuff on our own. the numpy array might get garbage collected */
-  ierr = PetscMalloc(sizeof(PetscInt)*nterms,ctx->masks);CHKERRQ(ierr);
-  ierr = PetscMalloc(sizeof(PetscInt)*nterms,ctx->signs);CHKERRQ(ierr);
-  ierr = PetscMalloc(sizeof(PetscScalar)*nterms,ctx->coeffs);CHKERRQ(ierr);
+  ierr = PetscMalloc(sizeof(PetscInt)*nterms,&(ctx->masks));CHKERRQ(ierr);
+  ierr = PetscMalloc(sizeof(PetscInt)*nterms,&(ctx->signs));CHKERRQ(ierr);
+  ierr = PetscMalloc(sizeof(PetscScalar)*nterms,&(ctx->coeffs));CHKERRQ(ierr);
 
   for (i=0;i<nterms;++i) {
     ctx->masks[i] = masks[i];
@@ -263,4 +266,6 @@ PetscErrorCode DestroyContext(Mat A)
   ierr = PetscFree(ctx->coeffs);CHKERRQ(ierr);
 
   ierr = PetscFree(ctx);CHKERRQ(ierr);
+
+  return ierr;
 }
