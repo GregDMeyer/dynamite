@@ -2,6 +2,7 @@
 
 from itertools import product
 from copy import deepcopy
+from timeit import default_timer
 import numpy as np
 import atexit
 from .backend.backend import build_mat,destroy_shell_context
@@ -29,8 +30,8 @@ class Operator:
     def set_size(self,L):
         raise NotImplementedError()
 
-    def evolve(self,x,t=None,result=None,tol=None,mfn=None):
-        return evolve(x,self,t,result,tol,mfn)
+    def evolve(self,x,*args,**kwargs):
+        return evolve(x,self,*args,**kwargs)
 
     def dag(self):
         self.destroy_mat()
@@ -65,7 +66,7 @@ class Operator:
 
         return combined
 
-    def build_mat(self,shell=False):
+    def build_mat(self,shell=False,verbose=True):
         if self.L is None:
             raise Exception('Must set number of spins (Operator.set_size(L)) before building PETSc matrix.')
 
@@ -78,11 +79,15 @@ class Operator:
         # TODO: don't forget--need to initialize slepc!
         term_array = self.build_term_array()
 
+        if verbose:
+            starttime = default_timer()
         self._mat = build_mat(self.L,
                              np.ascontiguousarray(term_array['masks']),
                              np.ascontiguousarray(term_array['signs']),
                              np.ascontiguousarray(term_array['coeffs']),
                              shell)
+        if verbose:
+            print('Matrix build completed in','%.2f' % (default_timer()-starttime),'s')
 
         self.is_shell = shell
 
@@ -245,6 +250,7 @@ class SumTerms(Expression):
             return np.ndarray((0,),dtype=Operator.term_dtype())
 
         all_terms = np.hstack([t.build_term_array(add_index=add_index) for t in self.terms])
+        all_terms['coeffs'] *= self.coeff
         return self.condense_terms(all_terms)
 
     def _build_tex(self,signs='-',request_parens=False):
@@ -380,6 +386,7 @@ class SigmaSum(SigmaType):
 
     def _build_term_array(self,add_index=0):
         all_terms = np.hstack([self.op.build_term_array(add_index=add_index+i) for i in range(self.min_i,self.max_i+1)])
+        all_terms['coeffs'] *= self.coeff
         return self.condense_terms(all_terms)
 
 class PiProd(SigmaType):

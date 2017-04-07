@@ -5,6 +5,7 @@ from slepc4py import SLEPc
 from petsc4py import PETSc
 
 import atexit
+from timeit import default_timer
 
 def build_state(L,init_state = 0):
     mgr.initialize_slepc()
@@ -13,6 +14,17 @@ def build_state(L,init_state = 0):
     v.setSizes(1<<L)
     v.setFromOptions()
 
+    if isinstance(init_state,str):
+        state_str = init_state
+        init_state = 0
+        if len(state_str) != L:
+            raise IndexError('init_state string must have length L')
+        if not all(c in ['U','D'] for c in state_str):
+            raise Exception('only character U and D allowed in init_state')
+        for i,c in enumerate(state_str):
+            if c == 'U':
+                init_state += 1<<i
+
     v[init_state] = 1
 
     v.assemblyBegin()
@@ -20,7 +32,7 @@ def build_state(L,init_state = 0):
 
     return v
 
-def evolve(x,H=None,t=None,result=None,tol=None,mfn=None):
+def evolve(x,H=None,t=None,result=None,tol=None,mfn=None,verbose=True):
 
     mgr.initialize_slepc()
 
@@ -49,7 +61,11 @@ def evolve(x,H=None,t=None,result=None,tol=None,mfn=None):
         f = mfn.getFN()
         f.setScale(-1j*t)
 
+    if verbose:
+        starttime = default_timer()
     mfn.solve(x,result)
+    if verbose:
+        print('Matrix solve completed in','%.2f' % (default_timer()-starttime),'s')
 
     return result
 
