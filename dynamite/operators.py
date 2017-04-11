@@ -2,7 +2,6 @@
 
 from itertools import product
 from copy import deepcopy
-from timeit import default_timer
 import numpy as np
 from .backend.backend import build_mat,destroy_shell_context
 from .computations import mgr,evolve
@@ -75,15 +74,11 @@ class Operator:
 
         term_array = self.build_term_array()
 
-        if verbose:
-            starttime = default_timer()
         self._mat = build_mat(self.L,
-                             np.ascontiguousarray(term_array['masks']),
-                             np.ascontiguousarray(term_array['signs']),
-                             np.ascontiguousarray(term_array['coeffs']),
-                             shell)
-        if verbose:
-            print('Matrix build completed in','%.2f' % (default_timer()-starttime),'s')
+                              np.ascontiguousarray(term_array['masks']),
+                              np.ascontiguousarray(term_array['signs']),
+                              np.ascontiguousarray(term_array['coeffs']),
+                              shell)
 
         self.is_shell = shell
 
