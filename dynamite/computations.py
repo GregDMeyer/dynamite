@@ -7,6 +7,9 @@ from petsc4py import PETSc
 import atexit
 from timeit import default_timer
 
+def commutator(o1,o2):
+    return o1*o2 - o2*o1
+
 def build_state(L,init_state = 0):
     mgr.initialize_slepc()
 

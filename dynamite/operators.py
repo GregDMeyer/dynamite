@@ -4,17 +4,17 @@ from itertools import product
 from copy import deepcopy
 from timeit import default_timer
 import numpy as np
-import atexit
 from .backend.backend import build_mat,destroy_shell_context
 from .computations import mgr,evolve
+from .utils import product_of_terms,term_dtype
 
-from petsc4py.PETSc import Vec
+from petsc4py.PETSc import Vec, COMM_WORLD
 
 class Operator:
 
-    def __init__(self):
+    def __init__(self,L=None):
 
-        self.L = None
+        self.L = L
         self.max_ind = None
         self.needs_parens = False
         self.coeff = 1
@@ -22,12 +22,13 @@ class Operator:
         self.is_shell = None
         self._dag = False # whether to take the complex conjugate
 
-    def _set_size(self,L):
+    def set_size(self,L):
         self.L = L
         if self._mat is not None:
             self.destroy_mat()
+        self._set_size(L)
 
-    def set_size(self,L):
+    def _set_size(self,L):
         raise NotImplementedError()
 
     def evolve(self,x,*args,**kwargs):
@@ -40,15 +41,11 @@ class Operator:
         return o
 
     @classmethod
-    def term_dtype(cls):
-        return np.dtype([('masks',np.int32),('signs',np.int32),('coeffs',np.complex128)])
-
-    @classmethod
     def condense_terms(cls,all_terms):
 
         all_terms.sort(order=['masks','signs'])
 
-        combined = np.ndarray((len(all_terms),),dtype=cls.term_dtype())
+        combined = np.ndarray((len(all_terms),),dtype=term_dtype())
 
         i = 0
         n = 0
@@ -76,7 +73,6 @@ class Operator:
             # destroy the old one
             self._mat.destroy()
 
-        # TODO: don't forget--need to initialize slepc!
         term_array = self.build_term_array()
 
         if verbose:
@@ -118,14 +114,20 @@ class Operator:
             return ('+' if '+' in signs else '')+str(x)
 
     def _repr_latex_(self):
-        return '$' + self.build_tex('-') + '$'
+
+        # don't print if we aren't process 0
+        # this causes there to still be some awkward white space,
+        # but at least it doesn't print the tex a zillion times
+        if COMM_WORLD.getRank() != 0:
+            return ''
+
+        return '$' + self.build_tex(signs='-') + '$'
 
     def build_tex(self,signs='-',request_parens=False):
         t = self._build_tex(signs,request_parens)
 
-        # # crap. this is a problem if there is already an index...
-        # if self._dag:
-        #     t += '^{\dagger}'
+        if self._dag:
+            t = r'{'+t+r'}^{\dagger}'
 
         return t
 
@@ -232,8 +234,7 @@ class Expression(Operator):
     def _build_tex(self,signs='-',request_parens=False):
         raise NotImplementedError()
 
-    def set_size(self,L):
-        self._set_size(L)
+    def _set_size(self,L):
         for term in self.terms:
             term.set_size(L)
 
@@ -247,7 +248,7 @@ class SumTerms(Expression):
     def _build_term_array(self,add_index=0):
 
         if not self.terms:
-            return np.ndarray((0,),dtype=Operator.term_dtype())
+            return np.ndarray((0,),dtype=term_dtype())
 
         all_terms = np.hstack([t.build_term_array(add_index=add_index) for t in self.terms])
         all_terms['coeffs'] *= self.coeff
@@ -284,23 +285,18 @@ class Product(Expression):
     def _build_term_array(self,add_index=0):
 
         if not self.terms:
-            return np.ndarray((0,),dtype=Operator.term_dtype())
+            return np.ndarray((0,),dtype=term_dtype())
 
         arrays = [t.build_term_array(add_index=add_index) for t in self.terms]
 
         sizes = np.array([a.shape[0] for a in arrays])
-        all_terms = np.ndarray((np.prod(sizes),),dtype=Operator.term_dtype())
+        all_terms = np.ndarray((np.prod(sizes),),dtype=term_dtype())
 
         prod_terms = product(*arrays)
 
         for n,t in enumerate(prod_terms):
-            prod = np.array([(0,0,1)],dtype=Operator.term_dtype())
-            for factor in t:
-                prod['masks'] = prod['masks'] ^ factor['masks']
-                prod['signs'] = prod['signs'] ^ factor['signs']
-                prod['coeffs'] *= factor['coeffs']
-            prod['coeffs'] *= self.coeff
-            all_terms[n] = prod
+            all_terms[n] = product_of_terms(t)
+            all_terms[n]['coeffs'] *= self.coeff
 
         return self.condense_terms(all_terms)
 
@@ -368,8 +364,7 @@ class SigmaType(Operator):
     def replace_index(self,ind,rep):
         return self.op.replace_index(ind,rep)
 
-    def set_size(self,L):
-        self._set_size(L)
+    def _set_size(self,L):
         self.op.set_size(L)
         if self.max_i is None:
             self.max_i = L - self.max_ind - 1
@@ -400,17 +395,12 @@ class PiProd(SigmaType):
 
         arrays = [self.op.build_term_array(add_index=add_index+i) for i in range(self.min_i,self.max_i+1)]
         nfacs = self.max_i - self.min_i + 1
-        all_terms = np.ndarray((arrays[0].shape[0]**nfacs,),dtype=Operator.term_dtype())
+        all_terms = np.ndarray((arrays[0].shape[0]**nfacs,),dtype=term_dtype())
 
         prod_terms = product(*arrays)
         for n,t in enumerate(prod_terms):
-            prod = np.array([(0,0,1)],dtype=Operator.term_dtype())
-            for factor in t:
-                prod['masks'] = prod['masks'] ^ factor['masks']
-                prod['signs'] = prod['signs'] ^ factor['signs']
-                prod['coeffs'] *= factor['coeffs']
-            prod['coeffs'] *= self.coeff
-            all_terms[n] = prod
+            all_terms[n] = product_of_terms(t)
+            all_terms[n]['coeffs'] *= self.coeff
 
         return self.condense_terms(all_terms)
 
@@ -440,8 +430,8 @@ class Fundamental(Operator):
         t += self.tex_end
         return t
 
-    def set_size(self,L):
-        self._set_size(L)
+    def _set_size(self,L):
+        pass
 
     def _build_term_array(self):
         raise NotImplementedError()
@@ -458,7 +448,7 @@ class Sigmax(Fundamental):
         ind = self.index+add_index
         if ind >= self.L:
             raise Exception('requested too large an index')
-        return np.array([(1<<ind,0,self.coeff)],dtype=self.term_dtype())
+        return np.array([(1<<ind,0,self.coeff)],dtype=term_dtype())
 
 class Sigmaz(Fundamental):
     def __init__(self,index=0):
@@ -472,7 +462,7 @@ class Sigmaz(Fundamental):
         ind = self.index+add_index
         if ind >= self.L:
             raise Exception('requested too large an index')
-        return np.array([(0,1<<ind,self.coeff)],dtype=self.term_dtype())
+        return np.array([(0,1<<ind,self.coeff)],dtype=term_dtype())
 
 class Sigmay(Fundamental):
     def __init__(self,index=0):
@@ -486,7 +476,7 @@ class Sigmay(Fundamental):
         ind = self.index+add_index
         if ind >= self.L:
             raise Exception('requested too large an index')
-        return np.array([(1<<ind,1<<ind,1j*self.coeff)],dtype=self.term_dtype())
+        return np.array([(1<<ind,1<<ind,-1j*self.coeff)],dtype=term_dtype())
 
 # TODO: should hide the tex if we multiply by something else...
 class Identity(Fundamental):
@@ -497,7 +487,7 @@ class Identity(Fundamental):
         self.max_ind = 0
 
     def _build_term_array(self,add_index=0):
-        return np.array([(0,0,self.coeff)],dtype=self.term_dtype())
+        return np.array([(0,0,self.coeff)],dtype=term_dtype())
 
 # also should hide this tex when appropriate
 class Zero(Fundamental):
@@ -508,4 +498,4 @@ class Zero(Fundamental):
         self.max_ind = 0
 
     def _build_term_array(self,add_index=0):
-        return np.array([(0,0,0)],dtype=self.term_dtype())
+        return np.array([(0,0,0)],dtype=term_dtype())

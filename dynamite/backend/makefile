@@ -30,4 +30,4 @@ clean::
 include ${SLEPC_DIR}/lib/slepc/conf/slepc_common
 MPIEXEC=
 
-PYTHON=python
+PYTHON=python3
