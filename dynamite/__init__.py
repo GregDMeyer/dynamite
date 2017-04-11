@@ -1,3 +1,6 @@
 
+from .computations import mgr as _mgr
+_mgr.initialize_slepc()
+
 from .operators import *
-from .computations import evolve,build_state
+from .computations import *
