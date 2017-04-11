@@ -37,7 +37,7 @@ PetscErrorCode BuildMat_Full(PetscInt L,PetscInt nterms,PetscInt* masks,PetscInt
   nonlocal_mask = (-1) << local_bits;
 
   d_nz = o_nz = 0;
-  for (int i=0;i<nterms;++i) {
+  for (i=0;i<nterms;++i) {
     /* only count each element once, even though
        there might be a few terms that contribute to it */
     if (i>0 && masks[i-1] == masks[i]) continue;
