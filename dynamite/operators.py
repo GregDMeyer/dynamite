@@ -64,7 +64,7 @@ class Operator:
 
     def build_mat(self,shell=False,verbose=True):
         if self.L is None:
-            raise Exception('Must set number of spins (Operator.set_size(L)) before building PETSc matrix.')
+            raise ValueError('Must set number of spins (Operator.set_size(L)) before building PETSc matrix.')
 
         mgr.initialize_slepc()
 
@@ -176,7 +176,7 @@ class Operator:
 
     def _op_add(self,o):
         if self.L is not None and o.L is not None and self.L != o.L:
-            raise Exception('Cannot add operators of different sizes (L=%d, L=%d)' % (self.L,o.L))
+            raise ValueError('Cannot add operators of different sizes (L=%d, L=%d)' % (self.L,o.L))
 
         if isinstance(o,SumTerms):
             return SumTerms(terms = [self] + o.terms)
@@ -209,12 +209,23 @@ class Expression(Operator):
                 # TODO: this could confuse people re: shell matrices (if they call build_mat themselves)
                 # should define a copy function
                 t.destroy_mat()
+                L = None
+                if t.L is not None:
+                    if L is not None:
+                        if t.L != L:
+                            raise ValueError('All terms must have same length L.')
+                    else:
+                        L = t.L
+            if self.L is None:
+                self.L = L
             terms = deepcopy(list(terms))
         self.terms = terms
         if len(self.terms) > 1:
             self.max_ind = max(o.max_ind for o in self.terms)
         elif len(self.terms) == 1:
             self.max_ind = self.terms[0].max_ind
+
+        self.set_size(self.L) # ensure size propagates to all terms
 
     def get_index_set(self):
         indices = set()
@@ -322,18 +333,22 @@ class SigmaType(Operator):
 
         self.max_ind = self.op.max_ind
         if not isinstance(index_label,str):
-            raise Exception('Index label should be a string.')
+            raise TypeError('Index label should be a string.')
         self.index_label = index_label
 
         indices = self.op.get_index_set()
         if any(not isinstance(x,int) for x in indices):
             raise TypeError('Can only sum/product over objects with integer indices')
         if min(indices) != 0:
-            raise TypeError('Minimum index of summand must be 0.')
+            raise IndexError('Minimum index of summand must be 0.')
 
         for ind in indices:
             if isinstance(ind,int):
                 self.op.replace_index(ind,index_label+'+'+str(ind) if ind else index_label)
+
+        if self.op.L is not None and self.L is None:
+            self.L = self.op.L
+        self.set_size(self.L) # propagate L
 
     def get_sigma_tex(self):
         raise NotImplementedError()
@@ -442,7 +457,7 @@ class Sigmax(Fundamental):
     def _build_term_array(self,add_index=0):
         ind = self.index+add_index
         if ind >= self.L:
-            raise Exception('requested too large an index')
+            raise IndexError('requested too large an index')
         return np.array([(1<<ind,0,self.coeff)],dtype=term_dtype())
 
 class Sigmaz(Fundamental):
@@ -456,7 +471,7 @@ class Sigmaz(Fundamental):
     def _build_term_array(self,add_index=0):
         ind = self.index+add_index
         if ind >= self.L:
-            raise Exception('requested too large an index')
+            raise IndexError('requested too large an index')
         return np.array([(0,1<<ind,self.coeff)],dtype=term_dtype())
 
 class Sigmay(Fundamental):
@@ -470,7 +485,7 @@ class Sigmay(Fundamental):
     def _build_term_array(self,add_index=0):
         ind = self.index+add_index
         if ind >= self.L:
-            raise Exception('requested too large an index')
+            raise IndexError('requested too large an index')
         return np.array([(1<<ind,1<<ind,-1j*self.coeff)],dtype=term_dtype())
 
 # TODO: should hide the tex if we multiply by something else...
