@@ -1,6 +1,11 @@
 
 import numpy as np
 
+try:
+    import qutip as qtp
+except ImportError:
+    qtp = None
+
 def term_dtype():
     return np.dtype([('masks',np.int32),('signs',np.int32),('coeffs',np.complex128)])
 
@@ -23,3 +28,20 @@ def product_of_terms(factors):
 
         prod['coeffs'] *= factor['coeffs'] * ( (-1)**n_flip )
     return prod
+
+def identity_product(op, index, L):
+
+    if qtp is None:
+        raise ImportError('Could not import qutip.')
+
+    ret = None
+    for i in range(L):
+        if i == index:
+            this_op = op
+        else:
+            this_op = qtp.identity(2)
+        if ret is None:
+            ret = this_op
+        else:
+            ret = qtp.tensor(this_op,ret)
+    return ret

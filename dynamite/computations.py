@@ -64,11 +64,7 @@ def evolve(x,H=None,t=None,result=None,tol=None,mfn=None,verbose=True):
         f = mfn.getFN()
         f.setScale(-1j*t)
 
-    if verbose:
-        starttime = default_timer()
     mfn.solve(x,result)
-    if verbose:
-        print('Matrix solve completed in','%.2f' % (default_timer()-starttime),'s')
 
     return result
 

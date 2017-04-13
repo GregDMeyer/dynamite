@@ -3,9 +3,15 @@
 from itertools import product
 from copy import deepcopy
 import numpy as np
+
+try:
+    import qutip as qtp
+except ImportError:
+    qtp = None
+
 from .backend.backend import build_mat,destroy_shell_context
 from .computations import mgr,evolve
-from .utils import product_of_terms,term_dtype
+from .utils import product_of_terms,term_dtype,identity_product
 
 from petsc4py.PETSc import Vec, COMM_WORLD
 
@@ -19,7 +25,6 @@ class Operator:
         self.coeff = 1
         self._mat = None
         self.is_shell = None
-        self._dag = False # whether to take the complex conjugate
 
     def set_size(self,L):
         self.L = L
@@ -32,12 +37,6 @@ class Operator:
 
     def evolve(self,x,*args,**kwargs):
         return evolve(x,self,*args,**kwargs)
-
-    def dag(self):
-        self.destroy_mat()
-        o = deepcopy(self)
-        o._dag = True
-        return o
 
     @classmethod
     def condense_terms(cls,all_terms):
@@ -62,7 +61,7 @@ class Operator:
 
         return combined
 
-    def build_mat(self,shell=False,verbose=True):
+    def build_mat(self,shell=False):
         if self.L is None:
             raise ValueError('Must set number of spins (Operator.set_size(L)) before building PETSc matrix.')
 
@@ -119,12 +118,7 @@ class Operator:
         return '$' + self.build_tex(signs='-') + '$'
 
     def build_tex(self,signs='-',request_parens=False):
-        t = self._build_tex(signs,request_parens)
-
-        if self._dag:
-            t = r'{'+t+r'}^{\dagger}'
-
-        return t
+        return self._build_tex(signs,request_parens)
 
     def _build_tex(self,signs='-',request_parens=False):
         raise NotImplementedError()
@@ -166,12 +160,21 @@ class Operator:
             raise TypeError('Multiplication not supported for types %s and %s' % (str(type(self)),str(type(x))))
 
     def build_term_array(self,add_index=0):
-        a = self._build_term_array(add_index)
-        if self._dag:
-            a['coeffs'] = np.conj(a['coeffs'])
-        return a
+        if self.L is None:
+            raise ValueError('Must set L before building term array.')
+        return self._build_term_array(add_index)
 
     def _build_term_array(self,add_index):
+        raise NotImplementedError()
+
+    def build_qutip(self,add_index=0):
+        if qtp is None:
+            raise ImportError('Could not import qutip.')
+        if self.L is None:
+            raise ValueError('Must set L before building qutip representation.')
+        return self.coeff * self._build_qutip(add_index)
+
+    def _build_qutip(self,add_index):
         raise NotImplementedError()
 
     def _op_add(self,o):
@@ -199,26 +202,28 @@ class Operator:
 
 
 class Expression(Operator):
-    def __init__(self,terms = None):
-        Operator.__init__(self)
-        if terms is None:
-            terms = []
-        else:
-            for t in terms:
-                # make sure we don't copy a huge matrix...
-                # TODO: this could confuse people re: shell matrices (if they call build_mat themselves)
-                # should define a copy function
-                t.destroy_mat()
-                L = None
-                if t.L is not None:
-                    if L is not None:
-                        if t.L != L:
-                            raise ValueError('All terms must have same length L.')
-                    else:
-                        L = t.L
-            if self.L is None:
-                self.L = L
-            terms = deepcopy(list(terms))
+    def __init__(self,terms,**kwargs):
+        Operator.__init__(self,**kwargs)
+
+        for t in terms:
+            # make sure we don't copy a huge matrix...
+            # TODO: this could confuse people re: shell matrices (if they call build_mat themselves)
+            # should define a copy function
+            t.destroy_mat()
+            L = None
+            if t.L is not None:
+                if L is not None:
+                    if t.L != L:
+                        raise ValueError('All terms must have same length L.')
+                else:
+                    L = t.L
+
+        # parent L overrides children
+        if self.L is None:
+            self.L = L
+
+        terms = deepcopy(list(terms))
+
         self.terms = terms
         if len(self.terms) > 1:
             self.max_ind = max(o.max_ind for o in self.terms)
@@ -246,9 +251,9 @@ class Expression(Operator):
 
 class SumTerms(Expression):
 
-    def __init__(self,terms = None):
-        Expression.__init__(self,terms)
-        if len(terms) > 1:
+    def __init__(self,terms,**kwargs):
+        Expression.__init__(self,terms,**kwargs)
+        if len(self.terms) > 1:
             self.needs_parens = True
 
     def _build_term_array(self,add_index=0):
@@ -272,6 +277,14 @@ class SumTerms(Expression):
             t += r'\right)'
         return t
 
+    def _build_qutip(self,add_index):
+        ret = Zero(L=self.L).build_qutip(add_index)
+
+        for term in self.terms:
+            ret += term.build_qutip(add_index)
+
+        return ret
+
     def _op_add(self,o):
         if isinstance(o,SumTerms):
             return SumTerms(terms = self.terms + o.terms)
@@ -282,8 +295,8 @@ class SumTerms(Expression):
 
 class Product(Expression):
 
-    def __init__(self,terms = None):
-        Expression.__init__(self,terms)
+    def __init__(self,terms,**kwargs):
+        Expression.__init__(self,terms,**kwargs)
         for term in self.terms:
             self.coeff = self.coeff * term.coeff
             term.coeff = 1
@@ -312,6 +325,14 @@ class Product(Expression):
             t += term.build_tex(request_parens=True)
         return t
 
+    def _build_qutip(self,add_index):
+        ret = Identity(L=self.L).build_qutip(add_index)
+
+        for term in self.terms:
+            ret *= term.build_qutip(add_index)
+
+        return ret
+
     def _op_mul(self,o):
         if isinstance(o,Product):
             return Product(terms = self.terms + o.terms)
@@ -322,10 +343,22 @@ class Product(Expression):
 
 class SigmaType(Operator):
 
-    def __init__(self,op,min_i=0,max_i=None,index_label='i'):
-        Operator.__init__(self)
-        self.min_i = min_i
-        self.max_i = max_i
+    def __init__(self,op,**kwargs):
+
+        self.min_i = kwargs.pop('min_i',0)
+        self.max_i = kwargs.pop('max_i',None)
+        index_label = kwargs.pop('index_label','i')
+
+        Operator.__init__(self,**kwargs)
+
+        if self.max_i is not None and self.max_i < self.min_i:
+            raise IndexError('max_i must be >= min_i.')
+
+        if self.min_i < 0:
+            raise IndexError('min_i must be >= 0.')
+
+        if self.max_i is not None and self.L is not None and self.max_i > self.L:
+            raise IndexError('max_i must be <= the size L.')
 
         # TODO: see above about this. find a better way to not copy a big matrix
         op.destroy_mat()
@@ -375,16 +408,18 @@ class SigmaType(Operator):
         return self.op.replace_index(ind,rep)
 
     def _set_size(self,L):
+        if self.max_i is not None and L is not None and self.max_i > L:
+            raise IndexError('Cannot set L smaller than max_i of PiProd.')
         self.op.set_size(L)
-        if self.max_i is None:
+        if self.max_i is None and L is not None:
             self.max_i = L - self.max_ind - 1
 
     def _build_term_array(self,add_index=0):
         raise NotImplementedError()
 
 class SigmaSum(SigmaType):
-    def __init__(self,*args,**kwargs):
-        SigmaType.__init__(self,*args,**kwargs)
+    def __init__(self,op,**kwargs):
+        SigmaType.__init__(self,op,**kwargs)
 
     def get_sigma_tex(self):
         return r'\sum'
@@ -394,9 +429,17 @@ class SigmaSum(SigmaType):
         all_terms['coeffs'] *= self.coeff
         return self.condense_terms(all_terms)
 
+    def _build_qutip(self,add_index):
+        ret = Zero(L=self.L).build_qutip()
+
+        for i in range(self.min_i,self.max_i+1):
+            ret += self.op.build_qutip(add_index=i)
+
+        return ret
+
 class PiProd(SigmaType):
-    def __init__(self,*args,**kwargs):
-        SigmaType.__init__(self,*args,**kwargs)
+    def __init__(self,op,**kwargs):
+        SigmaType.__init__(self,op,**kwargs)
 
     def get_sigma_tex(self):
         return r'\prod'
@@ -414,11 +457,22 @@ class PiProd(SigmaType):
 
         return self.condense_terms(all_terms)
 
+    def _build_qutip(self,add_index):
+        ret = Identity(L=self.L).build_qutip()
+
+        for i in range(self.min_i,self.max_i+1):
+            ret *= self.op.build_qutip(add_index=i)
+
+        return ret
+
 # the bottom level. a single operator (e.g. sigmax)
 class Fundamental(Operator):
 
-    def __init__(self):
-        Operator.__init__(self)
+    def __init__(self,index=0,**kwargs):
+
+        Operator.__init__(self,**kwargs)
+        self.index = index
+        self.max_ind = index
         self.tex = []
         self.tex_end = ''
 
@@ -443,16 +497,14 @@ class Fundamental(Operator):
     def _set_size(self,L):
         pass
 
-    def _build_term_array(self):
+    def _build_term_array(self,add_index=0):
         raise NotImplementedError()
 
 class Sigmax(Fundamental):
-    def __init__(self,index=0):
-        Fundamental.__init__(self)
-        self.index = index
-        self.tex = [[r'\sigma_x^{',index]]
+    def __init__(self,index=0,**kwargs):
+        Fundamental.__init__(self,index,**kwargs)
+        self.tex = [[r'\sigma_x^{',self.index]]
         self.tex_end = r'}'
-        self.max_ind = index
 
     def _build_term_array(self,add_index=0):
         ind = self.index+add_index
@@ -460,13 +512,19 @@ class Sigmax(Fundamental):
             raise IndexError('requested too large an index')
         return np.array([(1<<ind,0,self.coeff)],dtype=term_dtype())
 
+    def _build_qutip(self,add_index):
+
+        ind = self.index+add_index
+        if ind >= self.L:
+            raise IndexError('requested too large an index')
+
+        return identity_product(qtp.sigmax(),ind,self.L)
+
 class Sigmaz(Fundamental):
-    def __init__(self,index=0):
-        Fundamental.__init__(self)
-        self.index = index
-        self.tex = [[r'\sigma_z^{',index]]
+    def __init__(self,index=0,**kwargs):
+        Fundamental.__init__(self,index,**kwargs)
+        self.tex = [[r'\sigma_z^{',self.index]]
         self.tex_end = r'}'
-        self.max_ind = index
 
     def _build_term_array(self,add_index=0):
         ind = self.index+add_index
@@ -474,13 +532,19 @@ class Sigmaz(Fundamental):
             raise IndexError('requested too large an index')
         return np.array([(0,1<<ind,self.coeff)],dtype=term_dtype())
 
+    def _build_qutip(self,add_index):
+
+        ind = self.index+add_index
+        if ind >= self.L:
+            raise IndexError('requested too large an index')
+
+        return identity_product(qtp.sigmaz(),ind,self.L)
+
 class Sigmay(Fundamental):
-    def __init__(self,index=0):
-        Fundamental.__init__(self)
-        self.index = index
-        self.tex = [[r'\sigma_y^{',index]]
+    def __init__(self,index=0,**kwargs):
+        Fundamental.__init__(self,index,**kwargs)
+        self.tex = [[r'\sigma_y^{',self.index]]
         self.tex_end = r'}'
-        self.max_ind = index
 
     def _build_term_array(self,add_index=0):
         ind = self.index+add_index
@@ -488,10 +552,18 @@ class Sigmay(Fundamental):
             raise IndexError('requested too large an index')
         return np.array([(1<<ind,1<<ind,-1j*self.coeff)],dtype=term_dtype())
 
+    def _build_qutip(self,add_index):
+
+        ind = self.index+add_index
+        if ind >= self.L:
+            raise IndexError('requested too large an index')
+
+        return identity_product(qtp.sigmay(),ind,self.L)
+
 # TODO: should hide the tex if we multiply by something else...
 class Identity(Fundamental):
-    def __init__(self):
-        Fundamental.__init__(self)
+    def __init__(self,index=0,**kwargs):
+        Fundamental.__init__(self,index,**kwargs)
         self.tex = []
         self.tex_end = r'I'
         self.max_ind = 0
@@ -499,13 +571,29 @@ class Identity(Fundamental):
     def _build_term_array(self,add_index=0):
         return np.array([(0,0,self.coeff)],dtype=term_dtype())
 
+    def _build_qutip(self,add_index):
+
+        ind = self.index+add_index
+        if ind >= self.L:
+            raise IndexError('requested too large an index')
+
+        return identity_product(qtp.identity(2),ind,self.L)
+
 # also should hide this tex when appropriate
 class Zero(Fundamental):
-    def __init__(self):
-        Fundamental.__init__(self)
+    def __init__(self,index=0,**kwargs):
+        Fundamental.__init__(self,index,**kwargs)
         self.tex = []
         self.tex_end = r'0'
         self.max_ind = 0
 
     def _build_term_array(self,add_index=0):
         return np.array([(0,0,0)],dtype=term_dtype())
+
+    def _build_qutip(self,add_index):
+
+        ind = self.index+add_index
+        if ind >= self.L:
+            raise IndexError('requested too large an index')
+
+        return identity_product(qtp.Qobj([[0,0],[0,0]]),ind,self.L)
