@@ -211,7 +211,7 @@ class Sums(BaseTest):
 class Compound(BaseTest):
 
     def setUp(self):
-        self.L = 3
+        self.L = 8
         self.op_lists = {
             'XY':[(q_sigmax,q_sigmay),(dy.Sigmax,dy.Sigmay)],
             'XYZ':[(q_sigmax,q_sigmay,q_sigmaz),(dy.Sigmax,dy.Sigmay,dy.Sigmaz)]

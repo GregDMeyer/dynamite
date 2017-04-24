@@ -35,14 +35,23 @@ def build_state(L,init_state = 0):
 
     return v
 
-def evolve(x,H=None,t=None,result=None,tol=None,mfn=None,verbose=True):
+def evolve(x,H=None,t=None,result=None,tol=None,mfn=None):
 
     mgr.initialize_slepc()
 
     if result is None:
         result = H.get_mat().createVecs(side='l')
 
+    if H is not None:
+        # check if the evolution is trivial. if H*x = 0, then the evolution does nothing and x is unchanged.
+        # In this case MFNSolve fails. to avoid that, we check if we have that condition.
+        H.get_mat().mult(x,result)
+        if result.norm() == 0:
+            result = x.copy()
+            return result
+
     if mfn is None:
+
         mfn = SLEPc.MFN().create()
         mfn.setType('expokit')
 
