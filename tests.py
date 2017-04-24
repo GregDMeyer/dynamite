@@ -208,6 +208,154 @@ class Sums(BaseTest):
                 with self.assertRaises(IndexError):
                     dy.SigmaSum(dsy,min_i=low,max_i=high)
 
+class Compound(BaseTest):
+
+    def setUp(self):
+        self.L = 3
+        self.op_lists = {
+            'XY':[(q_sigmax,q_sigmay),(dy.Sigmax,dy.Sigmay)],
+            'XYZ':[(q_sigmax,q_sigmay,q_sigmaz),(dy.Sigmax,dy.Sigmay,dy.Sigmaz)]
+        }
+
+    def test_Ising(self):
+        H = dy.SigmaSum(dy.Sigmaz()*dy.Sigmaz(1)) + 0.5*dy.SigmaSum(dy.Sigmax())
+        H.set_size(self.L)
+
+        qz = q_sigmaz(index=0,L=self.L) * q_sigmaz(index=1,L=self.L)
+        for i in range(1,self.L-1):
+            qz += q_sigmaz(index=i,L=self.L) * q_sigmaz(index=i+1,L=self.L)
+
+        qx = q_sigmax(index=0,L=self.L)
+        for i in range(1,self.L):
+            qx += q_sigmax(index=i,L=self.L)
+
+        qH = qz + 0.5*qx
+
+        self.check_dy_qtp(H,qH)
+
+    def test_generatorSum(self):
+        for name,ol in self.op_lists.items():
+            with self.subTest(ops=name):
+
+                H = dy.SumTerms(s() for s in ol[1])
+                H.set_size(self.L)
+
+                qH = ol[0][0](0,self.L)
+                for o in ol[0][1:]:
+                    qH += o(0,self.L)
+
+                self.check_dy_qtp(H,qH)
+
+    def test_generatorProd(self):
+        for name,ol in self.op_lists.items():
+            with self.subTest(ops=name):
+                H = dy.Product(s() for s in ol[1])
+                H.set_size(self.L)
+
+                qH = ol[0][0](0,self.L)
+                for o in ol[0][1:]:
+                    qH *= o(0,self.L)
+
+                self.check_dy_qtp(H,qH)
+
+    def test_indexSumofSum(self):
+        for name,ol in self.op_lists.items():
+            with self.subTest(ops=name):
+                H = dy.SigmaSum(dy.SumTerms(s() for s in ol[1]))
+                H.set_size(self.L)
+
+                qH = ol[0][0](0,self.L)
+                for o in ol[0][1:]:
+                    qH += o(0,self.L)
+
+                for i in range(1,self.L):
+                    for o in ol[0]:
+                        qH += o(i,self.L)
+
+                self.check_dy_qtp(H,qH)
+
+    def test_indexSumofProd(self):
+        for name,ol in self.op_lists.items():
+            with self.subTest(ops=name):
+                H = dy.SigmaSum(dy.Product(s() for s in ol[1]))
+                H.set_size(self.L)
+
+                qH = ol[0][0](0,self.L)
+                for o in ol[0][1:]:
+                    qH *= o(0,self.L)
+
+                for i in range(1,self.L):
+                    qH_tmp = ol[0][0](i,self.L)
+                    for o in ol[0][1:]:
+                        qH_tmp *= o(i,self.L)
+                    qH += qH_tmp
+
+                self.check_dy_qtp(H,qH)
+
+    def test_indexProdofSum(self):
+        for name,ol in self.op_lists.items():
+            with self.subTest(ops=name):
+                H = dy.PiProd(dy.SumTerms(s() for s in ol[1]))
+                H.set_size(self.L)
+
+                qH = ol[0][0](0,self.L)
+                for o in ol[0][1:]:
+                    qH += o(0,self.L)
+
+                for i in range(1,self.L):
+                    qH_tmp = ol[0][0](i,self.L)
+                    for o in ol[0][1:]:
+                        qH_tmp += o(i,self.L)
+                    qH *= qH_tmp
+
+                self.check_dy_qtp(H,qH)
+
+    def test_indexProdofProd(self):
+        for name,ol in self.op_lists.items():
+            with self.subTest(ops=name):
+                H = dy.PiProd(dy.Product(s() for s in ol[1]))
+                H.set_size(self.L)
+
+                qH = ol[0][0](0,self.L)
+                for o in ol[0][1:]:
+                    qH *= o(0,self.L)
+
+                for i in range(1,self.L):
+                    qH_tmp = ol[0][0](i,self.L)
+                    for o in ol[0][1:]:
+                        qH_tmp *= o(i,self.L)
+                    qH *= qH_tmp
+
+                self.check_dy_qtp(H,qH)
+
+    def test_SumofProduct(self):
+        for name,ol in self.op_lists.items():
+            with self.subTest(ops=name):
+                H = dy.SumTerms(s(0)*s(1) for s in ol[1])
+                H.set_size(self.L)
+
+                qH = ol[0][0](0,self.L) * ol[0][0](1,self.L)
+                for o in ol[0][1:]:
+                    qH += o(0,self.L) * o(1,self.L)
+
+                self.check_dy_qtp(H,qH)
+
+    def test_indexSumofSumofProduct(self):
+        for name,ol in self.op_lists.items():
+            with self.subTest(ops=name):
+                H = dy.SigmaSum(dy.SumTerms(s(0)*s(1) for s in ol[1]))
+                H.set_size(self.L)
+
+                qH = ol[0][0](0,self.L) * ol[0][0](1,self.L)
+                for o in ol[0][1:]:
+                    qH += o(0,self.L) * o(1,self.L)
+
+                for i in range(1,self.L-1):
+                    for o in ol[0]:
+                        qH += o(i,self.L) * o(i+1,self.L)
+
+                self.check_dy_qtp(H,qH)
+
 class StateBuilding(BaseTest):
 
     def setUp(self):
@@ -225,7 +373,8 @@ class StateBuilding(BaseTest):
 class Evolution(BaseTest):
 
     def setUp(self):
-        self.L = 8
+        self.L = 6
+        self.test_states = [0,int(0.79737*(1<<self.L))]
 
     def check_solve(self,dH,init_state,t,tol=1E-7):
         ds = dy.build_state(L=self.L,init_state=init_state)
@@ -235,21 +384,28 @@ class Evolution(BaseTest):
         qs = qtp.basis(2,init_state&1)
         for j in range(1,self.L):
             qs = qtp.tensor(qtp.basis(2,(init_state>>j)&1),qs)
-        qres = qtp.sesolve(qH,qs,[t])
-        qr = qres.states[0].dag().full().flatten()
+        qres = qtp.sesolve(qH,qs,[0,t])
+        qr = qres.states[1].full().flatten()
         res = r[:]
         self.assertGreater(np.abs(res.conj().dot(qr)),1-tol)
 
     def test_Identity(self):
-        for i in [0,int(0.79737*(1<<self.L))]: # some random state I picked
+        for i in self.test_states: # some random state I picked
             with self.subTest(init_state=i):
                 H = dy.Identity(L=self.L)
                 self.check_solve(H,i,1.0)
 
     def test_ising(self):
-        for i in [0,int(0.79737*(1<<self.L))]:
+        for i in self.test_states:
             with self.subTest(init_state=i):
                 H = dy.SigmaSum(dy.Sigmaz()*dy.Sigmaz(1)) + 0.5*dy.SigmaSum(dy.Sigmax())
+                H.set_size(self.L)
+                self.check_solve(H,i,1.0)
+
+    def test_XXYY(self):
+        for i in self.test_states:
+            with self.subTest(init_state=i):
+                H = dy.SigmaSum(dy.SumTerms(s(0)*s(1) for s in [dy.Sigmax,dy.Sigmay]))
                 H.set_size(self.L)
                 self.check_solve(H,i,1.0)
 

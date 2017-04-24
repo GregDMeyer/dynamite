@@ -205,6 +205,8 @@ class Expression(Operator):
     def __init__(self,terms,**kwargs):
         Operator.__init__(self,**kwargs)
 
+        terms = list(terms)
+
         for t in terms:
             # make sure we don't copy a huge matrix...
             # TODO: this could confuse people re: shell matrices (if they call build_mat themselves)
