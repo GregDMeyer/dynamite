@@ -10,8 +10,8 @@ except ImportError:
     qtp = None
 
 from .backend.backend import build_mat,destroy_shell_context
-from .computations import mgr,evolve
-from .utils import product_of_terms,term_dtype,identity_product
+from .computations import evolve,eigsolve
+from .utils import mgr,product_of_terms,term_dtype,qtp_identity_product
 
 from petsc4py.PETSc import Vec, COMM_WORLD
 
@@ -37,6 +37,9 @@ class Operator:
 
     def evolve(self,x,*args,**kwargs):
         return evolve(x,self,*args,**kwargs)
+
+    def eigsolve(self,*args,**kwargs):
+        return eigsolve(self,*args,**kwargs)
 
     @classmethod
     def condense_terms(cls,all_terms):
@@ -520,7 +523,7 @@ class Sigmax(Fundamental):
         if ind >= self.L:
             raise IndexError('requested too large an index')
 
-        return identity_product(qtp.sigmax(),ind,self.L)
+        return qtp_identity_product(qtp.sigmax(),ind,self.L)
 
 class Sigmaz(Fundamental):
     def __init__(self,index=0,**kwargs):
@@ -540,7 +543,7 @@ class Sigmaz(Fundamental):
         if ind >= self.L:
             raise IndexError('requested too large an index')
 
-        return identity_product(qtp.sigmaz(),ind,self.L)
+        return qtp_identity_product(qtp.sigmaz(),ind,self.L)
 
 class Sigmay(Fundamental):
     def __init__(self,index=0,**kwargs):
@@ -560,7 +563,7 @@ class Sigmay(Fundamental):
         if ind >= self.L:
             raise IndexError('requested too large an index')
 
-        return identity_product(qtp.sigmay(),ind,self.L)
+        return qtp_identity_product(qtp.sigmay(),ind,self.L)
 
 # TODO: should hide the tex if we multiply by something else...
 class Identity(Fundamental):
@@ -579,7 +582,7 @@ class Identity(Fundamental):
         if ind >= self.L:
             raise IndexError('requested too large an index')
 
-        return identity_product(qtp.identity(2),ind,self.L)
+        return qtp_identity_product(qtp.identity(2),ind,self.L)
 
 # also should hide this tex when appropriate
 class Zero(Fundamental):
@@ -598,4 +601,4 @@ class Zero(Fundamental):
         if ind >= self.L:
             raise IndexError('requested too large an index')
 
-        return identity_product(qtp.Qobj([[0,0],[0,0]]),ind,self.L)
+        return qtp_identity_product(qtp.Qobj([[0,0],[0,0]]),ind,self.L)

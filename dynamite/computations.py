@@ -1,14 +1,9 @@
 
-from slepc4py import init
-
+import numpy as np
 from slepc4py import SLEPc
 from petsc4py import PETSc
 
-import atexit
-from timeit import default_timer
-
-def commutator(o1,o2):
-    return o1*o2 - o2*o1
+from .utils import mgr
 
 def build_state(L,init_state = 0):
     mgr.initialize_slepc()
@@ -77,41 +72,47 @@ def evolve(x,H=None,t=None,result=None,tol=None,mfn=None):
 
     return result
 
-class _Manager:
+def eigsolve(H,vecs=False,nev=1,target=None,which=None):
 
-    def __init__(self,printer):
-        self.slepc_initialized = False
-        self.mfn = None
-        self.printer = printer
+    if which is None:
+        if target is not None:
+            which = 'target'
+        else:
+            which = 'smallest'
 
-    def initialize_slepc(self,arg_list = None):
-        if self.slepc_initialized:
-            if arg_list is None:
-                return
-            else:
-                raise Exception('SLEPc already initialized.')
-        if arg_list is None:
-            arg_list = []
-        init(arg_list)
-        self.print = PETSc.Sys.Print
-        self.slepc_initialized = True
-        self.printer.set_print_fn(PETSc.Sys.Print)
+    mgr.initialize_slepc()
 
-# so that we can handle multiprocess printing
-class _Printer:
+    eps = SLEPc.EPS().create()
+    eps.setOperators(H.get_mat())
+    eps.setProblemType(SLEPc.EPS.ProblemType.HEP)
+    eps.setDimensions(nev)
 
-    def __init__(self):
-        self.print_fn = print
+    eps.setWhichEigenpairs({
+        'smallest':SLEPc.EPS.Which.SMALLEST_REAL,
+        'exterior':SLEPc.EPS.Which.LARGEST_MAGNITUDE,
+        'target':SLEPc.EPS.Which.TARGET_MAGNITUDE,
+        }[which])
 
-    def __call__(self,*args,**kwargs):
-        self.print_fn(*args,**kwargs)
+    if target is None and which=='target':
+        raise Exception("Must specify target when setting which='target'")
 
-    def set_print_fn(self,fn):
-        self.print_fn = fn
+    if target is not None:
+        st = eps.getST()
+        st.setType(SLEPc.ST.Type.SINVERT)
+        ksp = st.getKSP()
+        ksp.setType(PETSc.KSP.Type.PREONLY)
+        pc = ksp.getPC()
+        pc.setType(PETSc.PC.Type.CHOLESKY)
 
-Print = _Printer()
-mgr = _Manager(Print)
-# this way we can call initialize.slepc() as much as we want
-# and it will only actually initialize slepc once
+    eps.setFromOptions()
 
+    eps.solve()
 
+    nconv = eps.getConverged()
+
+    evs = np.ndarray((nconv,),dtype=np.complex128)
+
+    for i in range(nconv):
+        evs[i] = eps.getEigenvalue(i)
+
+    return evs

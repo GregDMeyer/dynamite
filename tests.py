@@ -370,6 +370,11 @@ class StateBuilding(BaseTest):
                     qs = qtp.tensor(qtp.basis(2,(i>>j)&1),qs)
                 self.assertTrue(np.all(s[:]==qs.full().flatten()))
 
+Hs = {
+    'XXYY':dy.SigmaSum(dy.SumTerms(s(0)*s(1) for s in [dy.Sigmax,dy.Sigmay])),
+    'ising':dy.SigmaSum(dy.Sigmaz()*dy.Sigmaz(1)) + 0.5*dy.SigmaSum(dy.Sigmax())
+}
+
 class Evolution(BaseTest):
 
     def setUp(self):
@@ -398,16 +403,37 @@ class Evolution(BaseTest):
     def test_ising(self):
         for i in self.test_states:
             with self.subTest(init_state=i):
-                H = dy.SigmaSum(dy.Sigmaz()*dy.Sigmaz(1)) + 0.5*dy.SigmaSum(dy.Sigmax())
+                H = Hs['ising']
                 H.set_size(self.L)
                 self.check_solve(H,i,1.0)
 
     def test_XXYY(self):
         for i in self.test_states:
             with self.subTest(init_state=i):
-                H = dy.SigmaSum(dy.SumTerms(s(0)*s(1) for s in [dy.Sigmax,dy.Sigmay]))
+                H = Hs['XXYY']
                 H.set_size(self.L)
                 self.check_solve(H,i,1.0)
 
+class Eigsolve(BaseTest):
+
+    def setUp(self):
+        self.L = 6
+
+    def check_eigs(self,H,**kwargs):
+        evs = H.eigsolve(**kwargs)
+        qevs,_ = np.linalg.eigh(H.build_qutip().full())
+
+        if 'nev' in kwargs:
+            self.assertGreater(len(evs),kwargs['nev'])
+
+        # make sure every eigenvalue is close to one in the list
+        for ev in evs:
+            self.assertLess((np.abs(qevs-ev)).min(),1E-8)
+
+    def test_ising(self):
+        H = Hs['ising']
+        H.set_size(self.L)
+        self.check_eigs(H)
+
 if __name__ == '__main__':
-    ut.main()
+    ut.main(warnings='ignore')
