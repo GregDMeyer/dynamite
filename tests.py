@@ -1,26 +1,35 @@
 
 from itertools import product
 
+from time import sleep
 import unittest as ut
 import dynamite as dy
 import numpy as np
 import qutip as qtp
-# from petsc4py.PETSc import Scatter
+# from petsc4py.PETSc import Sys,COMM_WORLD
+# Print = Sys.syncPrint
 
 def to_np(H):
     ret = np.ndarray((1<<H.L,1<<H.L),dtype=np.complex128)
     s1 = dy.build_state(H.L)
     s2 = dy.build_state(H.L)
-#    scat,s0 = Scatter.toZero(s2) # need to scatter for >1 process
+
     for i in range(1<<H.L):
         s1.set(0)
         s1.setValue(i,1)
         s1.assemblyBegin()
         s1.assemblyEnd()
-        s2 = H*s1
-        ret[:,i] = s2[:]
+        H.get_mat().mult(s1,s2)
+        r = dy.vectonumpy(s2)
+        if r is not None:
+            ret[:,i] = r
 
-    return ret
+    # Print('done to_np on process',COMM_WORLD.getRank(),'for',H.get_mat(),flush=True)
+
+    if r is None: # all processes other than 0
+        return None
+    else:
+        return ret
 
 def identity_product(op, index, L):
     ret = None
@@ -71,8 +80,13 @@ def get_both(op_type,index=0,L=1):
 class BaseTest(ut.TestCase):
 
     def check_dy_qtp(self,dy_obj,qtp_obj):
-        self.assertTrue(np.all(to_np(dy_obj)==qtp_obj.full()))
-        self.assertEqual(dy_obj.build_qutip(),qtp_obj)
+        np_mat = to_np(dy_obj)
+        if np_mat is not None:
+            if not np.all(np_mat==qtp_obj.full()):
+                print(np_mat)
+                print(qtp_obj.full())
+            self.assertTrue(np.all(np_mat==qtp_obj.full()))
+            self.assertEqual(dy_obj.build_qutip(),qtp_obj)
 
 class SingleOperators(BaseTest):
 
@@ -101,14 +115,19 @@ class SingleOperators(BaseTest):
                 self.check_dy_qtp(-0.5*ds,-0.5*qs)
 
     def test_zero(self):
-        self.assertTrue(np.all(to_np(dy.Zero(L=1))==np.array([[0.,0.],[0.,0.]])))
+        np_mat = to_np(dy.Zero(L=1))
+        if np_mat is None:
+            return
+        self.assertTrue(np.all(np_mat==np.array([[0.,0.],[0.,0.]])))
         self.assertEqual(dy.Zero(L=1).build_qutip(),qtp.Qobj([[0,0],[0,0]]))
 
     def test_identity(self):
         for L in range(1,5):
             with self.subTest(L=L):
-                self.assertTrue(np.all(to_np(dy.Identity(L=L))==np.identity(1<<L)))
-
+                np_mat = to_np(dy.Identity(L=L))
+                if np_mat is None:
+                    continue
+                self.assertTrue(np.all(np_mat==np.identity(1<<L)))
                 ident = qtp.identity(2)
                 for _ in range(1,L):
                     ident = qtp.tensor(ident,qtp.identity(2))
@@ -340,6 +359,8 @@ class Compound(BaseTest):
 
                 self.check_dy_qtp(H,qH)
 
+                H.destroy_mat()
+
     def test_indexSumofSumofProduct(self):
         for name,ol in self.op_lists.items():
             with self.subTest(ops=name):
@@ -368,7 +389,9 @@ class StateBuilding(BaseTest):
                 qs = qtp.basis(2,i&1)
                 for j in range(1,self.L):
                     qs = qtp.tensor(qtp.basis(2,(i>>j)&1),qs)
-                self.assertTrue(np.all(s[:]==qs.full().flatten()))
+                v = dy.vectonumpy(s)
+                if v is not None:
+                    self.assertTrue(np.all(v==qs.full().flatten()))
 
 Hs = {
     'XXYY':dy.SigmaSum(dy.SumTerms(s(0)*s(1) for s in [dy.Sigmax,dy.Sigmay])),
@@ -391,8 +414,9 @@ class Evolution(BaseTest):
             qs = qtp.tensor(qtp.basis(2,(init_state>>j)&1),qs)
         qres = qtp.sesolve(qH,qs,[0,t])
         qr = qres.states[1].full().flatten()
-        res = r[:]
-        self.assertGreater(np.abs(res.conj().dot(qr)),1-tol)
+        res = dy.vectonumpy(r)
+        if res is not None:
+            self.assertGreater(np.abs(res.conj().dot(qr)),1-tol)
 
     def test_Identity(self):
         for i in self.test_states: # some random state I picked
@@ -417,18 +441,30 @@ class Evolution(BaseTest):
 class Eigsolve(BaseTest):
 
     def setUp(self):
-        self.L = 6
+        self.L = 3
 
     def check_eigs(self,H,**kwargs):
-        evs = H.eigsolve(**kwargs)
+        evs,evecs = H.eigsolve(getvecs=True,**kwargs)
         qevs,_ = np.linalg.eigh(H.build_qutip().full())
 
         if 'nev' in kwargs:
             self.assertGreater(len(evs),kwargs['nev'])
+        else:
+            self.assertGreater(len(evs),0)
 
         # make sure every eigenvalue is close to one in the list
-        for ev in evs:
-            self.assertLess((np.abs(qevs-ev)).min(),1E-8)
+        # also check that the eigenvector is correct
+        for ev,evec in zip(evs,evecs):
+            r = dy.vectonumpy(evec)
+            if r is None:
+                continue
+
+            # there are some matching eigenvalues
+            self.assertLess(np.abs(qevs-ev).min(),1E-8)
+
+            # I should really check the eigenvectors, but honestly I'm not sure
+            # what a good way to do that is. What quantity should have small numerical
+            # error for good eigenvectors of size 2^L?
 
     def test_ising(self):
         H = Hs['ising']

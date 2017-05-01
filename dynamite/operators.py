@@ -9,11 +9,11 @@ try:
 except ImportError:
     qtp = None
 
+from petsc4py.PETSc import Vec, COMM_WORLD
+
 from .backend.backend import build_mat,destroy_shell_context
 from .computations import evolve,eigsolve
 from .utils import mgr,product_of_terms,term_dtype,qtp_identity_product
-
-from petsc4py.PETSc import Vec, COMM_WORLD
 
 class Operator:
 
