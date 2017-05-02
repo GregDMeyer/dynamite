@@ -1,13 +1,12 @@
 
 from itertools import product
 
-from time import sleep
 import unittest as ut
 import dynamite as dy
 import numpy as np
 import qutip as qtp
-# from petsc4py.PETSc import Sys,COMM_WORLD
-# Print = Sys.syncPrint
+from petsc4py.PETSc import Sys,COMM_WORLD,NormType
+Print = Sys.Print
 
 def to_np(H):
     ret = np.ndarray((1<<H.L,1<<H.L),dtype=np.complex128)
@@ -395,6 +394,7 @@ class StateBuilding(BaseTest):
 
 Hs = {
     'XXYY':dy.SigmaSum(dy.SumTerms(s(0)*s(1) for s in [dy.Sigmax,dy.Sigmay])),
+    'XXYYZZ':dy.SigmaSum(dy.SumTerms(s(0)*s(1) for s in [dy.Sigmax,dy.Sigmay,dy.Sigmaz])),
     'ising':dy.SigmaSum(dy.Sigmaz()*dy.Sigmaz(1)) + 0.5*dy.SigmaSum(dy.Sigmax())
 }
 
@@ -441,7 +441,7 @@ class Evolution(BaseTest):
 class Eigsolve(BaseTest):
 
     def setUp(self):
-        self.L = 3
+        self.L = 6
 
     def check_eigs(self,H,**kwargs):
         evs,evecs = H.eigsolve(getvecs=True,**kwargs)
@@ -451,6 +451,9 @@ class Eigsolve(BaseTest):
             self.assertGreater(len(evs),kwargs['nev'])
         else:
             self.assertGreater(len(evs),0)
+
+        # TODO: should check 'target' option actually gives eigs
+        # closest to target
 
         # make sure every eigenvalue is close to one in the list
         # also check that the eigenvector is correct
@@ -462,14 +465,48 @@ class Eigsolve(BaseTest):
             # there are some matching eigenvalues
             self.assertLess(np.abs(qevs-ev).min(),1E-8)
 
-            # I should really check the eigenvectors, but honestly I'm not sure
-            # what a good way to do that is. What quantity should have small numerical
-            # error for good eigenvectors of size 2^L?
+            # check that the eigenvector is a) an eigenvector and b) has the right eigenvalue
+            if ev != 0:
+                err = H.get_mat()*evec / ev - evec
+            else:
+                err = H.get_mat()*evec
+            errnorm = err.norm(NormType.INFINITY)
+            vecnorm = evec.norm(NormType.INFINITY)
+            self.assertLess(errnorm,1E-6*vecnorm)
 
     def test_ising(self):
         H = Hs['ising']
         H.set_size(self.L)
-        self.check_eigs(H)
+        with self.subTest(which='smallest'):
+            self.check_eigs(H)
+        with self.subTest(which='target0'):
+            self.check_eigs(H,target=0)
+        with self.subTest(which='target-1'):
+            self.check_eigs(H,target=-1)
+
+    def test_XXYY(self):
+        H = Hs['XXYY']
+        H.set_size(self.L)
+        with self.subTest(which='smallest'):
+            self.check_eigs(H)
+
+        # these tests fail numerically because of singular rows.
+        # I don't think that's something dynamite should try to fix
+
+        # with self.subTest(which='target0'):
+        #     self.check_eigs(H,target=0)
+        # with self.subTest(which='target-1'):
+        #     self.check_eigs(H,target=-1)
+
+    def test_XXYYZZ(self):
+        H = Hs['XXYYZZ']
+        H.set_size(self.L)
+        with self.subTest(which='smallest'):
+            self.check_eigs(H)
+        with self.subTest(which='target0'):
+            self.check_eigs(H,target=0)
+        with self.subTest(which='target-1'):
+            self.check_eigs(H,target=-1)
 
 if __name__ == '__main__':
     ut.main(warnings='ignore')

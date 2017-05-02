@@ -79,6 +79,9 @@ def eigsolve(H,getvecs=False,nev=1,target=None,which=None):
         pc = ksp.getPC()
         pc.setType(PETSc.PC.Type.CHOLESKY)
 
+        # fix for "bug" discussed here: https://www.mail-archive.com/petsc-users@mcs.anl.gov/msg22867.html
+        eps.setOperators(H.get_mat(diag_entries=True))
+
     eps.setFromOptions()
 
     eps.solve()

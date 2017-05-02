@@ -24,6 +24,7 @@ class Operator:
         self.needs_parens = False
         self.coeff = 1
         self._mat = None
+        self._diag_entries = False
         self.is_shell = None
 
     def set_size(self,L):
@@ -64,7 +65,7 @@ class Operator:
 
         return combined
 
-    def build_mat(self,shell=False):
+    def build_mat(self,shell=False,diag_entries=False):
         if self.L is None:
             raise ValueError('Must set number of spins (Operator.set_size(L)) before building PETSc matrix.')
 
@@ -75,6 +76,10 @@ class Operator:
             self._mat.destroy()
 
         term_array = self.build_term_array()
+
+        if diag_entries and not np.any(term_array['masks'] == 0):
+            term_array = np.hstack([np.array([(0,0,0)],dtype=term_dtype()),term_array])
+            print(term_array)
 
         self._mat = build_mat(self.L,
                               np.ascontiguousarray(term_array['masks']),
@@ -96,9 +101,10 @@ class Operator:
         self._mat = None
         self.is_shell = None
 
-    def get_mat(self):
-        if self._mat is None:
-            self.build_mat()
+    def get_mat(self,diag_entries=False):
+        if self._mat is None or self._diag_entries != diag_entries:
+            self.build_mat(diag_entries=diag_entries)
+            self._diag_entries = diag_entries
         return self._mat
 
     @classmethod
