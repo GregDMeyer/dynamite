@@ -1,5 +1,8 @@
 #!/usr/bin/python3
 
+from . import initialize
+initialize()
+
 from itertools import product
 from copy import deepcopy
 import numpy as np
@@ -13,7 +16,7 @@ from petsc4py.PETSc import Vec, COMM_WORLD
 
 from .backend.backend import build_mat,destroy_shell_context
 from .computations import evolve,eigsolve
-from .utils import mgr,product_of_terms,term_dtype,qtp_identity_product
+from .utils import product_of_terms,term_dtype,qtp_identity_product
 
 class Operator:
 
@@ -68,8 +71,6 @@ class Operator:
     def build_mat(self,shell=False,diag_entries=False):
         if self.L is None:
             raise ValueError('Must set number of spins (Operator.set_size(L)) before building PETSc matrix.')
-
-        mgr.initialize_slepc()
 
         if self._mat is not None:
             # destroy the old one

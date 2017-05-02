@@ -1,12 +1,12 @@
 
+from . import initialize
+initialize()
+
 import numpy as np
 from slepc4py import SLEPc
 from petsc4py import PETSc
 
-from .utils import mgr
-
 def build_state(L,init_state = 0):
-    mgr.initialize_slepc()
 
     v = PETSc.Vec().create()
     v.setSizes(1<<L)

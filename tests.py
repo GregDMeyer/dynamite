@@ -2,7 +2,8 @@
 from itertools import product
 
 import unittest as ut
-import dynamite as dy
+import dynamite.operators as dy
+from dynamite.tools import build_state,vectonumpy
 import numpy as np
 import qutip as qtp
 from petsc4py.PETSc import Sys,COMM_WORLD,NormType
@@ -10,8 +11,8 @@ Print = Sys.Print
 
 def to_np(H):
     ret = np.ndarray((1<<H.L,1<<H.L),dtype=np.complex128)
-    s1 = dy.build_state(H.L)
-    s2 = dy.build_state(H.L)
+    s1 = build_state(H.L)
+    s2 = build_state(H.L)
 
     for i in range(1<<H.L):
         s1.set(0)
@@ -19,7 +20,7 @@ def to_np(H):
         s1.assemblyBegin()
         s1.assemblyEnd()
         H.get_mat().mult(s1,s2)
-        r = dy.vectonumpy(s2)
+        r = vectonumpy(s2)
         if r is not None:
             ret[:,i] = r
 
@@ -384,11 +385,11 @@ class StateBuilding(BaseTest):
     def test_buildstate(self):
         for i in [0,int(0.79737*(1<<self.L))]: # some random state I picked
             with self.subTest(init_state=i):
-                s = dy.build_state(L=self.L,init_state=i)
+                s = build_state(L=self.L,init_state=i)
                 qs = qtp.basis(2,i&1)
                 for j in range(1,self.L):
                     qs = qtp.tensor(qtp.basis(2,(i>>j)&1),qs)
-                v = dy.vectonumpy(s)
+                v = vectonumpy(s)
                 if v is not None:
                     self.assertTrue(np.all(v==qs.full().flatten()))
 
@@ -405,7 +406,7 @@ class Evolution(BaseTest):
         self.test_states = [0,int(0.79737*(1<<self.L))]
 
     def check_solve(self,dH,init_state,t,tol=1E-7):
-        ds = dy.build_state(L=self.L,init_state=init_state)
+        ds = build_state(L=self.L,init_state=init_state)
         r = dH.evolve(ds,t=t)
 
         qH = dH.build_qutip()
@@ -414,7 +415,7 @@ class Evolution(BaseTest):
             qs = qtp.tensor(qtp.basis(2,(init_state>>j)&1),qs)
         qres = qtp.sesolve(qH,qs,[0,t])
         qr = qres.states[1].full().flatten()
-        res = dy.vectonumpy(r)
+        res = vectonumpy(r)
         if res is not None:
             self.assertGreater(np.abs(res.conj().dot(qr)),1-tol)
 
@@ -458,7 +459,7 @@ class Eigsolve(BaseTest):
         # make sure every eigenvalue is close to one in the list
         # also check that the eigenvector is correct
         for ev,evec in zip(evs,evecs):
-            r = dy.vectonumpy(evec)
+            r = vectonumpy(evec)
             if r is None:
                 continue
 

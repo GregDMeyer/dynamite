@@ -1,7 +1,10 @@
 
-from .operators import *
-from .computations import *
-from .tools import *
+_initialized = False
 
-from .utils import mgr as _mgr
-_mgr.initialize_slepc()
+import slepc4py
+
+def initialize(slepc_args=[]):
+    global _initialized
+    if not _initialized:
+        slepc4py.init(slepc_args)
+        _initialized = True

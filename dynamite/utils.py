@@ -47,23 +47,3 @@ def qtp_identity_product(op, index, L):
             ret = qtp.tensor(this_op,ret)
     return ret
 
-class _Manager:
-
-    def __init__(self):
-        self.slepc_initialized = False
-        self.mfn = None
-
-    def initialize_slepc(self,arg_list = None):
-        if self.slepc_initialized:
-            if arg_list is None:
-                return
-            else:
-                raise Exception('SLEPc already initialized.')
-        if arg_list is None:
-            arg_list = []
-        init(arg_list)
-        self.slepc_initialized = True
-
-mgr = _Manager()
-# this way we can call mgr.initialize_slepc() as much as we want
-# and it will only actually initialize slepc once

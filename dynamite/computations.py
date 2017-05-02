@@ -1,13 +1,12 @@
 
+from . import initialize
+initialize()
+
 import numpy as np
 from slepc4py import SLEPc
 from petsc4py import PETSc
 
-from .utils import mgr
-
 def evolve(x,H=None,t=None,result=None,tol=None,mfn=None):
-
-    mgr.initialize_slepc()
 
     if result is None:
         result = H.get_mat().createVecs(side='l')
@@ -54,8 +53,6 @@ def eigsolve(H,getvecs=False,nev=1,target=None,which=None):
             which = 'target'
         else:
             which = 'smallest'
-
-    mgr.initialize_slepc()
 
     eps = SLEPc.EPS().create()
     eps.setOperators(H.get_mat())
