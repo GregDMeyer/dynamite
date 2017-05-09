@@ -1,7 +1,0 @@
-dynamite\.computations module
-=============================
-
-.. automodule:: dynamite.computations
-    :members:
-    :undoc-members:
-    :show-inheritance:

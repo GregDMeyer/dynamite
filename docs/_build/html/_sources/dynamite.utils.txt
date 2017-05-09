@@ -1,7 +1,0 @@
-dynamite\.utils module
-======================
-
-.. automodule:: dynamite.utils
-    :members:
-    :undoc-members:
-    :show-inheritance:

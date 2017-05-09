@@ -1,7 +1,0 @@
-dynamite\.operators module
-==========================
-
-.. automodule:: dynamite.operators
-    :members:
-    :undoc-members:
-    :show-inheritance:
