@@ -1,0 +1,1160 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>dynamite.operators &mdash; dynamite 0.0.1 documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  
+
+  
+
+  
+        <link rel="index" title="Index"
+              href="../../genindex.html"/>
+        <link rel="search" title="Search" href="../../search.html"/>
+    <link rel="top" title="dynamite 0.0.1 documentation" href="../../index.html"/>
+        <link rel="up" title="dynamite" href="../dynamite.html"/> 
+
+  
+  <script src="../../_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+   
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="../../index.html" class="icon icon-home"> dynamite
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                0.0.1
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <p class="caption"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../install.html">Installing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../dynamite.html">Full API documentation</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">dynamite</a>
+        
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../../index.html">Docs</a> &raquo;</li>
+        
+          <li><a href="../index.html">Module code</a> &raquo;</li>
+        
+          <li><a href="../dynamite.html">dynamite</a> &raquo;</li>
+        
+      <li>dynamite.operators</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <h1>Source code for dynamite.operators</h1><div class="highlight"><pre>
+<span></span><span class="ch">#!/usr/bin/env python3</span>
+<span class="c1"># ^ that&#39;s just for pylinter</span>
+
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">This module provides the building blocks for Hamiltonians, and</span>
+<span class="sd">defines their built-in behavior and operations.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;Sigmax&#39;</span><span class="p">,</span>
+           <span class="s1">&#39;Sigmay&#39;</span><span class="p">,</span>
+           <span class="s1">&#39;Sigmaz&#39;</span><span class="p">,</span>
+           <span class="s1">&#39;Sum&#39;</span><span class="p">,</span>
+           <span class="s1">&#39;Product&#39;</span><span class="p">,</span>
+           <span class="s1">&#39;IndexSum&#39;</span><span class="p">,</span>
+           <span class="s1">&#39;IndexProduct&#39;</span><span class="p">]</span>
+
+<span class="kn">from</span> <span class="nn">.</span> <span class="k">import</span> <span class="n">initialize</span>
+<span class="n">initialize</span><span class="p">()</span>
+
+<span class="kn">from</span> <span class="nn">itertools</span> <span class="k">import</span> <span class="n">product</span>
+<span class="kn">from</span> <span class="nn">copy</span> <span class="k">import</span> <span class="n">deepcopy</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+
+<span class="k">try</span><span class="p">:</span>
+    <span class="kn">import</span> <span class="nn">qutip</span> <span class="k">as</span> <span class="nn">qtp</span>
+<span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
+    <span class="n">qtp</span> <span class="o">=</span> <span class="kc">None</span>
+
+<span class="kn">from</span> <span class="nn">petsc4py.PETSc</span> <span class="k">import</span> <span class="n">Vec</span><span class="p">,</span> <span class="n">COMM_WORLD</span>
+
+<span class="kn">from</span> <span class="nn">.backend.backend</span> <span class="k">import</span> <span class="n">build_mat</span><span class="p">,</span><span class="n">destroy_shell_context</span>
+<span class="kn">from</span> <span class="nn">.computations</span> <span class="k">import</span> <span class="n">evolve</span><span class="p">,</span><span class="n">eigsolve</span>
+<span class="kn">from</span> <span class="nn">._utils</span> <span class="k">import</span> <span class="n">product_of_terms</span><span class="p">,</span><span class="n">term_dtype</span><span class="p">,</span><span class="n">qtp_identity_product</span><span class="p">,</span><span class="n">condense_terms</span><span class="p">,</span><span class="n">coeff_to_str</span>
+
+<div class="viewcode-block" id="Operator"><a class="viewcode-back" href="../../dynamite.operators.html#dynamite.operators.Operator">[docs]</a><span class="k">class</span> <span class="nc">Operator</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Operator is the base class for all other operator classes.</span>
+<span class="sd">    This class should not be constructed explicitly by the user,</span>
+<span class="sd">    however here are defined some important member functions all</span>
+<span class="sd">    operators will have (see below).</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    L : int, optional</span>
+<span class="sd">        The length of the spin chain. Can be set later with ``op.L = L``.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">L</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_L</span> <span class="o">=</span> <span class="n">L</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">max_ind</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">needs_parens</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">coeff</span> <span class="o">=</span> <span class="mi">1</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_mat</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_diag_entries</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_shell</span> <span class="o">=</span> <span class="kc">False</span>
+
+
+    <span class="c1">### computation functions</span>
+
+<div class="viewcode-block" id="Operator.evolve"><a class="viewcode-back" href="../../dynamite.operators.html#dynamite.operators.Operator.evolve">[docs]</a>    <span class="k">def</span> <span class="nf">evolve</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">state</span><span class="p">,</span><span class="n">t</span><span class="p">,</span><span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Evolve a state under the Hamiltonian, according to the Schrodinger equation.</span>
+<span class="sd">        The units are natural; the evolution is:</span>
+
+<span class="sd">        .. math::</span>
+<span class="sd">            \Psi_t = e^{-i H t} \Psi_0</span>
+
+<span class="sd">        This class method is just a wrapper on :meth:`dynamite.computations.evolve`.</span>
+
+<span class="sd">        .. note:: The spin chain length ``L`` must be set before calling ``evolve``.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        state : petsc4py.PETSc.Vec</span>
+<span class="sd">            A PETSc vector containing the initial state.</span>
+<span class="sd">            Can be easily created with :meth:`dynamite.tools.build_state`.</span>
+
+<span class="sd">        t : float</span>
+<span class="sd">            The time for which to evolve the state (can be negative to evolve</span>
+<span class="sd">            backwards in time).</span>
+
+<span class="sd">        **kwargs :</span>
+<span class="sd">            Any further keyword arguments are passed to the underlying call to</span>
+<span class="sd">            :meth:`dynamite.computations.evolve`. See that documentation for a</span>
+<span class="sd">            detailed description of possible arguments.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        petsc4py.PETSc.Vec</span>
+<span class="sd">            The result vector :math:`\Psi_f`.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">evolve</span><span class="p">(</span><span class="n">state</span><span class="p">,</span><span class="bp">self</span><span class="p">,</span><span class="n">t</span><span class="p">,</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="Operator.eigsolve"><a class="viewcode-back" href="../../dynamite.operators.html#dynamite.operators.Operator.eigsolve">[docs]</a>    <span class="k">def</span> <span class="nf">eigsolve</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Find eigenvalues (and eigenvectors if requested) of the Hamiltonian. This class</span>
+<span class="sd">        method is a wrapper on :meth:`dynamite.computations.eigsolve`. Any keyword</span>
+<span class="sd">        arguments are passed to that function; see its documentation for details.</span>
+
+<span class="sd">        By default, finds one (or possibly a few) eigenvalues with the smallest real</span>
+<span class="sd">        values (i.e. the ground state).</span>
+
+<span class="sd">        .. note:: The spin chain length ``L`` must be set before calling ``eigsolve``.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        numpy.array or tuple(numpy.array, list(petsc4py.PETSc.Vec))</span>
+<span class="sd">            Either a 1D numpy array of eigenvalues, or a pair containing that array</span>
+<span class="sd">            and a list of the corresponding eigenvectors.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">eigsolve</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></div>
+
+    <span class="c1">### properties</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">L</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Property defining the length of the spin chain.</span>
+<span class="sd">        The matrix dimension will then be :math:`d = 2^L`.</span>
+<span class="sd">        If the length hasn&#39;t been set yet, ``L`` is ``None``.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_L</span>
+
+    <span class="nd">@L</span><span class="o">.</span><span class="n">setter</span>
+    <span class="k">def</span> <span class="nf">L</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">value</span><span class="p">):</span>
+
+        <span class="k">if</span> <span class="n">value</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">valid</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">value</span><span class="p">)</span> <span class="o">==</span> <span class="n">value</span>
+            <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+                <span class="n">valid</span> <span class="o">=</span> <span class="kc">False</span>
+
+            <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="n">valid</span> <span class="ow">and</span> <span class="n">value</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">):</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;L must be a positive integer.&#39;</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">value</span> <span class="o">&gt;</span> <span class="mi">31</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;Currently limited to 31 spins--will be increased soon!&#39;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_mat</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">destroy_mat</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_L</span> <span class="o">=</span> <span class="n">value</span>
+
+        <span class="c1"># propagate L down the tree of operators</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_prop_L</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+
+<div class="viewcode-block" id="Operator.set_length"><a class="viewcode-back" href="../../dynamite.operators.html#dynamite.operators.Operator.set_length">[docs]</a>    <span class="k">def</span> <span class="nf">set_length</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">length</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Set the length of the spin chain. An alternate interface to :attr:`Operator.L`.</span>
+
+<span class="sd">        Equivalent to ``Operator.L = length``.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        length : int</span>
+<span class="sd">            The length of the spin chain.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">L</span> <span class="o">=</span> <span class="n">length</span></div>
+
+    <span class="k">def</span> <span class="nf">_prop_L</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">L</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">()</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">dim</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Read-only attribute returning the dimension :math:`d = 2^L` of the matrix,</span>
+<span class="sd">        or ``None`` if ``L`` is ``None``.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_L</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">None</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="mi">1</span><span class="o">&lt;&lt;</span><span class="bp">self</span><span class="o">.</span><span class="n">_L</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">use_shell</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Switch whether to use shell matrices or not. For a description of shell</span>
+<span class="sd">        matrices and their benefits, see the documentation.</span>
+
+<span class="sd">        .. note::</span>
+<span class="sd">            Changing this value after the matrix has been built will invoke a call</span>
+<span class="sd">            to :meth:`Operator.destroy_mat`.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_shell</span>
+
+    <span class="nd">@use_shell</span><span class="o">.</span><span class="n">setter</span>
+    <span class="k">def</span> <span class="nf">use_shell</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">value</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">value</span> <span class="o">!=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_shell</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">destroy_mat</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_shell</span> <span class="o">=</span> <span class="n">value</span>
+
+    <span class="c1">### interface with PETSc</span>
+
+<div class="viewcode-block" id="Operator.get_mat"><a class="viewcode-back" href="../../dynamite.operators.html#dynamite.operators.Operator.get_mat">[docs]</a>    <span class="k">def</span> <span class="nf">get_mat</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">diag_entries</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Get the PETSc matrix corresponding to this operator, building it if necessary.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        diag_entries : bool</span>
+<span class="sd">            Ensure that the sparse matrix has all diagonal elements filled,</span>
+<span class="sd">            even if they are zero. Some PETSc functions fail if the</span>
+<span class="sd">            diagonal elements do not exist.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        petsc4py.PETSc.Mat</span>
+<span class="sd">            The PETSc matrix corresponding to the operator.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_mat</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="p">(</span><span class="n">diag_entries</span> <span class="ow">and</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_diag_entries</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">build_mat</span><span class="p">(</span><span class="n">diag_entries</span><span class="o">=</span><span class="n">diag_entries</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_mat</span></div>
+
+<div class="viewcode-block" id="Operator.destroy_mat"><a class="viewcode-back" href="../../dynamite.operators.html#dynamite.operators.Operator.destroy_mat">[docs]</a>    <span class="k">def</span> <span class="nf">destroy_mat</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Destroy the PETSc matrix associated with the Hamiltonian, and free the</span>
+<span class="sd">        associated memory. If the PETSc matrix does not exist (has not been built</span>
+<span class="sd">        or has already been destroyed), the function has no effect.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_mat</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_shell</span><span class="p">:</span>
+            <span class="n">destroy_shell_context</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_mat</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_mat</span><span class="o">.</span><span class="n">destroy</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_mat</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_shell</span> <span class="o">=</span> <span class="kc">None</span></div>
+
+<div class="viewcode-block" id="Operator.build_mat"><a class="viewcode-back" href="../../dynamite.operators.html#dynamite.operators.Operator.build_mat">[docs]</a>    <span class="k">def</span> <span class="nf">build_mat</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">diag_entries</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Build the PETSc matrix, destroying any matrix that has already been built, and</span>
+<span class="sd">        store it internally. This function does not return the matrix--see</span>
+<span class="sd">        :meth:`Operator.get_mat` for that functionality. This function is rarely needed</span>
+<span class="sd">        by the end user, since it is called automatically whenever the underlying matrix</span>
+<span class="sd">        needs to be built or rebuilt.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">L</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;Must set number of spins (Operator.L) before building PETSc matrix.&#39;</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">destroy_mat</span><span class="p">()</span>
+
+        <span class="n">term_array</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">build_term_array</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="n">diag_entries</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">np</span><span class="o">.</span><span class="n">any</span><span class="p">(</span><span class="n">term_array</span><span class="p">[</span><span class="s1">&#39;masks&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="mi">0</span><span class="p">):</span>
+            <span class="n">term_array</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">hstack</span><span class="p">([</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([(</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">)],</span><span class="n">dtype</span><span class="o">=</span><span class="n">term_dtype</span><span class="p">()),</span><span class="n">term_array</span><span class="p">])</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">np</span><span class="o">.</span><span class="n">any</span><span class="p">(</span><span class="n">term_array</span><span class="p">[</span><span class="s1">&#39;masks&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="mi">0</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_diag_entries</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_diag_entries</span> <span class="o">=</span> <span class="kc">True</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_mat</span> <span class="o">=</span> <span class="n">build_mat</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">L</span><span class="p">,</span>
+                              <span class="n">np</span><span class="o">.</span><span class="n">ascontiguousarray</span><span class="p">(</span><span class="n">term_array</span><span class="p">[</span><span class="s1">&#39;masks&#39;</span><span class="p">]),</span>
+                              <span class="n">np</span><span class="o">.</span><span class="n">ascontiguousarray</span><span class="p">(</span><span class="n">term_array</span><span class="p">[</span><span class="s1">&#39;signs&#39;</span><span class="p">]),</span>
+                              <span class="n">np</span><span class="o">.</span><span class="n">ascontiguousarray</span><span class="p">(</span><span class="n">term_array</span><span class="p">[</span><span class="s1">&#39;coeffs&#39;</span><span class="p">]),</span>
+                              <span class="bp">self</span><span class="o">.</span><span class="n">_shell</span><span class="p">)</span></div>
+
+    <span class="c1">### LaTeX representation of operators</span>
+
+<div class="viewcode-block" id="Operator.build_tex"><a class="viewcode-back" href="../../dynamite.operators.html#dynamite.operators.Operator.build_tex">[docs]</a>    <span class="k">def</span> <span class="nf">build_tex</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">signs</span><span class="o">=</span><span class="s1">&#39;-&#39;</span><span class="p">,</span><span class="n">request_parens</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Output LaTeX of a symbolic representation of the Hamiltonian.</span>
+<span class="sd">        The arguments are probably only useful if integrating the output</span>
+<span class="sd">        into some larger LaTeX expression, but they are used internally</span>
+<span class="sd">        and could be useful for somebody so I expose them in the API.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        signs : str</span>
+<span class="sd">            The possible signs to include at the front of the TeX. Possible</span>
+<span class="sd">            values are ``&#39;+-&#39;``, ``&#39;-&#39;``, and ``&#39;&#39;``. If the coefficient on</span>
+<span class="sd">            the expression is positive, a + sign will only be included if +</span>
+<span class="sd">            is included in the ``signs`` argument. Same with -, if the</span>
+<span class="sd">            coefficient is negative.</span>
+
+<span class="sd">        request_parens : bool</span>
+<span class="sd">            If set to ``True``, the returned expression will include surrounding</span>
+<span class="sd">            parentheses if they are needed (e.g. not if the result is a single</span>
+<span class="sd">            symbol that never would need parentheses around it).</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_build_tex</span><span class="p">(</span><span class="n">signs</span><span class="p">,</span><span class="n">request_parens</span><span class="p">)</span></div>
+
+    <span class="k">def</span> <span class="nf">_build_tex</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">signs</span><span class="o">=</span><span class="s1">&#39;-&#39;</span><span class="p">,</span><span class="n">request_parens</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">()</span>
+
+    <span class="k">def</span> <span class="nf">_repr_latex_</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+
+        <span class="c1"># don&#39;t print if we aren&#39;t process 0</span>
+        <span class="c1"># this causes there to still be some awkward white space,</span>
+        <span class="c1"># but at least it doesn&#39;t print the tex a zillion times</span>
+        <span class="k">if</span> <span class="n">COMM_WORLD</span><span class="o">.</span><span class="n">getRank</span><span class="p">()</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">return</span> <span class="s1">&#39;&#39;</span>
+
+        <span class="k">return</span> <span class="s1">&#39;$&#39;</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">build_tex</span><span class="p">(</span><span class="n">signs</span><span class="o">=</span><span class="s1">&#39;-&#39;</span><span class="p">)</span> <span class="o">+</span> <span class="s1">&#39;$&#39;</span>
+
+    <span class="k">def</span> <span class="nf">_get_index_set</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># Get the set of indices in the TeX representation of the object</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">()</span>
+
+    <span class="k">def</span> <span class="nf">_replace_index</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">ind</span><span class="p">,</span><span class="n">rep</span><span class="p">):</span>
+        <span class="c1"># Replace an index by some value in the TeX representation</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">()</span>
+
+    <span class="c1">### qutip representation of operators</span>
+
+<div class="viewcode-block" id="Operator.build_qutip"><a class="viewcode-back" href="../../dynamite.operators.html#dynamite.operators.Operator.build_qutip">[docs]</a>    <span class="k">def</span> <span class="nf">build_qutip</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">shift_index</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Build a representation of the operator as a qutip.Qobj. This functionality</span>
+<span class="sd">        is mostly useful for testing and checking correctness, though also perhaps</span>
+<span class="sd">        to access some qutip functionality directly from dynamite.</span>
+
+<span class="sd">        .. note::</span>
+<span class="sd">            QuTiP&#39;s representation of the matrix will not be split among processes--if</span>
+<span class="sd">            you call this on a large spin chain, it will build a copy on each process,</span>
+<span class="sd">            possibly causing your program to run out of memory and crash.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        shift_index : int</span>
+<span class="sd">            Shift the whole operator along the spin chain by ``shift_index`` spins.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        qutip.Qobj</span>
+<span class="sd">            The operator in qutip representation</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">qtp</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ImportError</span><span class="p">(</span><span class="s1">&#39;Could not import qutip.&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">L</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;Must set L before building qutip representation.&#39;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">coeff</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">_build_qutip</span><span class="p">(</span><span class="n">shift_index</span><span class="p">)</span></div>
+
+    <span class="k">def</span> <span class="nf">_build_qutip</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">shift_index</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">()</span>
+
+    <span class="c1">### mask, sign, coefficient representation of operators</span>
+
+<div class="viewcode-block" id="Operator.build_term_array"><a class="viewcode-back" href="../../dynamite.operators.html#dynamite.operators.Operator.build_term_array">[docs]</a>    <span class="k">def</span> <span class="nf">build_term_array</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">shift_index</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Get the representation of the operator in the (mask, sign, coefficient)</span>
+<span class="sd">        format used internally by :mod:`dynamite`.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        shift_index : int</span>
+<span class="sd">            Shift the whole operator along the spin chain by ``shift_index`` spins.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        numpy.ndarray</span>
+<span class="sd">            A numpy array containing the representation.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">L</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;Must set L before building term array.&#39;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_build_term_array</span><span class="p">(</span><span class="n">shift_index</span><span class="p">)</span></div>
+
+    <span class="k">def</span> <span class="nf">_build_term_array</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">shift_index</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">()</span>
+
+    <span class="c1">### unary and binary operations</span>
+
+    <span class="k">def</span> <span class="nf">__add__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">x</span><span class="p">):</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">x</span><span class="p">,</span><span class="n">Operator</span><span class="p">):</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_op_add</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s1">&#39;Addition not supported for types&#39;</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">__sub__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">x</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span> <span class="o">+</span> <span class="o">-</span><span class="n">x</span>
+
+    <span class="k">def</span> <span class="nf">__neg__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="o">-</span><span class="mi">1</span><span class="o">*</span><span class="bp">self</span>
+
+    <span class="k">def</span> <span class="nf">__mul__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">x</span><span class="p">):</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">x</span><span class="p">,</span><span class="n">Operator</span><span class="p">):</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_op_mul</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="nb">any</span><span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">x</span><span class="p">,</span><span class="n">t</span><span class="p">)</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="p">[</span><span class="nb">float</span><span class="p">,</span><span class="nb">int</span><span class="p">,</span><span class="nb">complex</span><span class="p">]):</span> <span class="c1"># TODO: this is bad. find a better way to check if it&#39;s a number</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_num_mul</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">x</span><span class="p">,</span><span class="n">Vec</span><span class="p">):</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_mat</span><span class="p">()</span> <span class="o">*</span> <span class="n">x</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s1">&#39;Multiplication not supported for types </span><span class="si">%s</span><span class="s1"> and </span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)),</span><span class="nb">str</span><span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="n">x</span><span class="p">))))</span>
+
+    <span class="k">def</span> <span class="nf">__rmul__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">x</span><span class="p">):</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">x</span><span class="p">,</span><span class="n">Vec</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">x</span><span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">get_mat</span><span class="p">()</span>
+        <span class="k">elif</span> <span class="nb">any</span><span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">x</span><span class="p">,</span><span class="n">t</span><span class="p">)</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="p">[</span><span class="nb">float</span><span class="p">,</span><span class="nb">int</span><span class="p">,</span><span class="nb">complex</span><span class="p">]):</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="fm">__mul__</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s1">&#39;Multiplication not supported for types </span><span class="si">%s</span><span class="s1"> and </span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)),</span><span class="nb">str</span><span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="n">x</span><span class="p">))))</span>
+
+    <span class="k">def</span> <span class="nf">_op_add</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">o</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">L</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">o</span><span class="o">.</span><span class="n">L</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">L</span> <span class="o">!=</span> <span class="n">o</span><span class="o">.</span><span class="n">L</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;Cannot add operators of different sizes (L=</span><span class="si">%d</span><span class="s1">, L=</span><span class="si">%d</span><span class="s1">)&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">L</span><span class="p">,</span><span class="n">o</span><span class="o">.</span><span class="n">L</span><span class="p">))</span>
+
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">o</span><span class="p">,</span><span class="n">Sum</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">Sum</span><span class="p">(</span><span class="n">terms</span> <span class="o">=</span> <span class="p">[</span><span class="bp">self</span><span class="p">]</span> <span class="o">+</span> <span class="n">o</span><span class="o">.</span><span class="n">terms</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">o</span><span class="p">,</span><span class="n">Operator</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">Sum</span><span class="p">(</span><span class="n">terms</span> <span class="o">=</span> <span class="p">[</span><span class="bp">self</span><span class="p">,</span><span class="n">o</span><span class="p">])</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s1">&#39;Cannot sum expression with type &#39;</span><span class="o">+</span><span class="nb">type</span><span class="p">(</span><span class="n">o</span><span class="p">))</span>
+
+    <span class="k">def</span> <span class="nf">_op_mul</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">o</span><span class="p">):</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">o</span><span class="p">,</span><span class="n">Product</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">Product</span><span class="p">(</span><span class="n">terms</span> <span class="o">=</span> <span class="p">[</span><span class="bp">self</span><span class="p">]</span> <span class="o">+</span> <span class="n">o</span><span class="o">.</span><span class="n">terms</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">o</span><span class="p">,</span><span class="n">Operator</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">Product</span><span class="p">(</span><span class="n">terms</span> <span class="o">=</span> <span class="p">[</span><span class="bp">self</span><span class="p">,</span><span class="n">o</span><span class="p">])</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s1">&#39;Cannot sum expression with type &#39;</span><span class="o">+</span><span class="nb">type</span><span class="p">(</span><span class="n">o</span><span class="p">))</span>
+
+    <span class="k">def</span> <span class="nf">_num_mul</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">x</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">coeff</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">coeff</span> <span class="o">*</span> <span class="n">x</span>
+        <span class="k">return</span> <span class="bp">self</span></div>
+
+
+<span class="k">class</span> <span class="nc">_Expression</span><span class="p">(</span><span class="n">Operator</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">terms</span><span class="p">,</span><span class="n">L</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Base class for Sum and Product classes.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">Operator</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">L</span><span class="o">=</span><span class="n">L</span><span class="p">)</span>
+
+        <span class="n">terms</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">terms</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">terms</span><span class="p">:</span>
+            <span class="c1"># make sure we don&#39;t copy a huge matrix...</span>
+            <span class="c1"># TODO: this could confuse people re: shell matrices (if they call build_mat themselves)</span>
+            <span class="c1"># should define a copy function</span>
+            <span class="n">t</span><span class="o">.</span><span class="n">destroy_mat</span><span class="p">()</span>
+            <span class="n">L</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="k">if</span> <span class="n">t</span><span class="o">.</span><span class="n">L</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">L</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="n">t</span><span class="o">.</span><span class="n">L</span> <span class="o">!=</span> <span class="n">L</span><span class="p">:</span>
+                        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;All terms must have same length L.&#39;</span><span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">L</span> <span class="o">=</span> <span class="n">t</span><span class="o">.</span><span class="n">L</span>
+
+        <span class="c1"># parent L overrides children</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">L</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_L</span> <span class="o">=</span> <span class="n">L</span>
+
+        <span class="n">terms</span> <span class="o">=</span> <span class="n">deepcopy</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">terms</span><span class="p">))</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">terms</span> <span class="o">=</span> <span class="n">terms</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">terms</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">max_ind</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">o</span><span class="o">.</span><span class="n">max_ind</span> <span class="k">for</span> <span class="n">o</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">terms</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">terms</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">max_ind</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">terms</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">max_ind</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">L</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_L</span> <span class="c1"># ensure size propagates to all terms</span>
+
+    <span class="k">def</span> <span class="nf">_get_index_set</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">indices</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">term</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">terms</span><span class="p">:</span>
+            <span class="n">indices</span> <span class="o">=</span> <span class="n">indices</span> <span class="o">|</span> <span class="n">term</span><span class="o">.</span><span class="n">_get_index_set</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">indices</span>
+
+    <span class="k">def</span> <span class="nf">_replace_index</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">ind</span><span class="p">,</span><span class="n">rep</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">term</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">terms</span><span class="p">:</span>
+            <span class="n">term</span><span class="o">.</span><span class="n">_replace_index</span><span class="p">(</span><span class="n">ind</span><span class="p">,</span><span class="n">rep</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_build_tex</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">signs</span><span class="o">=</span><span class="s1">&#39;-&#39;</span><span class="p">,</span><span class="n">request_parens</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">()</span>
+
+    <span class="k">def</span> <span class="nf">_prop_L</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">L</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">term</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">terms</span><span class="p">:</span>
+            <span class="n">term</span><span class="o">.</span><span class="n">L</span> <span class="o">=</span> <span class="n">L</span>
+
+<div class="viewcode-block" id="Sum"><a class="viewcode-back" href="../../dynamite.operators.html#dynamite.operators.Sum">[docs]</a><span class="k">class</span> <span class="nc">Sum</span><span class="p">(</span><span class="n">_Expression</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    A sum of several operators. This object can be used in a couple ways.</span>
+<span class="sd">    All of the following return the exact same object,</span>
+<span class="sd">    :math:`\sigma^x_0 + \sigma^y_0`\:</span>
+
+<span class="sd">    .. code:: python</span>
+
+<span class="sd">        Sigmax() + Sigmay()</span>
+<span class="sd">        Sum([Sigmax(),Sigmay()])</span>
+<span class="sd">        Sum(s() for s in [Sigmax,Sigmay])</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    terms : list</span>
+<span class="sd">        A list of operators to sum</span>
+
+<span class="sd">    L : int, optional</span>
+<span class="sd">        The length of the spin chain</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">terms</span><span class="p">,</span><span class="n">L</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="n">_Expression</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">terms</span><span class="p">,</span><span class="n">L</span><span class="o">=</span><span class="n">L</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">terms</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">needs_parens</span> <span class="o">=</span> <span class="kc">True</span>
+
+    <span class="k">def</span> <span class="nf">_build_term_array</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">shift_index</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">terms</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">((</span><span class="mi">0</span><span class="p">,),</span><span class="n">dtype</span><span class="o">=</span><span class="n">term_dtype</span><span class="p">())</span>
+
+        <span class="n">all_terms</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">hstack</span><span class="p">([</span><span class="n">t</span><span class="o">.</span><span class="n">build_term_array</span><span class="p">(</span><span class="n">shift_index</span><span class="o">=</span><span class="n">shift_index</span><span class="p">)</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">terms</span><span class="p">])</span>
+        <span class="n">all_terms</span><span class="p">[</span><span class="s1">&#39;coeffs&#39;</span><span class="p">]</span> <span class="o">*=</span> <span class="bp">self</span><span class="o">.</span><span class="n">coeff</span>
+        <span class="k">return</span> <span class="n">condense_terms</span><span class="p">(</span><span class="n">all_terms</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_build_tex</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">signs</span><span class="o">=</span><span class="s1">&#39;-&#39;</span><span class="p">,</span><span class="n">request_parens</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+        <span class="n">t</span> <span class="o">=</span> <span class="n">coeff_to_str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">coeff</span><span class="p">,</span><span class="n">signs</span><span class="p">)</span>
+        <span class="n">add_parens</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">t</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">needs_parens</span><span class="p">)</span> <span class="ow">or</span> <span class="p">(</span><span class="n">request_parens</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">needs_parens</span><span class="p">):</span>
+            <span class="n">add_parens</span> <span class="o">=</span> <span class="kc">True</span>
+            <span class="n">t</span> <span class="o">+=</span> <span class="sa">r</span><span class="s1">&#39;\left(&#39;</span>
+        <span class="k">for</span> <span class="n">n</span><span class="p">,</span><span class="n">term</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">terms</span><span class="p">):</span>
+            <span class="n">t</span> <span class="o">+=</span> <span class="n">term</span><span class="o">.</span><span class="n">build_tex</span><span class="p">(</span><span class="n">signs</span><span class="o">=</span><span class="p">(</span><span class="s1">&#39;+-&#39;</span> <span class="k">if</span> <span class="n">n</span> <span class="k">else</span> <span class="n">signs</span><span class="p">))</span>
+        <span class="k">if</span> <span class="n">add_parens</span><span class="p">:</span>
+            <span class="n">t</span> <span class="o">+=</span> <span class="sa">r</span><span class="s1">&#39;\right)&#39;</span>
+        <span class="k">return</span> <span class="n">t</span>
+
+    <span class="k">def</span> <span class="nf">_build_qutip</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">shift_index</span><span class="p">):</span>
+        <span class="n">ret</span> <span class="o">=</span> <span class="n">Zero</span><span class="p">(</span><span class="n">L</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">L</span><span class="p">)</span><span class="o">.</span><span class="n">build_qutip</span><span class="p">(</span><span class="n">shift_index</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">term</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">terms</span><span class="p">:</span>
+            <span class="n">ret</span> <span class="o">+=</span> <span class="n">term</span><span class="o">.</span><span class="n">build_qutip</span><span class="p">(</span><span class="n">shift_index</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">ret</span>
+
+    <span class="k">def</span> <span class="nf">_op_add</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">o</span><span class="p">):</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">o</span><span class="p">,</span><span class="n">Sum</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">Sum</span><span class="p">(</span><span class="n">terms</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">terms</span> <span class="o">+</span> <span class="n">o</span><span class="o">.</span><span class="n">terms</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">o</span><span class="p">,</span><span class="n">Operator</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">Sum</span><span class="p">(</span><span class="n">terms</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">terms</span> <span class="o">+</span> <span class="p">[</span><span class="n">o</span><span class="p">])</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s1">&#39;Cannot sum expression with type &#39;</span><span class="o">+</span><span class="nb">type</span><span class="p">(</span><span class="n">o</span><span class="p">))</span></div>
+
+<div class="viewcode-block" id="Product"><a class="viewcode-back" href="../../dynamite.operators.html#dynamite.operators.Product">[docs]</a><span class="k">class</span> <span class="nc">Product</span><span class="p">(</span><span class="n">_Expression</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    A product of several operators. Called in same way as :class:`Sum`.</span>
+<span class="sd">    For example:</span>
+
+<span class="sd">    .. code:: python</span>
+
+<span class="sd">        Sigmax() * Sigmay() == Product([Sigmax(),Sigmay()])</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    terms : list</span>
+<span class="sd">        A list of operators to multiply</span>
+
+<span class="sd">    L : int, optional</span>
+<span class="sd">        The length of the spin chain</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">terms</span><span class="p">,</span><span class="n">L</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="n">_Expression</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">terms</span><span class="p">,</span><span class="n">L</span><span class="o">=</span><span class="n">L</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">term</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">terms</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">coeff</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">coeff</span> <span class="o">*</span> <span class="n">term</span><span class="o">.</span><span class="n">coeff</span>
+            <span class="n">term</span><span class="o">.</span><span class="n">coeff</span> <span class="o">=</span> <span class="mi">1</span>
+
+    <span class="k">def</span> <span class="nf">_build_term_array</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">shift_index</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">terms</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">((</span><span class="mi">0</span><span class="p">,),</span><span class="n">dtype</span><span class="o">=</span><span class="n">term_dtype</span><span class="p">())</span>
+
+        <span class="n">arrays</span> <span class="o">=</span> <span class="p">[</span><span class="n">t</span><span class="o">.</span><span class="n">build_term_array</span><span class="p">(</span><span class="n">shift_index</span><span class="o">=</span><span class="n">shift_index</span><span class="p">)</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">terms</span><span class="p">]</span>
+
+        <span class="n">sizes</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">a</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">a</span> <span class="ow">in</span> <span class="n">arrays</span><span class="p">])</span>
+        <span class="n">all_terms</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">((</span><span class="n">np</span><span class="o">.</span><span class="n">prod</span><span class="p">(</span><span class="n">sizes</span><span class="p">),),</span><span class="n">dtype</span><span class="o">=</span><span class="n">term_dtype</span><span class="p">())</span>
+
+        <span class="n">prod_terms</span> <span class="o">=</span> <span class="n">product</span><span class="p">(</span><span class="o">*</span><span class="n">arrays</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">n</span><span class="p">,</span><span class="n">t</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">prod_terms</span><span class="p">):</span>
+            <span class="n">all_terms</span><span class="p">[</span><span class="n">n</span><span class="p">]</span> <span class="o">=</span> <span class="n">product_of_terms</span><span class="p">(</span><span class="n">t</span><span class="p">)</span>
+            <span class="n">all_terms</span><span class="p">[</span><span class="n">n</span><span class="p">][</span><span class="s1">&#39;coeffs&#39;</span><span class="p">]</span> <span class="o">*=</span> <span class="bp">self</span><span class="o">.</span><span class="n">coeff</span>
+
+        <span class="k">return</span> <span class="n">condense_terms</span><span class="p">(</span><span class="n">all_terms</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_build_tex</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">signs</span><span class="o">=</span><span class="s1">&#39;-&#39;</span><span class="p">,</span><span class="n">request_parens</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+        <span class="n">t</span> <span class="o">=</span> <span class="n">coeff_to_str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">coeff</span><span class="p">,</span><span class="n">signs</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">term</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">terms</span><span class="p">:</span>
+            <span class="n">t</span> <span class="o">+=</span> <span class="n">term</span><span class="o">.</span><span class="n">build_tex</span><span class="p">(</span><span class="n">request_parens</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">t</span>
+
+    <span class="k">def</span> <span class="nf">_build_qutip</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">shift_index</span><span class="p">):</span>
+        <span class="n">ret</span> <span class="o">=</span> <span class="n">Identity</span><span class="p">(</span><span class="n">L</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">L</span><span class="p">)</span><span class="o">.</span><span class="n">build_qutip</span><span class="p">(</span><span class="n">shift_index</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">term</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">terms</span><span class="p">:</span>
+            <span class="n">ret</span> <span class="o">*=</span> <span class="n">term</span><span class="o">.</span><span class="n">build_qutip</span><span class="p">(</span><span class="n">shift_index</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">ret</span>
+
+    <span class="k">def</span> <span class="nf">_op_mul</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">o</span><span class="p">):</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">o</span><span class="p">,</span><span class="n">Product</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">Product</span><span class="p">(</span><span class="n">terms</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">terms</span> <span class="o">+</span> <span class="n">o</span><span class="o">.</span><span class="n">terms</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">o</span><span class="p">,</span><span class="n">Operator</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">Product</span><span class="p">(</span><span class="n">terms</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">terms</span> <span class="o">+</span> <span class="p">[</span><span class="n">o</span><span class="p">])</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s1">&#39;Cannot sum expression with type &#39;</span><span class="o">+</span><span class="nb">type</span><span class="p">(</span><span class="n">o</span><span class="p">))</span></div>
+
+<span class="c1"># TODO: allow periodic boundary conditions</span>
+<span class="k">class</span> <span class="nc">_IndexType</span><span class="p">(</span><span class="n">Operator</span><span class="p">):</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">op</span><span class="p">,</span><span class="n">min_i</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span><span class="n">max_i</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span><span class="n">index_label</span><span class="o">=</span><span class="s1">&#39;i&#39;</span><span class="p">,</span><span class="n">L</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">min_i</span> <span class="o">=</span> <span class="n">min_i</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">max_i</span> <span class="o">=</span> <span class="n">max_i</span>
+
+        <span class="n">Operator</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">L</span><span class="o">=</span><span class="n">L</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">max_i</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">max_i</span> <span class="o">&lt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">min_i</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">IndexError</span><span class="p">(</span><span class="s1">&#39;max_i must be &gt;= min_i.&#39;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">min_i</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">IndexError</span><span class="p">(</span><span class="s1">&#39;min_i must be &gt;= 0.&#39;</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">max_ind</span> <span class="o">=</span> <span class="n">op</span><span class="o">.</span><span class="n">max_ind</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">max_i</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">L</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">max_i</span> <span class="o">&gt;=</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">L</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">max_ind</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">IndexError</span><span class="p">(</span><span class="s1">&#39;max_i must be &lt;= the size L.&#39;</span><span class="p">)</span>
+
+        <span class="c1"># TODO: see above about this. find a better way to not copy a big matrix</span>
+        <span class="n">op</span><span class="o">.</span><span class="n">destroy_mat</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">op</span> <span class="o">=</span> <span class="n">deepcopy</span><span class="p">(</span><span class="n">op</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">index_label</span><span class="p">,</span><span class="nb">str</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s1">&#39;Index label should be a string.&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">index_label</span> <span class="o">=</span> <span class="n">index_label</span>
+
+        <span class="n">indices</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">op</span><span class="o">.</span><span class="n">_get_index_set</span><span class="p">()</span>
+        <span class="k">if</span> <span class="nb">any</span><span class="p">(</span><span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">x</span><span class="p">,</span><span class="nb">int</span><span class="p">)</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">indices</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s1">&#39;Can only sum/product over objects with integer indices&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">min</span><span class="p">(</span><span class="n">indices</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">IndexError</span><span class="p">(</span><span class="s1">&#39;Minimum index of summand must be 0.&#39;</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">ind</span> <span class="ow">in</span> <span class="n">indices</span><span class="p">:</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">ind</span><span class="p">,</span><span class="nb">int</span><span class="p">):</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">op</span><span class="o">.</span><span class="n">_replace_index</span><span class="p">(</span><span class="n">ind</span><span class="p">,</span><span class="n">index_label</span><span class="o">+</span><span class="s1">&#39;+&#39;</span><span class="o">+</span><span class="nb">str</span><span class="p">(</span><span class="n">ind</span><span class="p">)</span> <span class="k">if</span> <span class="n">ind</span> <span class="k">else</span> <span class="n">index_label</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">op</span><span class="o">.</span><span class="n">L</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">L</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_L</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">op</span><span class="o">.</span><span class="n">L</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">L</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_L</span> <span class="c1"># propagate L</span>
+
+    <span class="k">def</span> <span class="nf">_get_sigma_tex</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">()</span>
+
+    <span class="k">def</span> <span class="nf">_build_tex</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">signs</span><span class="o">=</span><span class="s1">&#39;-&#39;</span><span class="p">,</span><span class="n">request_parens</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+        <span class="n">t</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span>
+        <span class="k">if</span> <span class="n">request_parens</span><span class="p">:</span>
+            <span class="n">t</span> <span class="o">+=</span> <span class="sa">r</span><span class="s1">&#39;\left[&#39;</span>
+        <span class="n">t</span> <span class="o">+=</span> <span class="n">coeff_to_str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">coeff</span><span class="p">,</span><span class="n">signs</span><span class="p">)</span>
+        <span class="n">t</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_sigma_tex</span><span class="p">()</span><span class="o">+</span><span class="sa">r</span><span class="s1">&#39;_{&#39;</span><span class="o">+</span><span class="bp">self</span><span class="o">.</span><span class="n">index_label</span><span class="o">+</span><span class="s1">&#39;=&#39;</span><span class="o">+</span><span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">min_i</span><span class="p">)</span><span class="o">+</span><span class="s1">&#39;}&#39;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">max_i</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">t</span> <span class="o">+=</span> <span class="s1">&#39;^{&#39;</span><span class="o">+</span><span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">max_i</span><span class="p">)</span><span class="o">+</span><span class="s1">&#39;}&#39;</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">t</span> <span class="o">+=</span> <span class="s1">&#39;^{L&#39;</span><span class="o">+</span><span class="p">(</span><span class="s1">&#39;-&#39;</span><span class="o">+</span><span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">max_ind</span><span class="o">+</span><span class="mi">1</span><span class="p">))</span><span class="o">+</span><span class="s1">&#39;}&#39;</span>
+        <span class="n">t</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">op</span><span class="o">.</span><span class="n">build_tex</span><span class="p">(</span><span class="n">request_parens</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">request_parens</span><span class="p">:</span>
+            <span class="n">t</span> <span class="o">+=</span> <span class="sa">r</span><span class="s1">&#39;\right]&#39;</span>
+        <span class="k">return</span> <span class="n">t</span>
+
+    <span class="k">def</span> <span class="nf">_get_index_set</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">op</span><span class="o">.</span><span class="n">_get_index_set</span><span class="p">()</span>
+
+    <span class="k">def</span> <span class="nf">_replace_index</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">ind</span><span class="p">,</span><span class="n">rep</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">op</span><span class="o">.</span><span class="n">_replace_index</span><span class="p">(</span><span class="n">ind</span><span class="p">,</span><span class="n">rep</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_prop_L</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">L</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">max_i</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">L</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">max_i</span> <span class="o">&gt;</span> <span class="n">L</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">IndexError</span><span class="p">(</span><span class="s1">&#39;Cannot set L smaller than max_i of PiProd.&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">op</span><span class="o">.</span><span class="n">L</span> <span class="o">=</span> <span class="n">L</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">max_i</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">L</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">max_i</span> <span class="o">=</span> <span class="n">L</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">max_ind</span> <span class="o">-</span> <span class="mi">1</span>
+
+    <span class="k">def</span> <span class="nf">_build_term_array</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">shift_index</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">()</span>
+
+<div class="viewcode-block" id="IndexSum"><a class="viewcode-back" href="../../dynamite.operators.html#dynamite.operators.IndexSum">[docs]</a><span class="k">class</span> <span class="nc">IndexSum</span><span class="p">(</span><span class="n">_IndexType</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    The sum of the operator ``op`` translated to sites ``min_i`` through ``max_i``, inclusive.</span>
+
+<span class="sd">    For illustrative examples, see the Examples pages.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    op : Operator</span>
+<span class="sd">        The operator to translate along the spin chain</span>
+
+<span class="sd">    min_i : int, optional</span>
+<span class="sd">        The shift index at which to start the sum</span>
+
+<span class="sd">    max_i : int or None, optional</span>
+<span class="sd">        The shift index at which to end the sum (inclusive). If None, sum goes to end of spin chain.</span>
+
+<span class="sd">    index_label : str, optional</span>
+<span class="sd">        The label to use as the index on the sum in the LaTeX representation.</span>
+
+<span class="sd">    L : int, optional</span>
+<span class="sd">        The length of the spin chain.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">op</span><span class="p">,</span><span class="n">min_i</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span><span class="n">max_i</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span><span class="n">index_label</span><span class="o">=</span><span class="s1">&#39;i&#39;</span><span class="p">,</span><span class="n">L</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="n">_IndexType</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span>
+                            <span class="n">op</span><span class="o">=</span><span class="n">op</span><span class="p">,</span>
+                            <span class="n">min_i</span><span class="o">=</span><span class="n">min_i</span><span class="p">,</span>
+                            <span class="n">max_i</span><span class="o">=</span><span class="n">max_i</span><span class="p">,</span>
+                            <span class="n">index_label</span><span class="o">=</span><span class="n">index_label</span><span class="p">,</span>
+                            <span class="n">L</span><span class="o">=</span><span class="n">L</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_get_sigma_tex</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="sa">r</span><span class="s1">&#39;\sum&#39;</span>
+
+    <span class="k">def</span> <span class="nf">_build_term_array</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">shift_index</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
+        <span class="n">all_terms</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">hstack</span><span class="p">([</span><span class="bp">self</span><span class="o">.</span><span class="n">op</span><span class="o">.</span><span class="n">build_term_array</span><span class="p">(</span><span class="n">shift_index</span><span class="o">=</span><span class="n">shift_index</span><span class="o">+</span><span class="n">i</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">min_i</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">max_i</span><span class="o">+</span><span class="mi">1</span><span class="p">)])</span>
+        <span class="n">all_terms</span><span class="p">[</span><span class="s1">&#39;coeffs&#39;</span><span class="p">]</span> <span class="o">*=</span> <span class="bp">self</span><span class="o">.</span><span class="n">coeff</span>
+        <span class="k">return</span> <span class="n">condense_terms</span><span class="p">(</span><span class="n">all_terms</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_build_qutip</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">shift_index</span><span class="p">):</span>
+        <span class="n">ret</span> <span class="o">=</span> <span class="n">Zero</span><span class="p">(</span><span class="n">L</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">L</span><span class="p">)</span><span class="o">.</span><span class="n">build_qutip</span><span class="p">()</span>
+
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">min_i</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">max_i</span><span class="o">+</span><span class="mi">1</span><span class="p">):</span>
+            <span class="n">ret</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">op</span><span class="o">.</span><span class="n">build_qutip</span><span class="p">(</span><span class="n">shift_index</span><span class="o">=</span><span class="n">i</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">ret</span></div>
+
+<div class="viewcode-block" id="IndexProduct"><a class="viewcode-back" href="../../dynamite.operators.html#dynamite.operators.IndexProduct">[docs]</a><span class="k">class</span> <span class="nc">IndexProduct</span><span class="p">(</span><span class="n">_IndexType</span><span class="p">):</span>
+
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    The product of the operator ``op`` translated to sites ``min_i`` through ``max_i``, inclusive.</span>
+
+<span class="sd">    For illustrative examples, see the Examples pages.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    op : Operator</span>
+<span class="sd">        The operator to translate along the spin chain</span>
+
+<span class="sd">    min_i : int, optional</span>
+<span class="sd">        The shift index at which to start the product</span>
+
+<span class="sd">    max_i : int or None, optional</span>
+<span class="sd">        The shift index at which to end the product (inclusive).</span>
+<span class="sd">        If None, product goes to end of spin chain.</span>
+
+<span class="sd">    index_label : str, optional</span>
+<span class="sd">        The label to use as the index on the product in the LaTeX representation.</span>
+
+<span class="sd">    L : int, optional</span>
+<span class="sd">        The length of the spin chain.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">op</span><span class="p">,</span><span class="n">min_i</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span><span class="n">max_i</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span><span class="n">index_label</span><span class="o">=</span><span class="s1">&#39;i&#39;</span><span class="p">,</span><span class="n">L</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="n">_IndexType</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span>
+                            <span class="n">op</span><span class="o">=</span><span class="n">op</span><span class="p">,</span>
+                            <span class="n">min_i</span><span class="o">=</span><span class="n">min_i</span><span class="p">,</span>
+                            <span class="n">max_i</span><span class="o">=</span><span class="n">max_i</span><span class="p">,</span>
+                            <span class="n">index_label</span><span class="o">=</span><span class="n">index_label</span><span class="p">,</span>
+                            <span class="n">L</span><span class="o">=</span><span class="n">L</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_get_sigma_tex</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="sa">r</span><span class="s1">&#39;\prod&#39;</span>
+
+    <span class="k">def</span> <span class="nf">_build_term_array</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">shift_index</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
+
+        <span class="n">arrays</span> <span class="o">=</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">op</span><span class="o">.</span><span class="n">build_term_array</span><span class="p">(</span><span class="n">shift_index</span><span class="o">=</span><span class="n">shift_index</span><span class="o">+</span><span class="n">i</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">min_i</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">max_i</span><span class="o">+</span><span class="mi">1</span><span class="p">)]</span>
+        <span class="n">nfacs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">max_i</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">min_i</span> <span class="o">+</span> <span class="mi">1</span>
+        <span class="n">all_terms</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">((</span><span class="n">arrays</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">**</span><span class="n">nfacs</span><span class="p">,),</span><span class="n">dtype</span><span class="o">=</span><span class="n">term_dtype</span><span class="p">())</span>
+
+        <span class="n">prod_terms</span> <span class="o">=</span> <span class="n">product</span><span class="p">(</span><span class="o">*</span><span class="n">arrays</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">n</span><span class="p">,</span><span class="n">t</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">prod_terms</span><span class="p">):</span>
+            <span class="n">all_terms</span><span class="p">[</span><span class="n">n</span><span class="p">]</span> <span class="o">=</span> <span class="n">product_of_terms</span><span class="p">(</span><span class="n">t</span><span class="p">)</span>
+            <span class="n">all_terms</span><span class="p">[</span><span class="n">n</span><span class="p">][</span><span class="s1">&#39;coeffs&#39;</span><span class="p">]</span> <span class="o">*=</span> <span class="bp">self</span><span class="o">.</span><span class="n">coeff</span>
+
+        <span class="k">return</span> <span class="n">condense_terms</span><span class="p">(</span><span class="n">all_terms</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_build_qutip</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">shift_index</span><span class="p">):</span>
+        <span class="n">ret</span> <span class="o">=</span> <span class="n">Identity</span><span class="p">(</span><span class="n">L</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">L</span><span class="p">)</span><span class="o">.</span><span class="n">build_qutip</span><span class="p">()</span>
+
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">min_i</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">max_i</span><span class="o">+</span><span class="mi">1</span><span class="p">):</span>
+            <span class="n">ret</span> <span class="o">*=</span> <span class="bp">self</span><span class="o">.</span><span class="n">op</span><span class="o">.</span><span class="n">build_qutip</span><span class="p">(</span><span class="n">shift_index</span><span class="o">=</span><span class="n">i</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">ret</span></div>
+
+<span class="c1"># the bottom level. a single operator (e.g. sigmax)</span>
+<span class="k">class</span> <span class="nc">_Fundamental</span><span class="p">(</span><span class="n">Operator</span><span class="p">):</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">index</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span><span class="n">L</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+
+        <span class="n">Operator</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">L</span><span class="o">=</span><span class="n">L</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">index</span> <span class="o">=</span> <span class="n">index</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">max_ind</span> <span class="o">=</span> <span class="n">index</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">tex</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">tex_end</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span>
+
+    <span class="k">def</span> <span class="nf">_get_index_set</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">indices</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">tex</span><span class="p">:</span>
+            <span class="n">indices</span> <span class="o">=</span> <span class="n">indices</span> <span class="o">|</span> <span class="p">{</span><span class="n">t</span><span class="p">[</span><span class="mi">1</span><span class="p">]}</span>
+        <span class="k">return</span> <span class="n">indices</span>
+
+    <span class="k">def</span> <span class="nf">_replace_index</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">ind</span><span class="p">,</span><span class="n">rep</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">tex</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">t</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="n">ind</span><span class="p">:</span>
+                <span class="n">t</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">rep</span>
+
+    <span class="k">def</span> <span class="nf">_build_tex</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">signs</span><span class="o">=</span><span class="s1">&#39;-&#39;</span><span class="p">,</span><span class="n">request_parens</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+        <span class="n">t</span> <span class="o">=</span> <span class="n">coeff_to_str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">coeff</span><span class="p">,</span><span class="n">signs</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">substring</span><span class="p">,</span><span class="n">index</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">tex</span><span class="p">:</span>
+            <span class="n">t</span> <span class="o">+=</span> <span class="n">substring</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">index</span><span class="p">)</span>
+        <span class="n">t</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">tex_end</span>
+        <span class="k">return</span> <span class="n">t</span>
+
+    <span class="k">def</span> <span class="nf">_prop_L</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">L</span><span class="p">):</span>
+        <span class="k">pass</span>
+
+    <span class="k">def</span> <span class="nf">_build_term_array</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">shift_index</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">()</span>
+
+<div class="viewcode-block" id="Sigmax"><a class="viewcode-back" href="../../dynamite.operators.html#dynamite.operators.Sigmax">[docs]</a><span class="k">class</span> <span class="nc">Sigmax</span><span class="p">(</span><span class="n">_Fundamental</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    The Pauli :math:`\sigma_x` operator on site :math:`i`.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">index</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span><span class="n">L</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="n">_Fundamental</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">index</span><span class="p">,</span><span class="n">L</span><span class="o">=</span><span class="n">L</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">tex</span> <span class="o">=</span> <span class="p">[[</span><span class="sa">r</span><span class="s1">&#39;\sigma^x_{&#39;</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">index</span><span class="p">]]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">tex_end</span> <span class="o">=</span> <span class="sa">r</span><span class="s1">&#39;}&#39;</span>
+
+    <span class="k">def</span> <span class="nf">_build_term_array</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">shift_index</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
+        <span class="n">ind</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">index</span><span class="o">+</span><span class="n">shift_index</span>
+        <span class="k">if</span> <span class="n">ind</span> <span class="o">&gt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">L</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">IndexError</span><span class="p">(</span><span class="s1">&#39;requested too large an index&#39;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([(</span><span class="mi">1</span><span class="o">&lt;&lt;</span><span class="n">ind</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">coeff</span><span class="p">)],</span><span class="n">dtype</span><span class="o">=</span><span class="n">term_dtype</span><span class="p">())</span>
+
+    <span class="k">def</span> <span class="nf">_build_qutip</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">shift_index</span><span class="p">):</span>
+
+        <span class="n">ind</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">index</span><span class="o">+</span><span class="n">shift_index</span>
+        <span class="k">if</span> <span class="n">ind</span> <span class="o">&gt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">L</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">IndexError</span><span class="p">(</span><span class="s1">&#39;requested too large an index&#39;</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">qtp_identity_product</span><span class="p">(</span><span class="n">qtp</span><span class="o">.</span><span class="n">sigmax</span><span class="p">(),</span><span class="n">ind</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">L</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="Sigmaz"><a class="viewcode-back" href="../../dynamite.operators.html#dynamite.operators.Sigmaz">[docs]</a><span class="k">class</span> <span class="nc">Sigmaz</span><span class="p">(</span><span class="n">_Fundamental</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    The Pauli :math:`\sigma_z` operator on site :math:`i`.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">index</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span><span class="n">L</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="n">_Fundamental</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">index</span><span class="p">,</span><span class="n">L</span><span class="o">=</span><span class="n">L</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">tex</span> <span class="o">=</span> <span class="p">[[</span><span class="sa">r</span><span class="s1">&#39;\sigma^z_{&#39;</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">index</span><span class="p">]]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">tex_end</span> <span class="o">=</span> <span class="sa">r</span><span class="s1">&#39;}&#39;</span>
+
+    <span class="k">def</span> <span class="nf">_build_term_array</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">shift_index</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
+        <span class="n">ind</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">index</span><span class="o">+</span><span class="n">shift_index</span>
+        <span class="k">if</span> <span class="n">ind</span> <span class="o">&gt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">L</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">IndexError</span><span class="p">(</span><span class="s1">&#39;requested too large an index&#39;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([(</span><span class="mi">0</span><span class="p">,</span><span class="mi">1</span><span class="o">&lt;&lt;</span><span class="n">ind</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">coeff</span><span class="p">)],</span><span class="n">dtype</span><span class="o">=</span><span class="n">term_dtype</span><span class="p">())</span>
+
+    <span class="k">def</span> <span class="nf">_build_qutip</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">shift_index</span><span class="p">):</span>
+
+        <span class="n">ind</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">index</span><span class="o">+</span><span class="n">shift_index</span>
+        <span class="k">if</span> <span class="n">ind</span> <span class="o">&gt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">L</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">IndexError</span><span class="p">(</span><span class="s1">&#39;requested too large an index&#39;</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">qtp_identity_product</span><span class="p">(</span><span class="n">qtp</span><span class="o">.</span><span class="n">sigmaz</span><span class="p">(),</span><span class="n">ind</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">L</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="Sigmay"><a class="viewcode-back" href="../../dynamite.operators.html#dynamite.operators.Sigmay">[docs]</a><span class="k">class</span> <span class="nc">Sigmay</span><span class="p">(</span><span class="n">_Fundamental</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    The Pauli :math:`\sigma_y` operator on site :math:`i`.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">index</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span><span class="n">L</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="n">_Fundamental</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">index</span><span class="p">,</span><span class="n">L</span><span class="o">=</span><span class="n">L</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">tex</span> <span class="o">=</span> <span class="p">[[</span><span class="sa">r</span><span class="s1">&#39;\sigma^y_{&#39;</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">index</span><span class="p">]]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">tex_end</span> <span class="o">=</span> <span class="sa">r</span><span class="s1">&#39;}&#39;</span>
+
+    <span class="k">def</span> <span class="nf">_build_term_array</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">shift_index</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
+        <span class="n">ind</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">index</span><span class="o">+</span><span class="n">shift_index</span>
+        <span class="k">if</span> <span class="n">ind</span> <span class="o">&gt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">L</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">IndexError</span><span class="p">(</span><span class="s1">&#39;requested too large an index&#39;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([(</span><span class="mi">1</span><span class="o">&lt;&lt;</span><span class="n">ind</span><span class="p">,</span><span class="mi">1</span><span class="o">&lt;&lt;</span><span class="n">ind</span><span class="p">,</span><span class="o">-</span><span class="mi">1</span><span class="n">j</span><span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">coeff</span><span class="p">)],</span><span class="n">dtype</span><span class="o">=</span><span class="n">term_dtype</span><span class="p">())</span>
+
+    <span class="k">def</span> <span class="nf">_build_qutip</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">shift_index</span><span class="p">):</span>
+
+        <span class="n">ind</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">index</span><span class="o">+</span><span class="n">shift_index</span>
+        <span class="k">if</span> <span class="n">ind</span> <span class="o">&gt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">L</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">IndexError</span><span class="p">(</span><span class="s1">&#39;requested too large an index&#39;</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">qtp_identity_product</span><span class="p">(</span><span class="n">qtp</span><span class="o">.</span><span class="n">sigmay</span><span class="p">(),</span><span class="n">ind</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">L</span><span class="p">)</span></div>
+
+<span class="c1"># TODO: should hide the tex if we multiply by something else...</span>
+<div class="viewcode-block" id="Identity"><a class="viewcode-back" href="../../dynamite.operators.html#dynamite.operators.Identity">[docs]</a><span class="k">class</span> <span class="nc">Identity</span><span class="p">(</span><span class="n">_Fundamental</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    The identity operator. Since it is tensored with identities on all</span>
+<span class="sd">    the rest of the sites, the ``index`` argument has no effect.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">index</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span><span class="n">L</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="n">_Fundamental</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">index</span><span class="p">,</span><span class="n">L</span><span class="o">=</span><span class="n">L</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">tex</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">tex_end</span> <span class="o">=</span> <span class="sa">r</span><span class="s1">&#39;I&#39;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">max_ind</span> <span class="o">=</span> <span class="mi">0</span>
+
+    <span class="k">def</span> <span class="nf">_build_term_array</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">shift_index</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([(</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">coeff</span><span class="p">)],</span><span class="n">dtype</span><span class="o">=</span><span class="n">term_dtype</span><span class="p">())</span>
+
+    <span class="k">def</span> <span class="nf">_build_qutip</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">shift_index</span><span class="p">):</span>
+
+        <span class="n">ind</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">index</span><span class="o">+</span><span class="n">shift_index</span>
+        <span class="k">if</span> <span class="n">ind</span> <span class="o">&gt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">L</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">IndexError</span><span class="p">(</span><span class="s1">&#39;requested too large an index&#39;</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">qtp_identity_product</span><span class="p">(</span><span class="n">qtp</span><span class="o">.</span><span class="n">identity</span><span class="p">(</span><span class="mi">2</span><span class="p">),</span><span class="n">ind</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">L</span><span class="p">)</span></div>
+
+<span class="c1"># also should hide this tex when appropriate</span>
+<div class="viewcode-block" id="Zero"><a class="viewcode-back" href="../../dynamite.operators.html#dynamite.operators.Zero">[docs]</a><span class="k">class</span> <span class="nc">Zero</span><span class="p">(</span><span class="n">_Fundamental</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    The zero operator---equivalent to a matrix of all zeros of dimension :math:`2^L`.</span>
+<span class="sd">    Like for the identity, the ``index`` argument has no effect.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">index</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span><span class="n">L</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="n">_Fundamental</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">index</span><span class="p">,</span><span class="n">L</span><span class="o">=</span><span class="n">L</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">tex</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">tex_end</span> <span class="o">=</span> <span class="sa">r</span><span class="s1">&#39;0&#39;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">max_ind</span> <span class="o">=</span> <span class="mi">0</span>
+
+    <span class="k">def</span> <span class="nf">_build_term_array</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">shift_index</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([(</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">)],</span><span class="n">dtype</span><span class="o">=</span><span class="n">term_dtype</span><span class="p">())</span>
+
+    <span class="k">def</span> <span class="nf">_build_qutip</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">shift_index</span><span class="p">):</span>
+
+        <span class="n">ind</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">index</span><span class="o">+</span><span class="n">shift_index</span>
+        <span class="k">if</span> <span class="n">ind</span> <span class="o">&gt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">L</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">IndexError</span><span class="p">(</span><span class="s1">&#39;requested too large an index&#39;</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">qtp_identity_product</span><span class="p">(</span><span class="n">qtp</span><span class="o">.</span><span class="n">Qobj</span><span class="p">([[</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">],[</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">]]),</span><span class="n">ind</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">L</span><span class="p">)</span></div>
+</pre></div>
+
+           </div>
+           <div class="articleComments">
+            
+           </div>
+          </div>
+          <footer>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2017, Greg Meyer.
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'../../',
+            VERSION:'0.0.1',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true,
+            SOURCELINK_SUFFIX: '.txt'
+        };
+    </script>
+      <script type="text/javascript" src="../../_static/jquery.js"></script>
+      <script type="text/javascript" src="../../_static/underscore.js"></script>
+      <script type="text/javascript" src="../../_static/doctools.js"></script>
+      <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.0/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="../../_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+   
+
+</body>
+</html>

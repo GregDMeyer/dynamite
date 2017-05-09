@@ -1,0 +1,21 @@
+dynamite package
+================
+
+Submodules
+----------
+
+.. toctree::
+
+   dynamite.computations
+   dynamite.extras
+   dynamite.operators
+   dynamite.tools
+   dynamite.utils
+
+Module contents
+---------------
+
+.. automodule:: dynamite
+    :members:
+    :undoc-members:
+    :show-inheritance:

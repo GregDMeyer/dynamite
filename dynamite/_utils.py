@@ -7,6 +7,14 @@ try:
 except ImportError:
     qtp = None
 
+def coeff_to_str(x,signs='+-'):
+    if x == 1:
+        return '+' if '+' in signs else ''
+    elif x == -1:
+        return '-' if '-' in signs else ''
+    else:
+        return ('+' if '+' in signs else '')+str(x)
+
 def term_dtype():
     return np.dtype([('masks',np.int32),('signs',np.int32),('coeffs',np.complex128)])
 
@@ -29,6 +37,28 @@ def product_of_terms(factors):
 
         prod['coeffs'] *= factor['coeffs'] * ( (-1)**n_flip )
     return prod
+
+def condense_terms(all_terms):
+
+    all_terms.sort(order=['masks','signs'])
+
+    combined = np.ndarray((len(all_terms),),dtype=term_dtype())
+
+    i = 0
+    n = 0
+    maxn = len(all_terms)
+    while n < maxn:
+        t = all_terms[n]
+        combined[i] = t
+        n += 1
+        while n < maxn and all_terms[n]['masks'] == t['masks'] and all_terms[n]['signs'] == t['signs']:
+            combined[i]['coeffs'] += all_terms[n]['coeffs']
+            n += 1
+        i += 1
+
+    combined.resize((i,)) # get rid of the memory we don't need
+
+    return combined
 
 def qtp_identity_product(op, index, L):
 

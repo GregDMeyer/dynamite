@@ -1,0 +1,423 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>dynamite.computations &mdash; dynamite 0.0.1 documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  
+
+  
+
+  
+        <link rel="index" title="Index"
+              href="../../genindex.html"/>
+        <link rel="search" title="Search" href="../../search.html"/>
+    <link rel="top" title="dynamite 0.0.1 documentation" href="../../index.html"/>
+        <link rel="up" title="dynamite" href="../dynamite.html"/> 
+
+  
+  <script src="../../_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+   
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="../../index.html" class="icon icon-home"> dynamite
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                0.0.1
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <p class="caption"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../install.html">Installing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../dynamite.html">Full API documentation</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">dynamite</a>
+        
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../../index.html">Docs</a> &raquo;</li>
+        
+          <li><a href="../index.html">Module code</a> &raquo;</li>
+        
+          <li><a href="../dynamite.html">dynamite</a> &raquo;</li>
+        
+      <li>dynamite.computations</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <h1>Source code for dynamite.computations</h1><div class="highlight"><pre>
+<span></span>
+<span class="kn">from</span> <span class="nn">.</span> <span class="k">import</span> <span class="n">initialize</span>
+<span class="n">initialize</span><span class="p">()</span>
+
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">from</span> <span class="nn">slepc4py</span> <span class="k">import</span> <span class="n">SLEPc</span>
+<span class="kn">from</span> <span class="nn">petsc4py</span> <span class="k">import</span> <span class="n">PETSc</span>
+
+<div class="viewcode-block" id="evolve"><a class="viewcode-back" href="../../dynamite.computations.html#dynamite.computations.evolve">[docs]</a><span class="k">def</span> <span class="nf">evolve</span><span class="p">(</span><span class="n">state</span><span class="p">,</span><span class="n">H</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span><span class="n">t</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span><span class="n">result</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span><span class="n">tol</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span><span class="n">mfn</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Evolve a quantum state according to the Schrodinger equation</span>
+<span class="sd">    under the Hamiltonian H. The units are natural, that is, the</span>
+<span class="sd">    evolution is simply</span>
+
+<span class="sd">    .. math::</span>
+<span class="sd">        \Psi_t = e^{-iHt} \Psi_0</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+
+<span class="sd">    state : petsc4py.PETSc.Vec</span>
+<span class="sd">        A PETSc vector containing the state to be evolved.</span>
+<span class="sd">        Can be created easily with :func:`dynamite.tools.build_state`.</span>
+
+<span class="sd">    H : Operator</span>
+<span class="sd">        The Hamiltonian</span>
+
+<span class="sd">    t : float</span>
+<span class="sd">        The time for which to evolve. Can be negative to evolve</span>
+<span class="sd">        backwards in time.</span>
+
+<span class="sd">    result : petsc4py.PETSc.Vec, optional</span>
+<span class="sd">        Where to store the result state. If not given, a new vector</span>
+<span class="sd">        is created in which to store the result. If evolving repeatedly</span>
+<span class="sd">        many times, it is a good idea to pass a result vector to avoid</span>
+<span class="sd">        repeatedly allocating a lot of memory. Will be overwritten.</span>
+
+<span class="sd">    tol : float, optional</span>
+<span class="sd">        The tolerance for the evolution. Error estimation is difficult</span>
+<span class="sd">        for Krylov exponentiation; this merely requests that the error</span>
+<span class="sd">        be somewhat close to ``tol``. There is no guarantee that it will</span>
+<span class="sd">        actually be smaller.</span>
+
+<span class="sd">    mfn : slepc4py.SLEPc.MFN, optional</span>
+<span class="sd">        Advanced users can pass their own matrix function object from</span>
+<span class="sd">        SLEPc. In that case the arguments ``H`` and ``t`` can be omitted</span>
+<span class="sd">        if they have been set for the MFN object manually.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    petsc4py.PETSc.Vec</span>
+<span class="sd">        The result vector</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">if</span> <span class="n">result</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="n">H</span><span class="o">.</span><span class="n">get_mat</span><span class="p">()</span><span class="o">.</span><span class="n">createVecs</span><span class="p">(</span><span class="n">side</span><span class="o">=</span><span class="s1">&#39;l&#39;</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">H</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="c1"># check if the evolution is trivial. if H*state = 0, then the evolution does nothing and state is unchanged.</span>
+        <span class="c1"># In this case MFNSolve fails. to avoid that, we check if we have that condition.</span>
+        <span class="n">H</span><span class="o">.</span><span class="n">get_mat</span><span class="p">()</span><span class="o">.</span><span class="n">mult</span><span class="p">(</span><span class="n">state</span><span class="p">,</span><span class="n">result</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">result</span><span class="o">.</span><span class="n">norm</span><span class="p">()</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">result</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+            <span class="k">return</span> <span class="n">result</span>
+
+    <span class="k">if</span> <span class="n">mfn</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+
+        <span class="n">mfn</span> <span class="o">=</span> <span class="n">SLEPc</span><span class="o">.</span><span class="n">MFN</span><span class="p">()</span><span class="o">.</span><span class="n">create</span><span class="p">()</span>
+        <span class="n">mfn</span><span class="o">.</span><span class="n">setType</span><span class="p">(</span><span class="s1">&#39;expokit&#39;</span><span class="p">)</span>
+
+        <span class="n">f</span> <span class="o">=</span> <span class="n">mfn</span><span class="o">.</span><span class="n">getFN</span><span class="p">()</span>
+        <span class="n">f</span><span class="o">.</span><span class="n">setType</span><span class="p">(</span><span class="n">SLEPc</span><span class="o">.</span><span class="n">FN</span><span class="o">.</span><span class="n">Type</span><span class="o">.</span><span class="n">EXP</span><span class="p">)</span>
+
+        <span class="n">mfn</span><span class="o">.</span><span class="n">setFromOptions</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="n">t</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">H</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s1">&#39;Must supply t and H if not supplying mfn to evolve&#39;</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">tol</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">mfn</span><span class="o">.</span><span class="n">setTolerances</span><span class="p">(</span><span class="n">tol</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">H</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">mfn</span><span class="o">.</span><span class="n">setOperator</span><span class="p">(</span><span class="n">H</span><span class="o">.</span><span class="n">get_mat</span><span class="p">())</span>
+
+    <span class="k">if</span> <span class="n">t</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">f</span> <span class="o">=</span> <span class="n">mfn</span><span class="o">.</span><span class="n">getFN</span><span class="p">()</span>
+        <span class="n">f</span><span class="o">.</span><span class="n">setScale</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="n">j</span><span class="o">*</span><span class="n">t</span><span class="p">)</span>
+
+    <span class="n">mfn</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="n">state</span><span class="p">,</span><span class="n">result</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">result</span></div>
+
+<div class="viewcode-block" id="eigsolve"><a class="viewcode-back" href="../../dynamite.computations.html#dynamite.computations.eigsolve">[docs]</a><span class="k">def</span> <span class="nf">eigsolve</span><span class="p">(</span><span class="n">H</span><span class="p">,</span><span class="n">getvecs</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span><span class="n">nev</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span><span class="n">which</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span><span class="n">target</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Solve for a subset of the eigenpairs of the Hamiltonian.</span>
+
+<span class="sd">    By default, solves for the eigenvalue with the smallest (most</span>
+<span class="sd">    negative) real part, e.g. the ground state. Which eigenvalues</span>
+<span class="sd">    are sought and how many can be adjusted with the options.</span>
+
+<span class="sd">    .. note::</span>
+<span class="sd">        Do NOT try to use this function to solve for the whole spectrum!</span>
+<span class="sd">        It&#39;s very efficient at finding a few eigenvalues, but no</span>
+<span class="sd">        faster than other routines for finding all of them. In the</span>
+<span class="sd">        future an efficient solver for the whole spectrum may be</span>
+<span class="sd">        included with dynamite.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+
+<span class="sd">    getvecs : Bool</span>
+<span class="sd">        Whether to return eigenvectors as well as eigenvalues.</span>
+
+<span class="sd">    nev : int</span>
+<span class="sd">        The number of eigenvalues sought. The algorithm may</span>
+<span class="sd">        return more eigenvalues than ``nev`` if more happen to</span>
+<span class="sd">        converge.</span>
+
+<span class="sd">    which : str</span>
+<span class="sd">        Which eigenvalues to seek. Options are\:</span>
+
+<span class="sd">        - ``&quot;smallest&quot;``, to find the eigenvalues with smallest real part</span>
+
+<span class="sd">        - ``&quot;exterior&quot;``, to find eigenvalues largest in absolute magnitude</span>
+
+<span class="sd">        - ``&quot;target&quot;``, to find eigenvalues closest to the given target</span>
+
+<span class="sd">        If ``target`` is set, ``which`` can be omitted and will</span>
+<span class="sd">        automatically be set to ``&quot;target&quot;``.</span>
+
+<span class="sd">    target : float</span>
+<span class="sd">        Using the shift-invert method, the eigensolver can seek</span>
+<span class="sd">        the eigenvalues with real part closest to some target value.</span>
+<span class="sd">        This requires a linear solve and so will be slower than solving</span>
+<span class="sd">        for exterior eigenvalues.</span>
+<span class="sd">        PETSc must be configured with a parallel linear solver</span>
+<span class="sd">        (e.g. ``--download-mumps`` option in ``configure``) to use</span>
+<span class="sd">        this option in parallel.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">if</span> <span class="n">which</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">target</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">which</span> <span class="o">=</span> <span class="s1">&#39;target&#39;</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">which</span> <span class="o">=</span> <span class="s1">&#39;smallest&#39;</span>
+
+    <span class="n">eps</span> <span class="o">=</span> <span class="n">SLEPc</span><span class="o">.</span><span class="n">EPS</span><span class="p">()</span><span class="o">.</span><span class="n">create</span><span class="p">()</span>
+    <span class="n">eps</span><span class="o">.</span><span class="n">setOperators</span><span class="p">(</span><span class="n">H</span><span class="o">.</span><span class="n">get_mat</span><span class="p">())</span>
+    <span class="n">eps</span><span class="o">.</span><span class="n">setProblemType</span><span class="p">(</span><span class="n">SLEPc</span><span class="o">.</span><span class="n">EPS</span><span class="o">.</span><span class="n">ProblemType</span><span class="o">.</span><span class="n">HEP</span><span class="p">)</span>
+    <span class="n">eps</span><span class="o">.</span><span class="n">setDimensions</span><span class="p">(</span><span class="n">nev</span><span class="p">)</span>
+
+    <span class="n">eps</span><span class="o">.</span><span class="n">setWhichEigenpairs</span><span class="p">({</span>
+        <span class="s1">&#39;smallest&#39;</span><span class="p">:</span><span class="n">SLEPc</span><span class="o">.</span><span class="n">EPS</span><span class="o">.</span><span class="n">Which</span><span class="o">.</span><span class="n">SMALLEST_REAL</span><span class="p">,</span>
+        <span class="s1">&#39;exterior&#39;</span><span class="p">:</span><span class="n">SLEPc</span><span class="o">.</span><span class="n">EPS</span><span class="o">.</span><span class="n">Which</span><span class="o">.</span><span class="n">LARGEST_MAGNITUDE</span><span class="p">,</span>
+        <span class="s1">&#39;target&#39;</span><span class="p">:</span><span class="n">SLEPc</span><span class="o">.</span><span class="n">EPS</span><span class="o">.</span><span class="n">Which</span><span class="o">.</span><span class="n">TARGET_MAGNITUDE</span><span class="p">,</span>
+        <span class="p">}[</span><span class="n">which</span><span class="p">])</span>
+
+    <span class="k">if</span> <span class="n">target</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">which</span><span class="o">==</span><span class="s1">&#39;target&#39;</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s2">&quot;Must specify target when setting which=&#39;target&#39;&quot;</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">target</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">st</span> <span class="o">=</span> <span class="n">eps</span><span class="o">.</span><span class="n">getST</span><span class="p">()</span>
+        <span class="n">st</span><span class="o">.</span><span class="n">setType</span><span class="p">(</span><span class="n">SLEPc</span><span class="o">.</span><span class="n">ST</span><span class="o">.</span><span class="n">Type</span><span class="o">.</span><span class="n">SINVERT</span><span class="p">)</span>
+        <span class="n">ksp</span> <span class="o">=</span> <span class="n">st</span><span class="o">.</span><span class="n">getKSP</span><span class="p">()</span>
+        <span class="n">ksp</span><span class="o">.</span><span class="n">setType</span><span class="p">(</span><span class="n">PETSc</span><span class="o">.</span><span class="n">KSP</span><span class="o">.</span><span class="n">Type</span><span class="o">.</span><span class="n">PREONLY</span><span class="p">)</span>
+        <span class="n">pc</span> <span class="o">=</span> <span class="n">ksp</span><span class="o">.</span><span class="n">getPC</span><span class="p">()</span>
+        <span class="n">pc</span><span class="o">.</span><span class="n">setType</span><span class="p">(</span><span class="n">PETSc</span><span class="o">.</span><span class="n">PC</span><span class="o">.</span><span class="n">Type</span><span class="o">.</span><span class="n">CHOLESKY</span><span class="p">)</span>
+
+        <span class="c1"># fix for &quot;bug&quot; discussed here: https://www.mail-archive.com/petsc-users@mcs.anl.gov/msg22867.html</span>
+        <span class="n">eps</span><span class="o">.</span><span class="n">setOperators</span><span class="p">(</span><span class="n">H</span><span class="o">.</span><span class="n">get_mat</span><span class="p">(</span><span class="n">diag_entries</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
+
+    <span class="n">eps</span><span class="o">.</span><span class="n">setFromOptions</span><span class="p">()</span>
+
+    <span class="n">eps</span><span class="o">.</span><span class="n">solve</span><span class="p">()</span>
+
+    <span class="n">nconv</span> <span class="o">=</span> <span class="n">eps</span><span class="o">.</span><span class="n">getConverged</span><span class="p">()</span>
+
+    <span class="n">evals</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">((</span><span class="n">nconv</span><span class="p">,),</span><span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">complex128</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">getvecs</span><span class="p">:</span>
+        <span class="n">evecs</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="n">v</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">nconv</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">getvecs</span><span class="p">:</span>
+            <span class="n">v</span> <span class="o">=</span> <span class="n">PETSc</span><span class="o">.</span><span class="n">Vec</span><span class="p">()</span><span class="o">.</span><span class="n">create</span><span class="p">()</span>
+            <span class="n">v</span><span class="o">.</span><span class="n">setSizes</span><span class="p">(</span><span class="mi">1</span><span class="o">&lt;&lt;</span><span class="n">H</span><span class="o">.</span><span class="n">L</span><span class="p">)</span>
+            <span class="n">v</span><span class="o">.</span><span class="n">setFromOptions</span><span class="p">()</span>
+        <span class="n">evals</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">eps</span><span class="o">.</span><span class="n">getEigenpair</span><span class="p">(</span><span class="n">i</span><span class="p">,</span><span class="n">v</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">getvecs</span><span class="p">:</span>
+            <span class="n">evecs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">v</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">getvecs</span><span class="p">:</span>
+        <span class="k">return</span> <span class="p">(</span><span class="n">evals</span><span class="p">,</span><span class="n">evecs</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">evals</span></div>
+</pre></div>
+
+           </div>
+           <div class="articleComments">
+            
+           </div>
+          </div>
+          <footer>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2017, Greg Meyer.
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'../../',
+            VERSION:'0.0.1',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true,
+            SOURCELINK_SUFFIX: '.txt'
+        };
+    </script>
+      <script type="text/javascript" src="../../_static/jquery.js"></script>
+      <script type="text/javascript" src="../../_static/underscore.js"></script>
+      <script type="text/javascript" src="../../_static/doctools.js"></script>
+      <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.0/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="../../_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+   
+
+</body>
+</html>

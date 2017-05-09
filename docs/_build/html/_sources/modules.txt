@@ -1,0 +1,7 @@
+dynamite
+========
+
+.. toctree::
+   :maxdepth: 4
+
+   dynamite
