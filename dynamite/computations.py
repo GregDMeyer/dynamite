@@ -136,6 +136,12 @@ def eigsolve(H,getvecs=False,nev=1,which=None,target=None):
         PETSc must be configured with a parallel linear solver
         (e.g. ``--download-mumps`` option in ``configure``) to use
         this option in parallel.
+
+    Returns
+    -------
+    numpy.array or tuple(numpy.array, list(petsc4py.PETSc.Vec))
+        Either a 1D numpy array of eigenvalues, or a pair containing that array
+        and a list of the corresponding eigenvectors.
     """
 
     if which is None:

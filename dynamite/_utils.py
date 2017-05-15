@@ -1,6 +1,7 @@
 
 import numpy as np
-from slepc4py import init
+
+from .backend.backend import MSC_dtype
 
 try:
     import qutip as qtp
@@ -15,12 +16,9 @@ def coeff_to_str(x,signs='+-'):
     else:
         return ('+' if '+' in signs else '')+str(x)
 
-def term_dtype():
-    return np.dtype([('masks',np.int32),('signs',np.int32),('coeffs',np.complex128)])
-
 def product_of_terms(factors):
 
-    prod = np.array([(0,0,1)],dtype=term_dtype())
+    prod = np.array([(0,0,1)],dtype=MSC_dtype())
     for factor in factors:
 
         # keep the sign correct after spin flips.
@@ -42,7 +40,7 @@ def condense_terms(all_terms):
 
     all_terms.sort(order=['masks','signs'])
 
-    combined = np.ndarray((len(all_terms),),dtype=term_dtype())
+    combined = np.ndarray((len(all_terms),),dtype=MSC_dtype())
 
     i = 0
     n = 0
@@ -76,4 +74,3 @@ def qtp_identity_product(op, index, L):
         else:
             ret = qtp.tensor(this_op,ret)
     return ret
-

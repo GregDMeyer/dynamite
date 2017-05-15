@@ -28,9 +28,9 @@ except ImportError:
 
 from petsc4py.PETSc import Vec, COMM_WORLD
 
-from .backend.backend import build_mat,destroy_shell_context
+from .backend.backend import build_mat,destroy_shell_context,MSC_dtype
 from .computations import evolve,eigsolve
-from ._utils import product_of_terms,term_dtype,qtp_identity_product,condense_terms,coeff_to_str
+from ._utils import product_of_terms,qtp_identity_product,condense_terms,coeff_to_str
 
 class Operator:
     """
@@ -244,7 +244,7 @@ class Operator:
         term_array = self.build_term_array()
 
         if diag_entries and not np.any(term_array['masks'] == 0):
-            term_array = np.hstack([np.array([(0,0,0)],dtype=term_dtype()),term_array])
+            term_array = np.hstack([np.array([(0,0,0)],dtype=MSC_dtype()),term_array])
 
         if not np.any(term_array['masks'] == 0):
             self._diag_entries = False
@@ -497,7 +497,7 @@ class Sum(_Expression):
     def _build_term_array(self,shift_index=0):
 
         if not self.terms:
-            return np.ndarray((0,),dtype=term_dtype())
+            return np.ndarray((0,),dtype=MSC_dtype())
 
         all_terms = np.hstack([t.build_term_array(shift_index=shift_index) for t in self.terms])
         all_terms['coeffs'] *= self.coeff
@@ -558,12 +558,12 @@ class Product(_Expression):
     def _build_term_array(self,shift_index=0):
 
         if not self.terms:
-            return np.ndarray((0,),dtype=term_dtype())
+            return np.ndarray((0,),dtype=MSC_dtype())
 
         arrays = [t.build_term_array(shift_index=shift_index) for t in self.terms]
 
         sizes = np.array([a.shape[0] for a in arrays])
-        all_terms = np.ndarray((np.prod(sizes),),dtype=term_dtype())
+        all_terms = np.ndarray((np.prod(sizes),),dtype=MSC_dtype())
 
         prod_terms = product(*arrays)
 
@@ -760,7 +760,7 @@ class IndexProduct(_IndexType):
 
         arrays = [self.op.build_term_array(shift_index=shift_index+i) for i in range(self.min_i,self.max_i+1)]
         nfacs = self.max_i - self.min_i + 1
-        all_terms = np.ndarray((arrays[0].shape[0]**nfacs,),dtype=term_dtype())
+        all_terms = np.ndarray((arrays[0].shape[0]**nfacs,),dtype=MSC_dtype())
 
         prod_terms = product(*arrays)
         for n,t in enumerate(prod_terms):
@@ -826,7 +826,7 @@ class Sigmax(_Fundamental):
         ind = self.index+shift_index
         if ind >= self.L:
             raise IndexError('requested too large an index')
-        return np.array([(1<<ind,0,self.coeff)],dtype=term_dtype())
+        return np.array([(1<<ind,0,self.coeff)],dtype=MSC_dtype())
 
     def _build_qutip(self,shift_index):
 
@@ -850,7 +850,7 @@ class Sigmaz(_Fundamental):
         ind = self.index+shift_index
         if ind >= self.L:
             raise IndexError('requested too large an index')
-        return np.array([(0,1<<ind,self.coeff)],dtype=term_dtype())
+        return np.array([(0,1<<ind,self.coeff)],dtype=MSC_dtype())
 
     def _build_qutip(self,shift_index):
 
@@ -874,7 +874,7 @@ class Sigmay(_Fundamental):
         ind = self.index+shift_index
         if ind >= self.L:
             raise IndexError('requested too large an index')
-        return np.array([(1<<ind,1<<ind,-1j*self.coeff)],dtype=term_dtype())
+        return np.array([(1<<ind,1<<ind,-1j*self.coeff)],dtype=MSC_dtype())
 
     def _build_qutip(self,shift_index):
 
@@ -898,7 +898,7 @@ class Identity(_Fundamental):
         self.max_ind = 0
 
     def _build_term_array(self,shift_index=0):
-        return np.array([(0,0,self.coeff)],dtype=term_dtype())
+        return np.array([(0,0,self.coeff)],dtype=MSC_dtype())
 
     def _build_qutip(self,shift_index):
 
@@ -922,7 +922,7 @@ class Zero(_Fundamental):
         self.max_ind = 0
 
     def _build_term_array(self,shift_index=0):
-        return np.array([(0,0,0)],dtype=term_dtype())
+        return np.array([(0,0,0)],dtype=MSC_dtype())
 
     def _build_qutip(self,shift_index):
 
