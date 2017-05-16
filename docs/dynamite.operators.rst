@@ -41,8 +41,6 @@ sites as well. The operator is translated by some number of sites, ranging from 
 argument ``min_i`` to ``max_i`` (inclusive). ``min_i`` defaults to 0, and ``max_i``
 defaults to a value such that the operator extends to the end of the spin chain.
 
-Soon, an option ``wrap`` will be added to allow for periodic boundary conditions.
-
 .. autoclass:: dynamite.operators.IndexSum
     :members:
 
