@@ -4,6 +4,7 @@ from itertools import product
 import unittest as ut
 import dynamite.operators as dy
 from dynamite.tools import build_state,vectonumpy
+from dynamite._utils import coeff_to_str
 import numpy as np
 import qutip as qtp
 from petsc4py.PETSc import Sys,COMM_WORLD,NormType
@@ -508,6 +509,28 @@ class Eigsolve(BaseTest):
             self.check_eigs(H,target=0)
         with self.subTest(which='target-1'):
             self.check_eigs(H,target=-1)
+
+class Utils(BaseTest):
+
+    def setUp(self):
+
+        # formatted as (x,signs,expected string)
+        self.cases = [
+            (-1,'+-','-'),
+            (1,'+-','+'),
+            (1,'-',''),
+            (0,'-','0'),
+            (-0.1,'-','-0.1'),
+            (-0.1111111,'-','-0.11111'),
+            (-0.1111111,'','0.11111'),
+            (1.1111111,'+-','+1.1111')
+        ]
+
+    def test_coefftostr(self):
+
+        for case in self.cases:
+            with self.subTest(x=case[0],signs=case[1]):
+                self.assertEqual(coeff_to_str(case[0],signs=case[1]),case[2])
 
 if __name__ == '__main__':
     ut.main(warnings='ignore')

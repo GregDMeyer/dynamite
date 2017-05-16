@@ -14,7 +14,12 @@ def coeff_to_str(x,signs='+-'):
     elif x == -1:
         return '-' if '-' in signs else ''
     else:
-        return ('+' if '+' in signs else '')+str(x)
+        rtn = '{:0.5g}'.format(x)
+        if '+' in signs and x >= 0:
+            rtn = '+' + rtn
+        elif '-' not in signs and x < 0:
+            rtn = rtn[1:]
+        return rtn
 
 def product_of_terms(factors):
 

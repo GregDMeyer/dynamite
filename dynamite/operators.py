@@ -18,7 +18,6 @@ from . import initialize
 initialize()
 
 from itertools import product
-from copy import deepcopy
 import numpy as np
 
 try:
@@ -188,6 +187,30 @@ class Operator:
         if value != self._shell:
             self.destroy_mat()
         self._shell = value
+
+    ### copy
+
+    def copy(self):
+        """
+        Return a copy of the operator.
+        Copy will not have its PETSc matrix already built,
+        even if the operator being copied does.
+
+        Returns
+        -------
+        Operator
+            A copy of the operator
+        """
+        o = self._copy()
+        o.L = self.L
+        o.max_ind = self.max_ind
+        o.needs_parens = self.needs_parens
+        o.coeff = self.coeff
+        o._shell = self.use_shell
+        return o
+
+    def _copy(self):
+        raise NotImplementedError()
 
     ### interface with PETSc
 
@@ -376,11 +399,16 @@ class Operator:
     def __mul__(self,x):
         if isinstance(x,Operator):
             return self._op_mul(x)
-        elif any(isinstance(x,t) for t in [float,int,complex]): # TODO: this is bad. find a better way to check if it's a number
-            return self._num_mul(x)
         elif isinstance(x,Vec):
             return self.get_mat() * x
         else:
+            try:
+                # check that it is a number, in the
+                # most generic way I can think of
+                if x == np.array([1]) * x:
+                    return self._num_mul(x)
+            except (TypeError,ValueError):
+                pass
             raise TypeError('Multiplication not supported for types %s and %s' % (str(type(self)),str(type(x))))
 
     def __rmul__(self,x):
@@ -422,34 +450,29 @@ class _Expression(Operator):
         """
         Operator.__init__(self,L=L)
 
-        terms = list(terms)
+        self.terms = [t.copy() for t in terms]
 
-        for t in terms:
-            # make sure we don't copy a huge matrix...
-            # TODO: this could confuse people re: shell matrices (if they call build_mat themselves)
-            # should define a copy function
-            t.destroy_mat()
-            L = None
+        terms_L = None
+        for t in self.terms:
             if t.L is not None:
-                if L is not None:
-                    if t.L != L:
+                if terms_L is not None:
+                    if t.L != terms_L:
                         raise ValueError('All terms must have same length L.')
                 else:
                     L = t.L
 
-        # parent L overrides children
-        if self.L is None:
-            self._L = L
-
-        terms = deepcopy(list(terms))
-
-        self.terms = terms
         if len(self.terms) > 1:
             self.max_ind = max(o.max_ind for o in self.terms)
         elif len(self.terms) == 1:
             self.max_ind = self.terms[0].max_ind
 
+        # parent L overrides children -- only set it
+        if self.L is None:
+            self._L = L
         self.L = self._L # ensure size propagates to all terms
+
+    def _copy(self):
+        return type(self)(terms=self.terms)
 
     def _get_index_set(self):
         indices = set()
@@ -595,13 +618,13 @@ class Product(_Expression):
         else:
             raise TypeError('Cannot sum expression with type '+type(o))
 
-# TODO: allow periodic boundary conditions
 class _IndexType(Operator):
 
-    def __init__(self,op,min_i=0,max_i=None,index_label='i',L=None):
+    def __init__(self,op,min_i=0,max_i=None,index_label='i',wrap=False,L=None):
 
         self.min_i = min_i
         self.max_i = max_i
+        self.wrap = wrap
 
         Operator.__init__(self,L=L)
 
@@ -612,12 +635,12 @@ class _IndexType(Operator):
             raise IndexError('min_i must be >= 0.')
 
         self.max_ind = op.max_ind
-        if self.max_i is not None and self.L is not None and self.max_i >= (self.L - self.max_ind):
-            raise IndexError('max_i must be <= the size L.')
+        if not wrap and (self.max_i is not None and self.L is not None and
+                         self.max_i >= (self.L - self.max_ind)):
+            raise IndexError('max_i would cause operators to extend past '
+                             'end of spin chain and wrap == False.')
 
-        # TODO: see above about this. find a better way to not copy a big matrix
-        op.destroy_mat()
-        self.op = deepcopy(op)
+        self.op = op.copy()
 
         if not isinstance(index_label,str):
             raise TypeError('Index label should be a string.')
@@ -631,11 +654,26 @@ class _IndexType(Operator):
 
         for ind in indices:
             if isinstance(ind,int):
-                self.op._replace_index(ind,index_label+'+'+str(ind) if ind else index_label)
+                rep = index_label
+                if ind:
+                    rep = rep+'+'+str(ind)
+                if self.wrap:
+                    if ind:
+                        rep = '(' + rep + ')'
+                    rep = '%L'  # TODO: change L to an integer when it's set
+                self.op._replace_index(ind,rep)
 
         if self.op.L is not None and self.L is None:
             self._L = self.op.L
         self.L = self._L # propagate L
+
+    def _copy(self):
+        o = type(self)(op=self.op,
+                       min_i=self.min_i,
+                       max_i=self.max_i,
+                       index_label=self.index_label,
+                       wrap=self.wrap)
+        return o
 
     def _get_sigma_tex(self):
         raise NotImplementedError()
@@ -649,7 +687,10 @@ class _IndexType(Operator):
         if self.max_i is not None:
             t += '^{'+str(self.max_i)+'}'
         else:
-            t += '^{L'+('-'+str(self.max_ind+1))+'}'
+            if self.wrap:
+                t += '^{L-1}'
+            else:
+                t += '^{L'+('-'+str(self.max_ind+1))+'}'
         t += self.op.build_tex(request_parens=True)
         if request_parens:
             t += r'\right]'
@@ -662,11 +703,20 @@ class _IndexType(Operator):
         return self.op._replace_index(ind,rep)
 
     def _prop_L(self,L):
-        if self.max_i is not None and L is not None and self.max_i > L:
-            raise IndexError('Cannot set L smaller than max_i of PiProd.')
+        if self.max_i is not None and L is not None:
+            if self.max_i > L-1:
+                raise IndexError('Cannot set L smaller than '
+                                 'max_i+1 of index sum or product.')
+            elif not self.wrap and self.max_i + self.max_ind > L-1:
+                raise IndexError('Index sum or product operator would extend '
+                                 'past end of spin chain (L too small).')
+
         self.op.L = L
         if self.max_i is None and L is not None:
-            self.max_i = L - self.max_ind - 1
+            if self.wrap:
+                self.max_i = L-1
+            else:
+                self.max_i = L - self.max_ind - 1
 
     def _build_term_array(self,shift_index=0):
         raise NotImplementedError()
@@ -691,16 +741,20 @@ class IndexSum(_IndexType):
     index_label : str, optional
         The label to use as the index on the sum in the LaTeX representation.
 
+    wrap : bool, optional
+        Whether to wrap around, that is, to use periodic boundary conditions.
+
     L : int, optional
         The length of the spin chain.
     """
 
-    def __init__(self,op,min_i=0,max_i=None,index_label='i',L=None):
+    def __init__(self,op,min_i=0,max_i=None,index_label='i',wrap=False,L=None):
         _IndexType.__init__(self,
                             op=op,
                             min_i=min_i,
                             max_i=max_i,
                             index_label=index_label,
+                            wrap=wrap,
                             L=L)
 
     def _get_sigma_tex(self):
@@ -741,16 +795,20 @@ class IndexProduct(_IndexType):
     index_label : str, optional
         The label to use as the index on the product in the LaTeX representation.
 
+    wrap : bool, optional
+        Whether to wrap around, that is, to use periodic boundary conditions.
+
     L : int, optional
         The length of the spin chain.
     """
 
-    def __init__(self,op,min_i=0,max_i=None,index_label='i',L=None):
+    def __init__(self,op,min_i=0,max_i=None,index_label='i',wrap=False,L=None):
         _IndexType.__init__(self,
                             op=op,
                             min_i=min_i,
                             max_i=max_i,
                             index_label=index_label,
+                            wrap=wrap,
                             L=L)
 
     def _get_sigma_tex(self):
@@ -787,6 +845,9 @@ class _Fundamental(Operator):
         self.max_ind = index
         self.tex = []
         self.tex_end = ''
+
+    def _copy(self):
+        return type(self)(index=self.index)
 
     def _get_index_set(self):
         indices = set()
@@ -884,7 +945,6 @@ class Sigmay(_Fundamental):
 
         return qtp_identity_product(qtp.sigmay(),ind,self.L)
 
-# TODO: should hide the tex if we multiply by something else...
 class Identity(_Fundamental):
     """
     The identity operator. Since it is tensored with identities on all
