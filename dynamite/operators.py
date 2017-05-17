@@ -51,6 +51,7 @@ class Operator:
         self.needs_parens = False
         self.coeff = 1
         self._mat = None
+        self._MSC = None
         self._diag_entries = False
         self._shell = False
 
@@ -133,11 +134,9 @@ class Operator:
             if not (valid and value > 0):
                 raise ValueError('L must be a positive integer.')
 
-            if value > 31:
-                raise ValueError('Currently limited to 31 spins--will be increased soon!')
-
         if self._mat is not None:
             self.destroy_mat()
+            self.release_MSC()
         self._L = value
 
         # propagate L down the tree of operators
@@ -169,6 +168,29 @@ class Operator:
             return None
         else:
             return 1<<self._L
+
+    @property
+    def nnz(self):
+        """
+        The number of nonzero elements per row of the sparse matrix.
+        """
+        t = self.get_MSC()
+        return len(np.unique(t['masks']))
+
+    @property
+    def MSC_size(self):
+        """
+        The number of elements in the MSC representation of the matrix.
+        """
+        return len(self.get_MSC())
+
+    @property
+    def density(self):
+        """
+        The density of the sparse matrix---that is, the number of non-zero
+        elements per row divided by the length of a row.
+        """
+        return self.nnz/self.dim
 
     @property
     def use_shell(self):
@@ -264,7 +286,9 @@ class Operator:
 
         self.destroy_mat()
 
-        term_array = self.build_term_array()
+        term_array = self.get_MSC()
+        # the thing might be big---should allow it to be freed to give a bit more memory for PETSc
+        self.release_MSC()
 
         if diag_entries and not np.any(term_array['masks'] == 0):
             term_array = np.hstack([np.array([(0,0,0)],dtype=MSC_dtype()),term_array])
@@ -278,7 +302,7 @@ class Operator:
                               np.ascontiguousarray(term_array['masks']),
                               np.ascontiguousarray(term_array['signs']),
                               np.ascontiguousarray(term_array['coeffs']),
-                              self._shell)
+                              self.use_shell)
 
     ### LaTeX representation of operators
 
@@ -360,10 +384,13 @@ class Operator:
 
     ### mask, sign, coefficient representation of operators
 
-    def build_term_array(self,shift_index=0):
+    def get_MSC(self,shift_index=None):
         """
         Get the representation of the operator in the (mask, sign, coefficient)
-        format used internally by :mod:`dynamite`.
+        format used internally by :mod:`dynamite`. The representation is saved
+        internally, so that if it takes a while to build it can be accessed quickly
+        next time. It is deleted when the PETSc matrix is built, however, to free
+        up some memory.
 
         Parameters
         ----------
@@ -377,10 +404,22 @@ class Operator:
         """
         if self.L is None:
             raise ValueError('Must set L before building term array.')
-        return self._build_term_array(shift_index)
+        if shift_index is None:
+            if self._MSC is None:
+                self._MSC = self._get_MSC()
+            return self._MSC
+        else:
+            return self._get_MSC(shift_index)
 
-    def _build_term_array(self,shift_index):
+    def _get_MSC(self,shift_index):
         raise NotImplementedError()
+
+    def release_MSC(self):
+        """
+        Remove the operator's reference to the MSC representation, so that it
+        can be garbage collected if there are no other references to it.
+        """
+        self._MSC = None
 
     ### unary and binary operations
 
@@ -517,12 +556,12 @@ class Sum(_Expression):
         if len(self.terms) > 1:
             self.needs_parens = True
 
-    def _build_term_array(self,shift_index=0):
+    def _get_MSC(self,shift_index=0):
 
         if not self.terms:
             return np.ndarray((0,),dtype=MSC_dtype())
 
-        all_terms = np.hstack([t.build_term_array(shift_index=shift_index) for t in self.terms])
+        all_terms = np.hstack([t.get_MSC(shift_index=shift_index) for t in self.terms])
         all_terms['coeffs'] *= self.coeff
         return condense_terms(all_terms)
 
@@ -578,12 +617,12 @@ class Product(_Expression):
             self.coeff = self.coeff * term.coeff
             term.coeff = 1
 
-    def _build_term_array(self,shift_index=0):
+    def _get_MSC(self,shift_index=0):
 
         if not self.terms:
             return np.ndarray((0,),dtype=MSC_dtype())
 
-        arrays = [t.build_term_array(shift_index=shift_index) for t in self.terms]
+        arrays = [t.get_MSC(shift_index=shift_index) for t in self.terms]
 
         sizes = np.array([a.shape[0] for a in arrays])
         all_terms = np.ndarray((np.prod(sizes),),dtype=MSC_dtype())
@@ -718,7 +757,7 @@ class _IndexType(Operator):
             else:
                 self.max_i = L - self.max_ind - 1
 
-    def _build_term_array(self,shift_index=0):
+    def _get_MSC(self,shift_index=0):
         raise NotImplementedError()
 
 class IndexSum(_IndexType):
@@ -760,8 +799,8 @@ class IndexSum(_IndexType):
     def _get_sigma_tex(self):
         return r'\sum'
 
-    def _build_term_array(self,shift_index=0):
-        all_terms = np.hstack([self.op.build_term_array(shift_index=shift_index+i) for i in range(self.min_i,self.max_i+1)])
+    def _get_MSC(self,shift_index=0):
+        all_terms = np.hstack([self.op.get_MSC(shift_index=shift_index+i) for i in range(self.min_i,self.max_i+1)])
         all_terms['coeffs'] *= self.coeff
         return condense_terms(all_terms)
 
@@ -814,9 +853,9 @@ class IndexProduct(_IndexType):
     def _get_sigma_tex(self):
         return r'\prod'
 
-    def _build_term_array(self,shift_index=0):
+    def _get_MSC(self,shift_index=0):
 
-        arrays = [self.op.build_term_array(shift_index=shift_index+i) for i in range(self.min_i,self.max_i+1)]
+        arrays = [self.op.get_MSC(shift_index=shift_index+i) for i in range(self.min_i,self.max_i+1)]
         nfacs = self.max_i - self.min_i + 1
         all_terms = np.ndarray((arrays[0].shape[0]**nfacs,),dtype=MSC_dtype())
 
@@ -870,7 +909,7 @@ class _Fundamental(Operator):
     def _prop_L(self,L):
         pass
 
-    def _build_term_array(self,shift_index=0):
+    def _get_MSC(self,shift_index=0):
         raise NotImplementedError()
 
 class Sigmax(_Fundamental):
@@ -883,7 +922,7 @@ class Sigmax(_Fundamental):
         self.tex = [[r'\sigma^x_{',self.index]]
         self.tex_end = r'}'
 
-    def _build_term_array(self,shift_index=0):
+    def _get_MSC(self,shift_index=0):
         ind = self.index+shift_index
         if ind >= self.L:
             raise IndexError('requested too large an index')
@@ -907,7 +946,7 @@ class Sigmaz(_Fundamental):
         self.tex = [[r'\sigma^z_{',self.index]]
         self.tex_end = r'}'
 
-    def _build_term_array(self,shift_index=0):
+    def _get_MSC(self,shift_index=0):
         ind = self.index+shift_index
         if ind >= self.L:
             raise IndexError('requested too large an index')
@@ -931,7 +970,7 @@ class Sigmay(_Fundamental):
         self.tex = [[r'\sigma^y_{',self.index]]
         self.tex_end = r'}'
 
-    def _build_term_array(self,shift_index=0):
+    def _get_MSC(self,shift_index=0):
         ind = self.index+shift_index
         if ind >= self.L:
             raise IndexError('requested too large an index')
@@ -957,7 +996,7 @@ class Identity(_Fundamental):
         self.tex_end = r'I'
         self.max_ind = 0
 
-    def _build_term_array(self,shift_index=0):
+    def _get_MSC(self,shift_index=0):
         return np.array([(0,0,self.coeff)],dtype=MSC_dtype())
 
     def _build_qutip(self,shift_index):
@@ -981,7 +1020,7 @@ class Zero(_Fundamental):
         self.tex_end = r'0'
         self.max_ind = 0
 
-    def _build_term_array(self,shift_index=0):
+    def _get_MSC(self,shift_index=0):
         return np.array([(0,0,0)],dtype=MSC_dtype())
 
     def _build_qutip(self,shift_index):

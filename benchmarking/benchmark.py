@@ -50,7 +50,7 @@ Print('begin building dynamite operator')
 
 if args.H == 'MBL':
     # dipolar interaction
-    H = Sum(s(0)*s(1) for s in (Sigmax,Sigmay,Sigmaz))
+    H = IndexSum(Sum(s(0)*s(1) for s in (Sigmax,Sigmay,Sigmaz)))
     # quenched disorder in z direction
     seed(0)
     for i in range(args.L):
@@ -67,26 +67,32 @@ elif args.H == 'SYK':
     H = Sum(uniform(-1,1)*Product(X(idx) for idx in idxs) for idxs in combinations(range(args.L*2),4))
 
 H.L = args.L
-
-Print('dynamite operator built. building PETSc matrix...')
+H.use_shell = args.shell
 
 start = default_timer()
-H.use_shell = args.shell
+
+Print('nnz:',H.nnz,'\ndensity:',H.density,'\nMSC size:',H.MSC_size)
+Print('dynamite operator built. building PETSc matrix...')
+
 H.build_mat()
 stats['build_time'] = default_timer() - start
 
 Print('PETSc matrix built.')
 
 if args.eigsolve:
+    Print('beginning eigsolve...')
     start = default_timer()
     H.eigsolve(nev=args.nev,target=args.target)
     stats['eigsolve_time'] = default_timer() - start
+    Print('eigsolve complete.')
 
 if args.evolve:
+    Print('beginning evolution...')
     start = default_timer()
     s = build_state(args.L,init_state=args.init_state)
     H.evolve(s,t=args.t)
     stats['evolve_time'] = default_timer() - start
+    Print('evolution complete.')
 
 H.destroy_mat()
 
