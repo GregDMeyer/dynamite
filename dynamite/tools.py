@@ -106,15 +106,15 @@ def get_max_memory_usage(which='all'):
     Get the maximum memory usage up to this point. Only updated whenever
     objects are destroyed (i.e. with :meth:`dynamite.operators.Operator.destroy_mat`)
 
-    ..note ::
+    .. note::
         :meth:`track_memory` must be called before this function is called,
-        and the option `'-malloc'` must be supplied to PETSc at runtime to track
+        and the option ``'-malloc'`` must be supplied to PETSc at runtime to track
         PETSc memory allocations
 
     Parameters
     ----------
     which : str
-        `'all'` to return all memory usage for the process, `'petsc'` to return
+        ``'all'`` to return all memory usage for the process, ``'petsc'`` to return
         only memory allocated by PETSc.
 
     Returns
@@ -131,7 +131,7 @@ def get_cur_memory_usage(which='all'):
     Parameters
     ----------
     type : str
-        'all' to return all memory usage for the process, 'petsc' to return
+        ``'all'`` to return all memory usage for the process, ``'petsc'`` to return
         only memory allocated by PETSc.
 
     Returns
