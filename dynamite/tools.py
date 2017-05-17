@@ -6,6 +6,15 @@ import numpy as np
 from slepc4py import SLEPc
 from petsc4py import PETSc
 
+from .backend import backend
+
+__all__ = [
+    'build_state',
+    'vectonumpy',
+    'track_memory',
+    'get_max_memory_usage',
+    'get_cur_memory_usage']
+
 def build_state(L,state = 0):
     '''
     Build a PETSc vector representing some product state.
@@ -85,3 +94,49 @@ def vectonumpy(v):
     ret[:] = v0[:]
 
     return ret
+
+def track_memory():
+    '''
+    Begin tracking memory usage for a later call to :meth:`get_max_memory_usage`.
+    '''
+    return backend.track_memory()
+
+def get_max_memory_usage(which='all'):
+    '''
+    Get the maximum memory usage up to this point. Only updated whenever
+    objects are destroyed (i.e. with :meth:`dynamite.operators.Operator.destroy_mat`)
+
+    ..note ::
+        :meth:`track_memory` must be called before this function is called,
+        and the option `'-malloc'` must be supplied to PETSc at runtime to track
+        PETSc memory allocations
+
+    Parameters
+    ----------
+    which : str
+        `'all'` to return all memory usage for the process, `'petsc'` to return
+        only memory allocated by PETSc.
+
+    Returns
+    -------
+    float
+        The max memory usage in bytes
+    '''
+    return backend.get_max_memory_usage(which=which)
+
+def get_cur_memory_usage(which='all'):
+    '''
+    Get the current memory usage (resident set size) in bytes.
+
+    Parameters
+    ----------
+    type : str
+        'all' to return all memory usage for the process, 'petsc' to return
+        only memory allocated by PETSc.
+
+    Returns
+    -------
+    float
+        The max memory usage in bytes
+    '''
+    return backend.get_cur_memory_usage(which=which)

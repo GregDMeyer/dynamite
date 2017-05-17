@@ -10,6 +10,7 @@ import cython
 
 cdef extern from "backend_impl.h":
     ctypedef int PetscInt
+    ctypedef float PetscLogDouble
 
     int BuildMat_Full(PetscInt L,
                       np.int_t nterms,
@@ -26,6 +27,12 @@ cdef extern from "backend_impl.h":
                        PetscMat *A)
 
     int DestroyContext(PetscMat A)
+
+    int PetscMemoryGetCurrentUsage(PetscLogDouble* mem)
+    int PetscMallocGetCurrentUsage(PetscLogDouble* mem)
+    int PetscMemorySetGetMaximumUsage()
+    int PetscMemoryGetMaximumUsage(PetscLogDouble* mem)
+    int PetscMallocGetMaximumUsage(PetscLogDouble* mem)
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
@@ -51,7 +58,10 @@ def build_mat(int L,
     return M
 
 def destroy_shell_context(Mat A):
-    DestroyContext(A.mat)
+    cdef int ierr
+    ierr = DestroyContext(A.mat)
+    if ierr != 0:
+        raise Error(ierr)
 
 if sizeof(PetscInt) == 4:
     int_dt = np.int32
@@ -62,3 +72,76 @@ else:
 
 def MSC_dtype():
     return np.dtype([('masks',int_dt),('signs',int_dt),('coeffs',np.complex128)])
+
+def track_memory():
+    '''
+    Begin tracking memory usage for a later call to :meth:`get_max_memory_usage`.
+    '''
+    cdef int ierr
+    ierr = PetscMemorySetGetMaximumUsage()
+    if ierr != 0:
+        raise Error(ierr)
+
+def get_max_memory_usage(which='all'):
+    '''
+    Get the maximum memory usage up to this point. Only updated whenever
+    objects are destroyed (i.e. with :meth:`dynamite.operators.Operator.destroy_mat`)
+
+    ..note ::
+        :meth:`track_memory` must be called before this function is called,
+        and the option `'-malloc'` must be supplied to PETSc at runtime to track
+        PETSc memory allocations
+
+    Parameters
+    ----------
+    which : str
+        `'all'` to return all memory usage for the process, `'petsc'` to return
+        only memory allocated by PETSc.
+
+    Returns
+    -------
+    float
+        The max memory usage in bytes
+    '''
+    cdef int ierr
+    cdef PetscLogDouble mem
+
+    if which == 'all':
+        ierr = PetscMemoryGetMaximumUsage(&mem)
+    elif which == 'petsc':
+        ierr = PetscMallocGetMaximumUsage(&mem)
+    else:
+        raise ValueError("argument 'which' must be 'all' or 'petsc'")
+
+    if ierr != 0:
+        raise Error(ierr)
+    return mem
+
+def get_cur_memory_usage(which='all'):
+    '''
+    Get the current memory usage (resident set size) in bytes.
+
+    Parameters
+    ----------
+    type : str
+        'all' to return all memory usage for the process, 'petsc' to return
+        only memory allocated by PETSc.
+
+    Returns
+    -------
+    float
+        The max memory usage in bytes
+    '''
+    cdef int ierr
+    cdef PetscLogDouble mem
+
+    if which == 'all':
+        ierr = PetscMemoryGetCurrentUsage(&mem)
+    elif which == 'petsc':
+        ierr = PetscMallocGetCurrentUsage(&mem)
+    else:
+        raise ValueError("argument 'which' must be 'all' or 'petsc'")
+
+    if ierr != 0:
+        raise Error(ierr)
+    return mem
