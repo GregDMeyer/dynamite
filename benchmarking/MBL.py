@@ -2,11 +2,16 @@
 import argparse as ap
 from random import uniform,seed
 from timeit import default_timer
+from itertools import combinations
 
-parser = ap.ArgumentParser(description='Benchmarking test for dynamite. Heisenberg spin chain with quenched disorder.')
+parser = ap.ArgumentParser(description='Benchmarking test for dynamite.')
 
 parser.add_argument('-L', type=int, help='Size of the spin chain.')
-parser.add_argument('-w', type=int, default=1, help='Magnitude of the disorder.')
+
+parser.add_argument('-H', choices=['MBL','long_range','SYK'], default='MBL', help='Hamiltonian to use')
+
+parser.add_argument('-w', type=int, default=1, help='Magnitude of the disorder for MBL Hamiltonian.')
+
 parser.add_argument('--shell',action='store_true',help='Make a shell matrix instead of a regular matrix.')
 parser.add_argument('--slepc_args',type=str,default='',help='Arguments to pass to SLEPc.')
 
@@ -22,11 +27,12 @@ args = parser.parse_args()
 
 slepc_args = args.slepc_args.split(' ')
 
-import slepc4py
-slepc4py.init(slepc_args)
+from dynamite import initialize
+initialize(slepc_args)
 
-from dynamite.operators import *
-from dynamite.tools import build_state
+from dynamite.operators import Sum,Product,IndexSum,Sigmax,Sigmay,Sigmaz
+from dynamite.tools import build_state,track_memory,get_max_memory_usage,get_cur_memory_usage
+from dynamite.extras import Majorana as X
 from petsc4py.PETSc import Sys
 Print = Sys.Print
 
@@ -37,20 +43,36 @@ stats = {
     'MaxRSS':None,
 }
 
+track_memory()
+mem_type = 'all'
+
 Print('begin building dynamite operator')
 
-H = SumTerms(s(0)*s(1) for s in (Sigmax,Sigmay,Sigmaz))
+if args.H == 'MBL':
+    # dipolar interaction
+    H = Sum(s(0)*s(1) for s in (Sigmax,Sigmay,Sigmaz))
+    # quenched disorder in z direction
+    seed(0)
+    for i in range(args.L):
+        H += uniform(-args.w,args.w) * Sigmaz(index=i)
+elif args.H == 'long_range':
+    # long-range ZZ interaction
+    H = Sum(IndexSum(Sigmaz(0)*Sigmaz(i)) for i in range(1,args.L))
+    # nearest neighbor XX
+    H += 0.5 * IndexSum(Sigmax(0)*Sigmax(1))
+    # some other fields
+    H += Sum(0.1*IndexSum(s()) for s in [Sigmax,Sigmay,Sigmaz])
+elif args.H == 'SYK':
+    seed(0)
+    H = Sum(uniform(-1,1)*Product(X(idx) for idx in idxs) for idxs in combinations(range(args.L*2),4))
 
-seed(0)
-for i in range(args.L):
-    H += uniform(-args.w,args.w) * Sigmaz(index=i)
-
-H.set_size(args.L)
+H.L = args.L
 
 Print('dynamite operator built. building PETSc matrix...')
 
 start = default_timer()
-H.build_mat(shell=args.shell)
+H.use_shell = args.shell
+H.build_mat()
 stats['build_time'] = default_timer() - start
 
 Print('PETSc matrix built.')
@@ -66,8 +88,10 @@ if args.evolve:
     H.evolve(s,t=args.t)
     stats['evolve_time'] = default_timer() - start
 
+H.destroy_mat()
+
 # crap. this isn't implemented in petsc4py. I can add it to dynamite's API though...
-stats['MaxRSS'] = None
+stats['MaxRSS'] = get_max_memory_usage(mem_type)
 
 Print('Results:')
 for k,v in stats.items():

@@ -42,6 +42,6 @@ def Majorana(idx):
         m = Sigmax(b_idx)
 
     if b_idx > 0:
-        m = PiProd( Sigmaz(),max_i=b_idx-1) * m
+        m = IndexProduct( Sigmaz(),max_i=b_idx-1) * m
 
     return m
