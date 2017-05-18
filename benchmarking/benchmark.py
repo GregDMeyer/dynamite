@@ -6,9 +6,9 @@ from itertools import combinations
 
 parser = ap.ArgumentParser(description='Benchmarking test for dynamite.')
 
-parser.add_argument('-L', type=int, help='Size of the spin chain.')
+parser.add_argument('-L', type=int, help='Size of the spin chain.', required=True)
 
-parser.add_argument('-H', choices=['MBL','long_range','SYK'], default='MBL', help='Hamiltonian to use')
+parser.add_argument('-H', choices=['MBL','long_range','SYK'], default='MBL', help='Hamiltonian to use', required=True)
 
 parser.add_argument('-w', type=int, default=1, help='Magnitude of the disorder for MBL Hamiltonian.')
 
