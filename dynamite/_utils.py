@@ -1,7 +1,7 @@
 
 import numpy as np
 
-from .backend.backend import MSC_dtype
+from .backend.backend import MSC_dtype,product_of_terms
 
 try:
     import qutip as qtp
@@ -21,31 +21,11 @@ def coeff_to_str(x,signs='+-'):
             rtn = rtn[1:]
         return rtn
 
-def product_of_terms(factors):
-
-    prod = np.array([(0,0,1)],dtype=MSC_dtype())
-    for factor in factors:
-
-        # keep the sign correct after spin flips.
-        # this is crucial... otherwise everything
-        # would commute!
-        flipped = prod['masks'] & factor['signs']
-        n_flip = 0
-        while flipped:
-            n_flip += 1
-            flipped = flipped & (flipped-1)
-
-        prod['masks'] = prod['masks'] ^ factor['masks']
-        prod['signs'] = prod['signs'] ^ factor['signs']
-
-        prod['coeffs'] *= factor['coeffs'] * ( (-1)**n_flip )
-    return prod
-
 def condense_terms(all_terms):
 
     all_terms.sort(order=['masks','signs'])
 
-    combined = np.ndarray((len(all_terms),),dtype=MSC_dtype())
+    combined = np.ndarray((len(all_terms),),dtype=MSC_dtype)
 
     i = 0
     n = 0
@@ -79,3 +59,37 @@ def qtp_identity_product(op, index, L):
         else:
             ret = qtp.tensor(this_op,ret)
     return ret
+
+def MSC_matrix_product(terms):
+
+    arrays = np.vstack(terms)
+
+    sizes = np.array([a.shape[0] for a in arrays])
+    all_terms = np.ndarray((np.prod(sizes),),dtype=MSC_dtype)
+
+    prod_idxs = _pi.idxs(sizes) # see class _PermIndices below
+
+    aT = arrays.T
+
+    for n,idxs in enumerate(prod_idxs):
+        t = np.choose(idxs,aT)
+        all_terms[n] = product_of_terms(t)
+
+    return all_terms
+
+class _PermIndices:
+    """
+    store result of np.indices so as to keep that function from
+    being called a zillion times
+    """
+
+    def __init__(self):
+        self.p = {}
+
+    def idxs(self,sizes):
+        st = tuple(sizes)
+        if st not in self.p:
+            self.p[st] = np.indices(sizes).reshape((sizes.size,np.prod(sizes))).T
+        return self.p[st]
+
+_pi = _PermIndices()

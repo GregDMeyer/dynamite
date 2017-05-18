@@ -1,7 +1,8 @@
-#!/usr/bin/env python
 
 #$ python setup.py build_ext --inplace
 
+import os
+from os.path import join
 from distutils.core import setup
 from distutils.extension import Extension
 from Cython.Build import cythonize
@@ -15,24 +16,18 @@ def configure():
     LIBRARY_DIRS = []
     LIBRARIES    = []
 
-    # PETSc
-    import os
     PETSC_DIR  = os.environ['PETSC_DIR']
-    PETSC_ARCH = os.environ.get('PETSC_ARCH', '')
+    PETSC_ARCH = os.environ['PETSC_ARCH']
     SLEPC_DIR  = os.environ['SLEPC_DIR']
-    from os.path import join, isdir
-    if PETSC_ARCH and isdir(join(PETSC_DIR, PETSC_ARCH)):
-        INCLUDE_DIRS += [join(PETSC_DIR, PETSC_ARCH, 'include'),
-                         join(PETSC_DIR, 'include')]
-        LIBRARY_DIRS += [join(PETSC_DIR, PETSC_ARCH, 'lib')]
-    else:
-        if PETSC_ARCH: pass # XXX should warn ...
-        INCLUDE_DIRS += [join(PETSC_DIR, 'include')]
-        LIBRARY_DIRS += [join(PETSC_DIR, 'lib')]
-    if SLEPC_DIR and isdir(join(SLEPC_DIR, PETSC_ARCH)):
-        INCLUDE_DIRS += [join(SLEPC_DIR, PETSC_ARCH, 'include'),
-                         join(SLEPC_DIR, 'include')]
-        LIBRARY_DIRS += [join(SLEPC_DIR, PETSC_ARCH, 'lib')]
+
+    INCLUDE_DIRS += [join(PETSC_DIR, PETSC_ARCH, 'include'),
+                     join(PETSC_DIR, 'include')]
+    LIBRARY_DIRS += [join(PETSC_DIR, PETSC_ARCH, 'lib')]
+
+    INCLUDE_DIRS += [join(SLEPC_DIR, PETSC_ARCH, 'include'),
+                     join(SLEPC_DIR, 'include')]
+    LIBRARY_DIRS += [join(SLEPC_DIR, PETSC_ARCH, 'lib')]
+
     LIBRARIES += ['petsc','slepc']
 
     # PETSc/SLEPc for Python
@@ -41,17 +36,20 @@ def configure():
     # NumPy
     INCLUDE_DIRS += [numpy.get_include()]
 
+    # backend_impl
+    INCLUDE_DIRS += ['.']
+
     return dict(
-        include_dirs=INCLUDE_DIRS + [os.curdir],
+        include_dirs=INCLUDE_DIRS,
         libraries=LIBRARIES,
         library_dirs=LIBRARY_DIRS,
         runtime_library_dirs=LIBRARY_DIRS,
+        extra_objects=['backend_impl.o']
     )
 
 extensions = [
     Extension('backend',
-              sources = ['backend.pyx',
-                         'backend_impl.c'],
+              sources = ['backend.pyx'],
               depends = ['backend_impl.h'],
               **configure()),
 ]

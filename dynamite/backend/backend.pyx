@@ -70,8 +70,7 @@ elif sizeof(PetscInt) == 8:
 else:
     raise TypeError('Only 32 or 64 bit integers supported.')
 
-def MSC_dtype():
-    return np.dtype([('masks',int_dt),('signs',int_dt),('coeffs',np.complex128)])
+MSC_dtype = np.dtype([('masks',int_dt),('signs',int_dt),('coeffs',np.complex128)])
 
 def track_memory():
     '''
@@ -145,3 +144,37 @@ def get_cur_memory_usage(which='all'):
     if ierr != 0:
         raise Error(ierr)
     return mem
+
+cdef packed struct MSC_t:
+    PetscInt masks
+    PetscInt signs
+    np.complex128_t coeffs
+
+def product_of_terms(np.ndarray[MSC_t,ndim=1] factors):
+    cdef MSC_t factor,prod
+    cdef np.ndarray[MSC_t,ndim=1] prod_array
+    cdef PetscInt flipped
+    cdef int flip
+
+    prod = factors[0]
+
+    for factor in factors[1:]:
+
+        # keep the sign correct after spin flips.
+        # this is crucial... otherwise everything
+        # would commute!
+        flipped = prod.masks & factor.signs
+        flip = 1
+        while flipped:
+            flip *= -1
+            flipped = flipped & (flipped-1)
+
+        prod.masks = prod.masks ^ factor.masks
+        prod.signs = prod.signs ^ factor.signs
+
+        prod.coeffs *= (factor.coeffs * flip)
+
+    prod_array = np.ndarray((1,),dtype=MSC_dtype)
+    prod_array[0] = prod
+
+    return prod_array

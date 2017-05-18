@@ -36,7 +36,7 @@ If you want, you can run the PETSc tests as specified in the output of `make` (s
  - `COPTFLAGS=-O3` Optimization flags to pass to the C compiler.
  - `CXXOPTFLAGS=-O3` Opt. flags for C++.
  - `FOPTFLAGS=-O3` Opt. flags for FORTRAN.
- 
+
  To see all possible options to `configure`, run `./configure --help`. You may want to pipe to `less`; it is a big help page ;)
 
 #### Building SLEPc
@@ -76,7 +76,7 @@ ___
 
 **If you use a virtual environment:**
 
-Go to wherever you want your virtual environment stored (maybe wherever you will store your dynamite code). 
+Go to wherever you want your virtual environment stored (maybe wherever you will store your dynamite code).
 
 Then create the virtual environment:
 `python3 -m venv $PWD/.venv`
@@ -101,9 +101,11 @@ With those installed, you have to do a bit of building (I will automate this soo
 
 `cd dynamite/dynamite/backend`
 
-`make build`
+`make backend_impl.o`
 
-Then you should be all set to import dynamite. You can import it directly from the top-level `dynamite` directory, or you can install it. 
+`python setup.py -q build_ext --inplace`
+
+Then you should be all set to import dynamite. You can import it directly from the top-level `dynamite` directory, or you can install it.
 
 To install, I would suggest going to the top-level `dynamite` directory and doing `pip install -e ./`. That way you can `git pull` any changes that I make, and they will automatically be integrated (though you might have to run `make build` again).
 

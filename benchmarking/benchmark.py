@@ -37,7 +37,8 @@ from petsc4py.PETSc import Sys
 Print = Sys.Print
 
 stats = {
-    'build_time':None,
+    'MSC_build_time':None,
+    'mat_build_time':None,
     'evolve_time':None,
     'eigsolve_time':None,
     'MaxRSS':None,
@@ -74,8 +75,11 @@ start = default_timer()
 Print('nnz:',H.nnz,'\ndensity:',H.density,'\nMSC size:',H.MSC_size)
 Print('dynamite operator built. building PETSc matrix...')
 
+stats['MSC_build_time'] = default_timer() - start
+
+start = default_timer()
 H.build_mat()
-stats['build_time'] = default_timer() - start
+stats['mat_build_time'] = default_timer() - start
 
 Print('PETSc matrix built.')
 

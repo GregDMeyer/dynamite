@@ -29,7 +29,7 @@ from petsc4py.PETSc import Vec, COMM_WORLD
 
 from .backend.backend import build_mat,destroy_shell_context,MSC_dtype
 from .computations import evolve,eigsolve
-from ._utils import product_of_terms,qtp_identity_product,condense_terms,coeff_to_str
+from ._utils import qtp_identity_product,condense_terms,coeff_to_str,MSC_matrix_product
 
 class Operator:
     """
@@ -291,7 +291,7 @@ class Operator:
         self.release_MSC()
 
         if diag_entries and not np.any(term_array['masks'] == 0):
-            term_array = np.hstack([np.array([(0,0,0)],dtype=MSC_dtype()),term_array])
+            term_array = np.hstack([np.array([(0,0,0)],dtype=MSC_dtype),term_array])
 
         if not np.any(term_array['masks'] == 0):
             self._diag_entries = False
@@ -559,7 +559,7 @@ class Sum(_Expression):
     def _get_MSC(self,shift_index=0):
 
         if not self.terms:
-            return np.ndarray((0,),dtype=MSC_dtype())
+            return np.ndarray((0,),dtype=MSC_dtype)
 
         all_terms = np.hstack([t.get_MSC(shift_index=shift_index) for t in self.terms])
         all_terms['coeffs'] *= self.coeff
@@ -620,19 +620,10 @@ class Product(_Expression):
     def _get_MSC(self,shift_index=0):
 
         if not self.terms:
-            return np.ndarray((0,),dtype=MSC_dtype())
+            return np.ndarray((0,),dtype=MSC_dtype)
 
-        arrays = [t.get_MSC(shift_index=shift_index) for t in self.terms]
-
-        sizes = np.array([a.shape[0] for a in arrays])
-        all_terms = np.ndarray((np.prod(sizes),),dtype=MSC_dtype())
-
-        prod_terms = product(*arrays)
-
-        for n,t in enumerate(prod_terms):
-            all_terms[n] = product_of_terms(t)
-            all_terms[n]['coeffs'] *= self.coeff
-
+        all_terms = MSC_matrix_product(t.get_MSC(shift_index=shift_index) for t in self.terms)
+        all_terms['coeffs'] *= self.coeff
         return condense_terms(all_terms)
 
     def _build_tex(self,signs='-',request_parens=False):
@@ -855,15 +846,9 @@ class IndexProduct(_IndexType):
 
     def _get_MSC(self,shift_index=0):
 
-        arrays = [self.op.get_MSC(shift_index=shift_index+i) for i in range(self.min_i,self.max_i+1)]
-        nfacs = self.max_i - self.min_i + 1
-        all_terms = np.ndarray((arrays[0].shape[0]**nfacs,),dtype=MSC_dtype())
-
-        prod_terms = product(*arrays)
-        for n,t in enumerate(prod_terms):
-            all_terms[n] = product_of_terms(t)
-            all_terms[n]['coeffs'] *= self.coeff
-
+        terms = (self.op.get_MSC(shift_index=shift_index+i) for i in range(self.min_i,self.max_i+1))
+        all_terms = MSC_matrix_product(terms)
+        all_terms['coeffs'] *= self.coeff
         return condense_terms(all_terms)
 
     def _build_qutip(self,shift_index):
@@ -926,7 +911,7 @@ class Sigmax(_Fundamental):
         ind = self.index+shift_index
         if ind >= self.L:
             raise IndexError('requested too large an index')
-        return np.array([(1<<ind,0,self.coeff)],dtype=MSC_dtype())
+        return np.array([(1<<ind,0,self.coeff)],dtype=MSC_dtype)
 
     def _build_qutip(self,shift_index):
 
@@ -950,7 +935,7 @@ class Sigmaz(_Fundamental):
         ind = self.index+shift_index
         if ind >= self.L:
             raise IndexError('requested too large an index')
-        return np.array([(0,1<<ind,self.coeff)],dtype=MSC_dtype())
+        return np.array([(0,1<<ind,self.coeff)],dtype=MSC_dtype)
 
     def _build_qutip(self,shift_index):
 
@@ -974,7 +959,7 @@ class Sigmay(_Fundamental):
         ind = self.index+shift_index
         if ind >= self.L:
             raise IndexError('requested too large an index')
-        return np.array([(1<<ind,1<<ind,-1j*self.coeff)],dtype=MSC_dtype())
+        return np.array([(1<<ind,1<<ind,-1j*self.coeff)],dtype=MSC_dtype)
 
     def _build_qutip(self,shift_index):
 
@@ -997,7 +982,7 @@ class Identity(_Fundamental):
         self.max_ind = 0
 
     def _get_MSC(self,shift_index=0):
-        return np.array([(0,0,self.coeff)],dtype=MSC_dtype())
+        return np.array([(0,0,self.coeff)],dtype=MSC_dtype)
 
     def _build_qutip(self,shift_index):
 
@@ -1021,7 +1006,7 @@ class Zero(_Fundamental):
         self.max_ind = 0
 
     def _get_MSC(self,shift_index=0):
-        return np.array([(0,0,0)],dtype=MSC_dtype())
+        return np.array([(0,0,0)],dtype=MSC_dtype)
 
     def _build_qutip(self,shift_index):
 
