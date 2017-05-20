@@ -20,8 +20,8 @@ parser.add_argument('--init_state',type=int,default=0,help='The initial state fo
 parser.add_argument('-t',type=float,default=1.0,help='The time to evolve for.')
 
 parser.add_argument('--eigsolve',action='store_true',help='Request to solve for eigenvalues of the Hamiltonian.')
-parser.add_argument('-nev',type=int,default=1,help='The number of eigenpairs to solve for.')
-parser.add_argument('-target',type=int,help='The target for a shift-invert eigensolve.')
+parser.add_argument('--nev',type=int,default=1,help='The number of eigenpairs to solve for.')
+parser.add_argument('--target',type=int,help='The target for a shift-invert eigensolve.')
 
 args = parser.parse_args()
 
@@ -47,7 +47,12 @@ stats = {
 track_memory()
 mem_type = 'all'
 
-Print('begin building dynamite operator')
+if __debug__:
+    Print('begin building dynamite operator')
+else:
+    Print('---ARGUMENTS---')
+    for k,v in vars(args).items():
+        Print(str(k)+','+str(v))
 
 if args.H == 'MBL':
     # dipolar interaction
@@ -72,8 +77,9 @@ H.use_shell = args.shell
 
 start = default_timer()
 
-Print('nnz:',H.nnz,'\ndensity:',H.density,'\nMSC size:',H.MSC_size)
-Print('dynamite operator built. building PETSc matrix...')
+if __debug__:
+    Print('nnz:',H.nnz,'\ndensity:',H.density,'\nMSC size:',H.MSC_size)
+    Print('dynamite operator built. building PETSc matrix...')
 
 stats['MSC_build_time'] = default_timer() - start
 
@@ -81,28 +87,32 @@ start = default_timer()
 H.build_mat()
 stats['mat_build_time'] = default_timer() - start
 
-Print('PETSc matrix built.')
+if __debug__:
+    Print('PETSc matrix built.')
 
 if args.eigsolve:
-    Print('beginning eigsolve...')
+    if __debug__:
+        Print('beginning eigsolve...')
     start = default_timer()
     H.eigsolve(nev=args.nev,target=args.target)
     stats['eigsolve_time'] = default_timer() - start
-    Print('eigsolve complete.')
+    if __debug__:
+        Print('eigsolve complete.')
 
 if args.evolve:
-    Print('beginning evolution...')
+    if __debug__:
+        Print('beginning evolution...')
     start = default_timer()
-    s = build_state(args.L,init_state=args.init_state)
+    s = build_state(args.L,state=args.init_state)
     H.evolve(s,t=args.t)
     stats['evolve_time'] = default_timer() - start
-    Print('evolution complete.')
+    if __debug__:
+        Print('evolution complete.')
 
 H.destroy_mat()
 
-# crap. this isn't implemented in petsc4py. I can add it to dynamite's API though...
 stats['MaxRSS'] = get_max_memory_usage(mem_type)
 
-Print('Results:')
+Print('---RESULTS---')
 for k,v in stats.items():
-    Print('\t',k+':',v)
+    Print(str(k)+','+str(v))

@@ -9,7 +9,8 @@
 PetscErrorCode BuildMat_Full(PetscInt L,PetscInt nterms,PetscInt* masks,PetscInt* signs,PetscScalar* coeffs,Mat *A)
 {
   PetscErrorCode ierr;
-  PetscInt N,i,state,Istart,Iend,mpi_rank,mpi_size,nrows,local_bits,nonlocal_mask;
+  PetscInt N,i,state,Istart,Iend,nrows,local_bits,nonlocal_mask;
+  int mpi_rank,mpi_size;
   PetscInt d_nz,o_nz;
 
   PetscInt lstate,sign;
