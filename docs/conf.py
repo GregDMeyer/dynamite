@@ -23,24 +23,6 @@ sys.path.insert(0, os.path.abspath('../'))
 
 # -- General configuration ------------------------------------------------
 
-## For RTD
-
-import sys
-from unittest.mock import MagicMock
-
-class Mock(MagicMock):
-    @classmethod
-    def __getattr__(cls, name):
-            return MagicMock()
-
-MOCK_MODULES = ['slepc4py',
-                'slepc4py.SLEPc',
-                'petsc4py',
-                'petsc4py.PETSc',
-                'numpy',
-                'dynamite.backend.backend']
-sys.modules.update((mod_name, Mock()) for mod_name in MOCK_MODULES)
-
 # If your documentation needs a minimal Sphinx version, state it here.
 #
 # needs_sphinx = '1.0'
