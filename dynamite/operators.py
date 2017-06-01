@@ -9,6 +9,8 @@ defines their built-in behavior and operations.
 __all__ = ['Sigmax',
            'Sigmay',
            'Sigmaz',
+           'Identity',
+           'Zero',
            'Sum',
            'Product',
            'IndexSum',
