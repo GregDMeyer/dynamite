@@ -3,11 +3,6 @@ import numpy as np
 
 from .backend.backend import MSC_dtype,product_of_terms
 
-try:
-    import qutip as qtp
-except ImportError:
-    qtp = None
-
 def coeff_to_str(x,signs='+-'):
     if x == 1:
         return '+' if '+' in signs else ''
@@ -45,8 +40,7 @@ def condense_terms(all_terms):
 
 def qtp_identity_product(op, index, L):
 
-    if qtp is None:
-        raise ImportError('Could not import qutip.')
+    import qutip as qtp
 
     ret = None
     for i in range(L):

@@ -22,11 +22,6 @@ initialize()
 from itertools import product
 import numpy as np
 
-try:
-    import qutip as qtp
-except ImportError:
-    qtp = None
-
 from petsc4py.PETSc import Vec, COMM_WORLD
 
 from .backend.backend import build_mat,destroy_shell_context,MSC_dtype
@@ -375,8 +370,8 @@ class Operator:
         qutip.Qobj
             The operator in qutip representation
         """
-        if qtp is None:
-            raise ImportError('Could not import qutip.')
+        import qutip as qtp
+
         if self.L is None:
             raise ValueError('Must set L before building qutip representation.')
         return self.coeff * self._build_qutip(shift_index)
@@ -916,7 +911,7 @@ class Sigmax(_Fundamental):
         return np.array([(1<<ind,0,self.coeff)],dtype=MSC_dtype)
 
     def _build_qutip(self,shift_index):
-
+        import qutip as qtp
         ind = self.index+shift_index
         if ind >= self.L:
             raise IndexError('requested too large an index')
@@ -940,7 +935,7 @@ class Sigmaz(_Fundamental):
         return np.array([(0,1<<ind,self.coeff)],dtype=MSC_dtype)
 
     def _build_qutip(self,shift_index):
-
+        import qutip as qtp
         ind = self.index+shift_index
         if ind >= self.L:
             raise IndexError('requested too large an index')
@@ -964,7 +959,7 @@ class Sigmay(_Fundamental):
         return np.array([(1<<ind,1<<ind,-1j*self.coeff)],dtype=MSC_dtype)
 
     def _build_qutip(self,shift_index):
-
+        import qutip as qtp
         ind = self.index+shift_index
         if ind >= self.L:
             raise IndexError('requested too large an index')
@@ -987,7 +982,7 @@ class Identity(_Fundamental):
         return np.array([(0,0,self.coeff)],dtype=MSC_dtype)
 
     def _build_qutip(self,shift_index):
-
+        import qutip as qtp
         ind = self.index+shift_index
         if ind >= self.L:
             raise IndexError('requested too large an index')
@@ -1011,7 +1006,7 @@ class Zero(_Fundamental):
         return np.array([(0,0,0)],dtype=MSC_dtype)
 
     def _build_qutip(self,shift_index):
-
+        import qutip as qtp
         ind = self.index+shift_index
         if ind >= self.L:
             raise IndexError('requested too large an index')
