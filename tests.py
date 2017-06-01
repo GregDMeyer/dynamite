@@ -5,6 +5,7 @@ import unittest as ut
 import dynamite.operators as dy
 from dynamite.tools import build_state,vectonumpy
 from dynamite._utils import coeff_to_str
+from dynamite.extras import commutator, Majorana
 import numpy as np
 import qutip as qtp
 from petsc4py.PETSc import Sys,COMM_WORLD,NormType
@@ -115,6 +116,68 @@ class SingleOperators(BaseTest):
                 ds,qs = get_both(t,index=1,L=self.L)
                 self.check_dy_qtp(-0.5*ds,-0.5*qs)
 
+    def test_equality(self):
+        self.assertEqual(dy.Sigmax(),dy.Sigmax())
+
+    def test_Lsetting(self):
+        good_Ls = [2]
+        for L in good_Ls:
+            with self.subTest(L=L):
+                s = dy.Sigmax(1)
+                s.L = L
+                s.set_length(L)
+
+        bad_Ls = [0,'hi',1]
+        for L in bad_Ls:
+            with self.subTest(L=L):
+                with self.assertRaises(ValueError):
+                    s = dy.Sigmax(1)
+                    s.L = L
+
+    def test_dim(self):
+        s = dy.Identity()
+        L = 5
+
+        self.assertEqual(s.dim,None)
+
+        s.L = L
+        self.assertEqual(s.dim,2**L)
+
+    def test_nnz(self):
+        s = dy.Sigmaz(0) + dy.Sigmaz(1) + dy.Sigmax(0)
+        self.assertEqual(s.nnz,2)
+
+    def test_MSC_size(self):
+        s = dy.Sigmaz(0) + dy.Sigmaz(1) + dy.Sigmax(0)
+        self.assertEqual(s.MSC_size,3)
+
+    def test_shell(self):
+        s = dy.Zero()
+        s.L = 1
+
+        s.build_mat()
+
+        s.use_shell = True
+        self.assertIs(s._mat,None)
+
+        s.build_mat()
+        s.use_shell = True
+        self.assertIsNot(s._mat,None)
+
+        s.destroy_mat()
+
+    def test_build(self):
+        s = dy.Sigmax()
+        with self.assertRaises(ValueError):
+            s.build_mat()
+        s.L = 1
+        s.get_mat(diag_entries=True)
+
+    def test_qutip_exception(self):
+        s = dy.Identity()
+        with self.assertRaises(ValueError):
+            s.build_qutip()
+
     def test_zero(self):
         np_mat = to_np(dy.Zero(L=1))
         if np_mat is None:
@@ -196,6 +259,14 @@ class Sums(BaseTest):
         ds3,qs3 = get_both('sx',index=3,L=self.L)
         self.check_dy_qtp(ds1+ds2+ds3,qs1+qs2+qs3)
 
+    def test_length(self):
+        with self.assertRaises(ValueError):
+            x = dy.Sigmax()
+            y = dy.Sigmay()
+            x.L = 1
+            y.L = 2
+            x + y
+
     def test_IndexSum(self):
         for s in ['sx','sy','sz']:
             with self.subTest(s=s):
@@ -227,6 +298,16 @@ class Sums(BaseTest):
                 dsy,_ = get_both('sy',L=self.L)
                 with self.assertRaises(IndexError):
                     dy.IndexSum(dsy,min_i=low,max_i=high)
+
+    def test_IndexSum_wrap(self):
+        ds,qs = get_both('sx',L=self.L)
+        ds1,qs1 = get_both('sx',L=self.L,index=1)
+        p = dy.IndexSum(ds*ds1,wrap=True)
+        p.L = self.L
+        qs = qs*qs1
+        for i in range(1,self.L-1):
+            qs += q_sigmai('sx',index=i,L=self.L) * q_sigmai('sx',index=i+1,L=self.L)
+        qs += q_sigmai('sx',index=self.L-1,L=self.L) * q_sigmai('sx',index=0,L=self.L)
 
 class Compound(BaseTest):
 
@@ -478,7 +559,7 @@ class Eigsolve(BaseTest):
 
     def test_ising(self):
         H = Hs['ising']
-        H.L = self.L
+        H.set_length(self.L)
         with self.subTest(which='smallest'):
             self.check_eigs(H)
         with self.subTest(which='target0'):
@@ -531,6 +612,22 @@ class Utils(BaseTest):
         for case in self.cases:
             with self.subTest(x=case[0],signs=case[1]):
                 self.assertEqual(coeff_to_str(case[0],signs=case[1]),case[2])
+
+class Extras(BaseTest):
+
+    def test_Majorana(self):
+        tests = [
+            (1,dy.Sigmay()),
+            (2,dy.Sigmaz(0)*dy.Sigmax(1)),
+            (4,dy.Sigmaz(0)*dy.Sigmaz(1)*dy.Sigmax(2))
+        ]
+
+        for idx,op in tests:
+            X = Majorana(idx)
+            self.assertEqual(X,op)
+
+    def test_commutator(self):
+        self.assertEqual(commutator(dy.Sigmax(),dy.Sigmay()),2j*dy.Sigmaz())
 
 if __name__ == '__main__':
     ut.main(warnings='ignore')

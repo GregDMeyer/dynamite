@@ -131,6 +131,10 @@ class Operator:
             if not (valid and value > 0):
                 raise ValueError('L must be a positive integer.')
 
+            if self.max_ind is not None and value <= self.max_ind:
+                raise ValueError('Length %d too short--non-identity'
+                                 'operator on index %d' % (value,self.max_ind))
+
         if self._mat is not None:
             self.destroy_mat()
             self.release_MSC()
@@ -399,8 +403,6 @@ class Operator:
         numpy.ndarray
             A numpy array containing the representation.
         """
-        if self.L is None:
-            raise ValueError('Must set L before building term array.')
         if shift_index is None:
             if self._MSC is None:
                 self._MSC = self._get_MSC()
@@ -454,6 +456,12 @@ class Operator:
             return self.__mul__(x)
         else:
             raise TypeError('Multiplication not supported for types %s and %s' % (str(type(self)),str(type(x))))
+
+    def __eq__(self,x):
+        if isinstance(x,Operator):
+            return np.array_equal(self.get_MSC(),x.get_MSC())
+        else:
+            raise TypeError('Equality not supported for types %s and %s' % (str(type(self)),str(type(x))))
 
     def _op_add(self,o):
         if self.L is not None and o.L is not None and self.L != o.L:
@@ -788,6 +796,8 @@ class IndexSum(_IndexType):
         return r'\sum'
 
     def _get_MSC(self,shift_index=0):
+        if self.max_i is None:
+            raise Exception('Must set L or max_i before building MSC representation of IndexSum.')
         all_terms = np.hstack([self.op.get_MSC(shift_index=shift_index+i) for i in range(self.min_i,self.max_i+1)])
         all_terms['coeffs'] *= self.coeff
         return condense_terms(all_terms)
@@ -842,7 +852,8 @@ class IndexProduct(_IndexType):
         return r'\prod'
 
     def _get_MSC(self,shift_index=0):
-
+        if self.max_i is None:
+            raise Exception('Must set L or max_i before building MSC representation of IndexSum.')
         terms = (self.op.get_MSC(shift_index=shift_index+i) for i in range(self.min_i,self.max_i+1))
         all_terms = MSC_matrix_product(terms)
         all_terms['coeffs'] *= self.coeff
@@ -906,7 +917,7 @@ class Sigmax(_Fundamental):
 
     def _get_MSC(self,shift_index=0):
         ind = self.index+shift_index
-        if ind >= self.L:
+        if self.L is not None and ind >= self.L:
             raise IndexError('requested too large an index')
         return np.array([(1<<ind,0,self.coeff)],dtype=MSC_dtype)
 
@@ -930,7 +941,7 @@ class Sigmaz(_Fundamental):
 
     def _get_MSC(self,shift_index=0):
         ind = self.index+shift_index
-        if ind >= self.L:
+        if self.L is not None and ind >= self.L:
             raise IndexError('requested too large an index')
         return np.array([(0,1<<ind,self.coeff)],dtype=MSC_dtype)
 
@@ -954,7 +965,7 @@ class Sigmay(_Fundamental):
 
     def _get_MSC(self,shift_index=0):
         ind = self.index+shift_index
-        if ind >= self.L:
+        if self.L is not None and ind >= self.L:
             raise IndexError('requested too large an index')
         return np.array([(1<<ind,1<<ind,-1j*self.coeff)],dtype=MSC_dtype)
 
