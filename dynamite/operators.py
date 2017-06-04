@@ -55,7 +55,7 @@ class Operator:
 
     ### computation functions
 
-    def evolve(self,state,t,**kwargs):
+    def evolve(self,state,t=None,**kwargs):
         """
         Evolve a state under the Hamiltonian, according to the Schrodinger equation.
         The units are natural; the evolution is:
@@ -426,7 +426,8 @@ class Operator:
         if isinstance(x,Operator):
             return self._op_add(x)
         else:
-            raise TypeError('Addition not supported for types')
+            raise TypeError('Addition not supported for types %s and %s'
+                            % (str(type(self)),str(type(x))))
 
     def __sub__(self,x):
         return self + -x
@@ -445,27 +446,27 @@ class Operator:
                 # most generic way I can think of
                 if x == np.array([1]) * x:
                     return self._num_mul(x)
+                else:
+                    raise ValueError()
             except (TypeError,ValueError):
-                pass
-            raise TypeError('Multiplication not supported for types %s and %s' % (str(type(self)),str(type(x))))
+                raise TypeError('Multiplication not supported for types %s and %s'
+                                % (str(type(self)),str(type(x))))
 
     def __rmul__(self,x):
         if isinstance(x,Vec):
-            return x*self.get_mat()
-        elif any(isinstance(x,t) for t in [float,int,complex]):
-            return self.__mul__(x)
+            return TypeError('Left vector-matrix multiplication not currently '
+                             'supported.')
         else:
-            raise TypeError('Multiplication not supported for types %s and %s' % (str(type(self)),str(type(x))))
+            return self.__mul__(x)
 
     def __eq__(self,x):
         if isinstance(x,Operator):
             return np.array_equal(self.get_MSC(),x.get_MSC())
         else:
-            raise TypeError('Equality not supported for types %s and %s' % (str(type(self)),str(type(x))))
+            raise TypeError('Equality not supported for types %s and %s'
+                            % (str(type(self)),str(type(x))))
 
     def _op_add(self,o):
-        if self.L is not None and o.L is not None and self.L != o.L:
-            raise ValueError('Cannot add operators of different sizes (L=%d, L=%d)' % (self.L,o.L))
 
         if isinstance(o,Sum):
             return Sum(terms = [self] + o.terms)
@@ -475,6 +476,7 @@ class Operator:
             raise TypeError('Cannot sum expression with type '+type(o))
 
     def _op_mul(self,o):
+
         if isinstance(o,Product):
             return Product(terms = [self] + o.terms)
         elif isinstance(o,Operator):
@@ -496,6 +498,9 @@ class _Expression(Operator):
 
         self.terms = [t.copy() for t in terms]
 
+        if len(self.terms) == 0:
+            raise ValueError('Term list is empty.')
+
         terms_L = None
         for t in self.terms:
             if t.L is not None:
@@ -503,17 +508,17 @@ class _Expression(Operator):
                     if t.L != terms_L:
                         raise ValueError('All terms must have same length L.')
                 else:
-                    L = t.L
+                    terms_L = t.L
 
         if len(self.terms) > 1:
             self.max_ind = max(o.max_ind for o in self.terms)
         elif len(self.terms) == 1:
             self.max_ind = self.terms[0].max_ind
 
-        # parent L overrides children -- only set it
-        if self.L is None:
-            self._L = L
-        self.L = self._L # ensure size propagates to all terms
+        if L is None:
+            L = terms_L
+
+        self.L = L
 
     def _copy(self):
         return type(self)(terms=self.terms)
@@ -562,9 +567,6 @@ class Sum(_Expression):
             self.needs_parens = True
 
     def _get_MSC(self,shift_index=0):
-
-        if not self.terms:
-            return np.ndarray((0,),dtype=MSC_dtype)
 
         all_terms = np.hstack([t.get_MSC(shift_index=shift_index) for t in self.terms])
         all_terms['coeffs'] *= self.coeff
@@ -624,9 +626,6 @@ class Product(_Expression):
 
     def _get_MSC(self,shift_index=0):
 
-        if not self.terms:
-            return np.ndarray((0,),dtype=MSC_dtype)
-
         all_terms = MSC_matrix_product(t.get_MSC(shift_index=shift_index) for t in self.terms)
         all_terms['coeffs'] *= self.coeff
         return condense_terms(all_terms)
@@ -670,12 +669,11 @@ class _IndexType(Operator):
             raise IndexError('min_i must be >= 0.')
 
         self.max_ind = op.max_ind
-        if not wrap and (self.max_i is not None and self.L is not None and
-                         self.max_i >= (self.L - self.max_ind)):
-            raise IndexError('max_i would cause operators to extend past '
-                             'end of spin chain and wrap == False.')
-
         self.op = op.copy()
+
+        if self.op.L is not None and self.L is None:
+            self._L = self.op.L
+        self.L = self._L # propagate L
 
         if not isinstance(index_label,str):
             raise TypeError('Index label should be a string.')
@@ -697,10 +695,6 @@ class _IndexType(Operator):
                         rep = '(' + rep + ')'
                     rep = '%L'  # TODO: change L to an integer when it's set
                 self.op._replace_index(ind,rep)
-
-        if self.op.L is not None and self.L is None:
-            self._L = self.op.L
-        self.L = self._L # propagate L
 
     def _copy(self):
         o = type(self)(op=self.op,
@@ -853,7 +847,7 @@ class IndexProduct(_IndexType):
 
     def _get_MSC(self,shift_index=0):
         if self.max_i is None:
-            raise Exception('Must set L or max_i before building MSC representation of IndexSum.')
+            raise Exception('Must set L or max_i before building MSC representation of IndexProduct.')
         terms = (self.op.get_MSC(shift_index=shift_index+i) for i in range(self.min_i,self.max_i+1))
         all_terms = MSC_matrix_product(terms)
         all_terms['coeffs'] *= self.coeff

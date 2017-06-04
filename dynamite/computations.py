@@ -56,8 +56,16 @@ def evolve(state,H=None,t=None,result=None,tol=None,mfn=None):
         result = H.get_mat().createVecs(side='l')
 
     if H is not None:
-        # check if the evolution is trivial. if H*state = 0, then the evolution does nothing and state is unchanged.
-        # In this case MFNSolve fails. to avoid that, we check if we have that condition.
+        # check if the evolution is trivial. if H*state = 0,
+        # then the evolution does nothing and state is unchanged.
+        # In this case MFNSolve fails. to avoid that, we check if
+        # we have that condition.
+
+        # TODO: this is really fast because it's just a matrix-vector
+        # multiply, but it takes a non-negligible amount of time for
+        # really big matrices. Should think of a better way or add a
+        # switch to remove this check
+
         H.get_mat().mult(state,result)
         if result.norm() == 0:
             result = state.copy()
@@ -74,7 +82,7 @@ def evolve(state,H=None,t=None,result=None,tol=None,mfn=None):
         mfn.setFromOptions()
 
         if t is None or H is None:
-            raise Exception('Must supply t and H if not supplying mfn to evolve')
+            raise ValueError('Must supply t and H if not supplying mfn to evolve')
 
     if tol is not None:
         mfn.setTolerances(tol)
@@ -162,7 +170,7 @@ def eigsolve(H,getvecs=False,nev=1,which=None,target=None):
         }[which])
 
     if target is None and which=='target':
-        raise Exception("Must specify target when setting which='target'")
+        raise ValueError("Must specify target when setting which='target'")
 
     if target is not None:
         st = eps.getST()

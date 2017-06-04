@@ -50,12 +50,17 @@ def build_state(L,state = 0):
         state_str = state
         state = 0
         if len(state_str) != L:
-            raise IndexError('state string must have length L')
+            raise ValueError('state string must have length L')
         if not all(c in ['U','D'] for c in state_str):
-            raise Exception('only character U and D allowed in state')
+            raise ValueError('only character U and D allowed in state')
         for i,c in enumerate(state_str):
             if c == 'U':
                 state += 1<<i
+    elif not isinstance(state,int):
+        raise TypeError('State must be an int or str.')
+
+    if not 0 <= state < 2**L:
+        raise ValueError('Requested state out of bounds (0,2**L).')
 
     v[state] = 1
 

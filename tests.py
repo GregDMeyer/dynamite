@@ -4,6 +4,7 @@ from itertools import product
 import unittest as ut
 import dynamite.operators as dy
 from dynamite.tools import build_state,vectonumpy
+from dynamite.tools import track_memory,get_max_memory_usage,get_cur_memory_usage
 from dynamite._utils import coeff_to_str
 from dynamite.extras import commutator, Majorana
 import numpy as np
@@ -209,6 +210,39 @@ class Products(BaseTest):
         q = qs1*qs2
         self.check_dy_qtp(d,q)
 
+    def test_num_product(self):
+        ds1,qs1 = get_both('sx',index=0,L=1)
+        self.check_dy_qtp(2.1*ds1,2.1*qs1)
+
+        with self.assertRaises(TypeError):
+            [1,2] * ds1
+
+    def test_vec_product(self):
+        dH,qH = get_both('sx',index=0,L=1)
+        dvec = build_state(L=1)
+        qvec = qtp.basis(2,0)
+
+        self.assertTrue(np.allclose(vectonumpy(dH * dvec),
+                                    (qH * qvec).full().flatten()))
+
+    def test_prod_recursive(self):
+        s = [dy.Sigmax(i) for i in range(3)]
+
+        s1 = s[0] * s[1] * s[2]
+        s2 = s[0] * (s[1] * s[2])
+        self.assertEqual(s1,s2)
+        self.assertEqual(len(s1.terms),3)
+        self.assertEqual(len(s2.terms),3)
+
+        s1 = s[0] * s[1] * s[2] * s[0]
+        s2 = (s[0] * s[1]) * (s[2] * s[0])
+        self.assertEqual(s1,s2)
+        self.assertEqual(len(s1.terms),4)
+        self.assertEqual(len(s2.terms),4)
+
+        with self.assertRaises(ValueError):
+            dy.Sum(terms=[])
+
     def test_alltwopoint(self):
         for i in range(self.L):
             for j in range(self.L):
@@ -242,11 +276,12 @@ class Products(BaseTest):
                 self.check_dy_qtp(prod,q_sigmax(i,self.L))
 
     def test_IndexProduct_exceptions(self):
-        for low,high in [(1,0),(0,self.L+1),(-1,0)]:
+        for low,high in [(1,0),(0,self.L-1),(0,self.L),(-1,0)]:
             with self.subTest(low=low,high=high):
-                dsy,_ = get_both('sy',L=self.L)
+                H = dy.Sigmay(index=0) * dy.Sigmay(index=1)
+                H.L = self.L
                 with self.assertRaises(IndexError):
-                    dy.IndexProduct(dsy,min_i=low,max_i=high)
+                    dy.IndexProduct(H,min_i=low,max_i=high)
 
 class Sums(BaseTest):
 
@@ -259,12 +294,36 @@ class Sums(BaseTest):
         ds3,qs3 = get_both('sx',index=3,L=self.L)
         self.check_dy_qtp(ds1+ds2+ds3,qs1+qs2+qs3)
 
+    def test_sum_recursive(self):
+        s = [dy.Sigmax(i) for i in range(3)]
+
+        s1 = s[0] + s[1] + s[2]
+        s2 = s[0] + (s[1] + s[2])
+        self.assertEqual(s1,s2)
+        self.assertEqual(len(s1.terms),3)
+        self.assertEqual(len(s2.terms),3)
+
+        s1 = s[0] + s[1] + s[2] + s[0]
+        s2 = (s[0] + s[1]) + (s[2] + s[0])
+        self.assertEqual(s1,s2)
+        self.assertEqual(len(s1.terms),4)
+        self.assertEqual(len(s2.terms),4)
+
+    def test_num_sum(self):
+        H = dy.Sigmax()
+        with self.assertRaises(TypeError):
+            H + 1
+
+    def test_sum_one(self):
+        H = dy.Sum([dy.Sigmax()])
+        self.assertEqual(dy.Sigmax(),H)
+
     def test_length(self):
+        x = dy.Sigmax()
+        y = dy.Sigmay()
+        x.L = 1
+        y.L = 2
         with self.assertRaises(ValueError):
-            x = dy.Sigmax()
-            y = dy.Sigmay()
-            x.L = 1
-            y.L = 2
             x + y
 
     def test_IndexSum(self):
@@ -475,6 +534,28 @@ class StateBuilding(BaseTest):
                 if v is not None:
                     self.assertTrue(np.all(v==qs.full().flatten()))
 
+    def test_str_buildstate(self):
+        for i in ['UUUU','UDUD']:
+            with self.subTest(state=i):
+                s = build_state(L=self.L,state=i)
+                qs = qtp.basis(2,0 if i[0] == 'D' else 1)
+                for j in range(1,self.L):
+                    qs = qtp.tensor(qtp.basis(2,0 if i[j] == 'D' else 1),qs)
+                v = vectonumpy(s)
+                if v is not None:
+                    self.assertTrue(np.all(v==qs.full().flatten()))
+
+    def test_buildstate_exceptions(self):
+        for i in ['U','UDDUDUD','DUDE',10000,-1]:
+            with self.subTest(state=i):
+                with self.assertRaises(ValueError):
+                    build_state(L=self.L,state=i)
+
+        for i in [1j,4.2]:
+            with self.subTest(state=i):
+                with self.assertRaises(TypeError):
+                    build_state(L=self.L,state=i)
+
 Hs = {
     'XXYY':dy.IndexSum(dy.Sum(s(0)*s(1) for s in [dy.Sigmax,dy.Sigmay])),
     'XXYYZZ':dy.IndexSum(dy.Sum(s(0)*s(1) for s in [dy.Sigmax,dy.Sigmay,dy.Sigmaz])),
@@ -487,9 +568,18 @@ class Evolution(BaseTest):
         self.L = 6
         self.test_states = [0,int(0.79737*(1<<self.L))]
 
+    def test_evolve(self):
+        H = dy.Sigmax()
+        H.L = 1
+
+        state = build_state(L=1)
+
+        with self.assertRaises(ValueError):
+            H.evolve(state=state)
+
     def check_solve(self,dH,state,t,tol=1E-7):
         ds = build_state(L=self.L,state=state)
-        r = dH.evolve(ds,t=t)
+        r = dH.evolve(ds,t=t,tol=tol)
 
         qH = dH.build_qutip()
         qs = qtp.basis(2,state&1)
@@ -562,10 +652,15 @@ class Eigsolve(BaseTest):
         H.set_length(self.L)
         with self.subTest(which='smallest'):
             self.check_eigs(H)
+        with self.subTest(which='exterior'):
+            self.check_eigs(H,which='exterior')
         with self.subTest(which='target0'):
             self.check_eigs(H,target=0)
         with self.subTest(which='target-1'):
             self.check_eigs(H,target=-1)
+        with self.subTest(which='targetexcept'):
+            with self.assertRaises(ValueError):
+                self.check_eigs(H,which='target')
 
     def test_XXYY(self):
         H = Hs['XXYY']
@@ -628,6 +723,24 @@ class Extras(BaseTest):
 
     def test_commutator(self):
         self.assertEqual(commutator(dy.Sigmax(),dy.Sigmay()),2j*dy.Sigmaz())
+
+class Benchmarking(BaseTest):
+
+    # just test that there are no exceptions thrown
+    # don't think we need to make sure the values returned
+    # are actually correct, that's not our problem
+
+    def test_memtracking(self):
+        get_cur_memory_usage()
+
+        # this isn't implemented yet
+        # TODO: should raise RuntimeError if get_max_memory_usage
+        # is called without a preceding call to track_memory
+        # with self.assertRaises(RuntimeError):
+        #     get_max_memory_usage()
+
+        track_memory()
+        get_max_memory_usage()
 
 if __name__ == '__main__':
     ut.main(warnings='ignore')
