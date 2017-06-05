@@ -16,6 +16,7 @@ routines and various auxiliary functions.
    :caption: Contents:
 
    install.rst
+   Examples.ipynb
    dynamite.rst
 
 Indices and tables

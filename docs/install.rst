@@ -8,7 +8,7 @@ Building PETSc
 
 To build PETSc in your working directory, as per the `download page <https://www.mcs.anl.gov/petsc/download/index.html>`_, do the following:
 
-.. code::
+.. code:: bash
 
     git clone -b maint https://bitbucket.org/petsc/petsc petsc
     cd petsc
@@ -50,7 +50,7 @@ For bash shell:
 
 Now download and install SLEPc:
 
-.. code::
+.. code:: bash
 
     git clone -b maint https://bitbucket.org/slepc/slepc
     cd slepc
@@ -90,7 +90,7 @@ Now to set up the packages:
 
 With those installed, you have to do a bit of building (I will automate this soon):
 
-.. code::
+.. code:: bash
 
     cd dynamite/dynamite/backend
     make backend_impl.o
