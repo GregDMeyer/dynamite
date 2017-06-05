@@ -9,12 +9,20 @@ def coeff_to_str(x,signs='+-'):
     elif x == -1:
         return '-' if '-' in signs else ''
     else:
-        rtn = '{:0.5g}'.format(x)
-        if '+' in signs and x >= 0:
-            rtn = '+' + rtn
-        elif '-' not in signs and x < 0:
-            rtn = rtn[1:]
-        return rtn
+        if x == 0:
+            return '0'
+        elif x.imag == 0:
+            rtn = '{:0.3g}'.format(x.real)
+            if '+' in signs and x >= 0:
+                rtn = '+' + rtn
+            elif '-' not in signs and x < 0:
+                rtn = rtn[1:]
+            return rtn
+        elif x.real == 0:
+            return coeff_to_str(x.imag,signs=signs)+'i'
+        else:
+            rtn = '{:0.3g}'.format(x.real) + coeff_to_str(x.imag,signs='+-')
+            return '(' + rtn + ')'
 
 def condense_terms(all_terms):
 
