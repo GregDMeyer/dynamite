@@ -53,9 +53,10 @@ def build_state(L,state = 0):
             raise ValueError('state string must have length L')
         if not all(c in ['U','D'] for c in state_str):
             raise ValueError('only character U and D allowed in state')
-        for i,c in enumerate(state_str):
+        for i,c in enumerate(state_str[::-1]):
             if c == 'U':
                 state += 1<<i
+
     elif not isinstance(state,int):
         raise TypeError('State must be an int or str.')
 
