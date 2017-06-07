@@ -88,12 +88,4 @@ Now to set up the packages:
 ``pip3 install cython petsc4py slepc4py``
 (you may want ``sudo -E`` depending on your setup, see above)
 
-With those installed, you have to do a bit of building (I will automate this soon):
-
-.. code:: bash
-
-    cd dynamite/dynamite/backend
-    make backend_impl.o
-    python setup.py -q build_ext --inplace
-
-Then you should be all set to import dynamite. You can import it directly from the top-level ``dynamite`` directory, or you can install it by doing ``pip install ./`` in the top-level directory.
+Then, in the top-level source directory run `pip install ./`, and you should be all set to import dynamite!
