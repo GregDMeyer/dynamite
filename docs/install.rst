@@ -1,6 +1,9 @@
 Installing
 ==========
 
+.. note ::
+    dynamite is written for Python 3! You may need to install that first if you don't already have it.
+
 Dynamite is built on the `PETSc <www.mcs.anl.gov/petsc/>`_ and `SLEPc <http://slepc.upv.es/>`_ packages, as well as the Python wrappers around them, ``petsc4py`` and ``slepc4py``. The first step is to install those.
 
 Building PETSc
@@ -25,7 +28,7 @@ If you want, you can run the PETSc tests as specified in the output of ``make`` 
 
 **Configure options:**
 
- - ``--with-scalar-type=complex`` Use complex numbers with PETSc.
+ - ``--with-scalar-type=complex`` Use complex numbers with PETSc. **Required**
  - ``--with-petsc-arch=complex-opt`` The name of the PETSc build (we call this ``PETSC_ARCH`` later)
  - ``--with-debugging=0`` Do not include C debugging symbols, to improve PETSc performance significantly. Since the normal dynamite user won't be messing with the underlying C code, you won't need C debugging.
  - ``--download-mpich`` If you don't have an MPI implementation, then this downloads and configures ``mpich`` for PETSc. However, if you do already have MPI set up (for example, supercomputing clusters will for sure already have an implementation), remove this option and configure should find your MPI implementation.
@@ -34,7 +37,7 @@ If you want, you can run the PETSc tests as specified in the output of ``make`` 
  - ``CXXOPTFLAGS=-O3`` Opt. flags for C++.
  - ``FOPTFLAGS=-O3`` Opt. flags for FORTRAN.
 
- Optional:
+ Even more optional:
 
  - ``--use-64-bit-indices`` Required to work with spin chains longer than 31.
 
@@ -88,4 +91,4 @@ Now to set up the packages:
 ``pip3 install cython petsc4py slepc4py``
 (you may want ``sudo -E`` depending on your setup, see above)
 
-Then, in the top-level source directory run `pip install ./`, and you should be all set to import dynamite!
+Then, in the top-level source directory run ``pip install ./``, and you should be all set to import dynamite!
