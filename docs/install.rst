@@ -91,4 +91,16 @@ Now to set up the packages:
 ``pip3 install cython petsc4py slepc4py``
 (you may want ``sudo -E`` depending on your setup, see above)
 
-Then, in the top-level source directory run ``pip install ./``, and you should be all set to import dynamite!
+Finally, get the dynamite source from GitHub and install:
+
+.. code:: bash
+
+    git clone https://github.com/GregDMeyer/dynamite.git
+    cd dynamite
+    pip install ./  # you may want sudo with pip
+
+Now you should be all set to use dynamite! If you want to work on the dynamite source code, or just easily pull updates from GitHub, you might want to do ``pip install -e ./`` to keep the source files in-place.
+
+.. note::
+
+    Don't try to do ``pip install dynamite``! There is a totally unrelated package on PyPI by that name. Eventually this dynamite will hopefully be on PyPI under the name ``quantumdynamite``.

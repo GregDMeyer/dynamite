@@ -19,6 +19,8 @@ to arbitrarily long times, but is quite limited in Hilbert space size.
 dynamite is best at evolving for moderate time scales (perhaps :math:`\sim 10^4 * 1/|J|`)
 on moderate size Hilbert spaces (up to :math:`\sim 30` spins or so).
 
+`Check out dynamite on GitHub! <https://github.com/GregDMeyer/dynamite>`_
+
 .. note::
     dynamite is in beta! You may, and probably will, find bugs. When you do,
     please submit them on the `GitHub Issues <https://github.com/GregDMeyer/dynamite/issues>`_
@@ -49,9 +51,3 @@ Coming Soon
    Examples.ipynb
    tips.rst
    dynamite.rst
-
-Indices and tables
-==================
-
-* :ref:`genindex`
-* :ref:`search`
