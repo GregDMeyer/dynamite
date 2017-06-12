@@ -27,11 +27,11 @@ args = parser.parse_args()
 
 slepc_args = args.slepc_args.split(' ')
 
-from dynamite import initialize
-initialize(slepc_args)
+from dynamite import config
+config.initialize(slepc_args)
 
 from dynamite.operators import Sum,Product,IndexSum,Sigmax,Sigmay,Sigmaz
-from dynamite.tools import build_state,track_memory,get_max_memory_usage,get_cur_memory_usage
+from dynamite.tools import build_state,track_memory,get_max_memory_usage
 from dynamite.extras import Majorana as X
 from petsc4py.PETSc import Sys
 Print = Sys.Print
@@ -46,6 +46,8 @@ stats = {
 
 track_memory()
 mem_type = 'all'
+
+config.global_L = args.L
 
 if __debug__:
     Print('begin building dynamite operator')
@@ -72,7 +74,6 @@ elif args.H == 'SYK':
     seed(0)
     H = Sum(uniform(-1,1)*Product(X(idx) for idx in idxs) for idxs in combinations(range(args.L*2),4))
 
-H.L = args.L
 H.use_shell = args.shell
 
 start = default_timer()
@@ -103,7 +104,7 @@ if args.evolve:
     if __debug__:
         Print('beginning evolution...')
     start = default_timer()
-    s = build_state(args.L,state=args.init_state)
+    s = build_state(state=args.init_state)
     H.evolve(s,t=args.t)
     stats['evolve_time'] = default_timer() - start
     if __debug__:
