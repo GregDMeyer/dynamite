@@ -52,3 +52,5 @@ Coming Soon
    tips.rst
    FAQ.rst
    dynamite.rst
+
+This package was created by Greg Meyer in `Prof. Norman Yao's lab <https://quantumoptics.physics.berkeley.edu/>`_ at UC Berkeley. Special thanks also to Francisco Machado for contributing helpful ideas.
