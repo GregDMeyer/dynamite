@@ -1,6 +1,6 @@
 
-from . import initialize
-initialize()
+from . import config
+config.initialize()
 
 import numpy as np
 from slepc4py import SLEPc
@@ -15,7 +15,7 @@ __all__ = [
     'get_max_memory_usage',
     'get_cur_memory_usage']
 
-def build_state(L,state = 0):
+def build_state(L = None,state = 0):
     '''
     Build a PETSc vector representing some product state.
 
@@ -27,7 +27,8 @@ def build_state(L,state = 0):
     Parameters
     ----------
     L : int
-        The length of the spin chain
+        The length of the spin chain. Can be omitted if a global
+        L has been set with :meth:`dynamite.Config.global_L`.
 
     state : int or str, optional
         The product state. Can either be an integer whose
@@ -41,6 +42,9 @@ def build_state(L,state = 0):
     petsc4py.PETSc.Vec
         The product state
     '''
+
+    if L is None:
+        L = config.global_L
 
     v = PETSc.Vec().create()
     v.setSizes(1<<L)

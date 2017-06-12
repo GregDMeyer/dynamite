@@ -1,6 +1,6 @@
 
-from . import initialize
-initialize()
+from . import config
+config.initialize()
 
 import numpy as np
 from slepc4py import SLEPc

@@ -1,4 +1,7 @@
 
+from . import config
+config.initialize()
+
 from .operators import Sigmax,Sigmay,Sigmaz,IndexProduct
 
 def commutator(o1,o2):

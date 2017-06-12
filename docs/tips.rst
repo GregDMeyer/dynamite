@@ -10,6 +10,8 @@ Pitfalls (TL,DR)
  - The algorithm for finding eigenvalues is really good at finding a few eigenvalues in the spectrum. It is not good at finding the entire spectrum. If you try to find the whole spectrum, you will not find any more success than if you used other methods.
  - It really is useful to read the SLEPc (and PETSc) Users' Manual!
 
+.. _parallelism:
+
 Parallelism
 -----------
 
@@ -78,15 +80,15 @@ Interacting with PETSc/SLEPc
 
 The underlying PETSc matrix for any operator is easily accessible with :meth:`dynamite.operators.Operator.get_mat`, and states in dynamite are just petsc4py vectors themselves. So arbitrary functions from petsc4py can be used with them. The documentation is not too extensive for the petsc4py and slepc4py, but it is inferred easily from the C interface. For example, the C function ``MatMult()`` is implemented as a member function of the Python :meth:`petsc4py.PETSc.Mat` class: one would just do ``my_matrix.mult(in_vec,result_vec)``.
 
-C programs using PETSc and SLEPc can take options at runtime that modify how the libraries work. This is possible in dynamite as well. It is accomplished by using :meth:`dynamite.initialize`. An example: if PETSc is configured with GPU support, the following will cause the computations to be performed on the GPU:
+C programs using PETSc and SLEPc can take options at runtime that modify how the libraries work. This is possible in dynamite as well. It is accomplished by using :meth:`dynamite.config.initialize`. An example: if PETSc is configured with GPU support, the following will cause the computations to be performed on the GPU:
 
 .. code:: python
 
     # at very beginning of script
-    from dynamite import initialize
-    initialize(['-vec_type','cuda',
-                '-mat_type','aijcusparse',
-                '-bv_type','vecs'])
+    from dynamite import config
+    config.initialize(['-vec_type','cuda',
+                       '-mat_type','aijcusparse',
+                       '-bv_type','vecs'])
 
 Note that this must be called at the very start of a script. Calling, for example, ``from dynamite.operators import *`` will automatically initialize PETSc with no arguments.
 

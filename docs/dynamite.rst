@@ -7,3 +7,4 @@ Full API documentation
    dynamite.computations
    dynamite.tools
    dynamite.extras
+   dynamite.config

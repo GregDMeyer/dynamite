@@ -7,6 +7,7 @@ from dynamite.tools import build_state,vectonumpy
 from dynamite.tools import track_memory,get_max_memory_usage,get_cur_memory_usage
 from dynamite._utils import coeff_to_str
 from dynamite.extras import commutator, Majorana
+from dynamite import config
 import numpy as np
 import qutip as qtp
 from petsc4py.PETSc import Sys,COMM_WORLD,NormType
@@ -280,7 +281,7 @@ class Products(BaseTest):
             with self.subTest(low=low,high=high):
                 H = dy.Sigmay(index=0) * dy.Sigmay(index=1)
                 H.L = self.L
-                with self.assertRaises(IndexError):
+                with self.assertRaises(ValueError):
                     dy.IndexProduct(H,min_i=low,max_i=high)
 
 class Sums(BaseTest):
@@ -355,7 +356,7 @@ class Sums(BaseTest):
         for low,high in [(1,0),(0,self.L+1),(-1,0)]:
             with self.subTest(low=low,high=high):
                 dsy,_ = get_both('sy',L=self.L)
-                with self.assertRaises(IndexError):
+                with self.assertRaises(ValueError):
                     dy.IndexSum(dsy,min_i=low,max_i=high)
 
     def test_IndexSum_wrap(self):
@@ -741,6 +742,37 @@ class Benchmarking(BaseTest):
 
         track_memory()
         get_max_memory_usage()
+
+class Config(BaseTest):
+
+    def test_global_L(self):
+
+        config.global_L = 10
+
+        test_ops = {
+            'sx' : lambda: dy.Sigmax(),
+            'sy' : lambda: dy.Sigmay(),
+            'sz' : lambda: dy.Sigmaz(),
+            'ident' : lambda: dy.Identity(),
+            'zero' : lambda: dy.Zero(),
+            'sum' : lambda: dy.Sum([dy.Sigmax()]),
+            'product' : lambda: dy.Product([dy.Sigmax()]),
+            'indexsum' : lambda: dy.IndexSum(dy.Sigmax()),
+            'indexproduct' : lambda: dy.IndexProduct(dy.Sigmax()),
+        }
+
+        for op,d in test_ops.items():
+            with self.subTest(op=op):
+                self.assertEqual(d().L,10)
+
+        v = build_state()
+        self.assertEqual(v.size,2**10)
+
+        config.global_L = None
+
+        for op,d in test_ops.items():
+            with self.subTest(op=op):
+                self.assertIs(d().L,None)
 
 if __name__ == '__main__':
     ut.main(warnings='ignore')

@@ -50,4 +50,5 @@ Coming Soon
    install.rst
    Examples.ipynb
    tips.rst
+   FAQ.rst
    dynamite.rst

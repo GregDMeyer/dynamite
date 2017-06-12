@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-# ^ that's just for pylinter
 
 """
 This module provides the building blocks for Hamiltonians, and
@@ -16,10 +14,9 @@ __all__ = ['Sigmax',
            'IndexSum',
            'IndexProduct']
 
-from . import initialize
-initialize()
+from . import config
+config.initialize()
 
-from itertools import product
 import numpy as np
 
 from petsc4py.PETSc import Vec, COMM_WORLD
@@ -42,6 +39,9 @@ class Operator:
     """
 
     def __init__(self,L=None):
+
+        if L is None:
+            L = config.global_L
 
         self._L = L
         self.max_ind = None
@@ -229,7 +229,7 @@ class Operator:
         o.max_ind = self.max_ind
         o.needs_parens = self.needs_parens
         o.coeff = self.coeff
-        o._shell = self.use_shell
+        o.use_shell = self.use_shell
         return o
 
     def _copy(self):
@@ -494,6 +494,10 @@ class _Expression(Operator):
         """
         Base class for Sum and Product classes.
         """
+
+        if L is None:
+            L = config.global_L
+
         Operator.__init__(self,L=L)
 
         self.terms = [t.copy() for t in terms]
@@ -515,6 +519,7 @@ class _Expression(Operator):
         elif len(self.terms) == 1:
             self.max_ind = self.terms[0].max_ind
 
+        # pick up length from terms if it isn't set any other way
         if L is None:
             L = terms_L
 
@@ -562,6 +567,10 @@ class Sum(_Expression):
     """
 
     def __init__(self,terms,L=None):
+
+        if L is None:
+            L = config.global_L
+
         _Expression.__init__(self,terms,L=L)
         if len(self.terms) > 1:
             self.needs_parens = True
@@ -619,6 +628,10 @@ class Product(_Expression):
     """
 
     def __init__(self,terms,L=None):
+
+        if L is None:
+            L = config.global_L
+
         _Expression.__init__(self,terms,L=L)
         for term in self.terms:
             self.coeff = self.coeff * term.coeff
@@ -656,19 +669,27 @@ class _IndexType(Operator):
 
     def __init__(self,op,min_i=0,max_i=None,index_label='i',wrap=False,L=None):
 
-        self.min_i = min_i
-        self.max_i = max_i
+        if L is None:
+            L = config.global_L
+
+        self._min_i = min_i
+        self._max_i = max_i
+        self.hard_max = max_i is not None
         self.wrap = wrap
 
         Operator.__init__(self,L=L)
 
-        if self.max_i is not None and self.max_i < self.min_i:
-            raise IndexError('max_i must be >= min_i.')
-
-        if self.min_i < 0:
-            raise IndexError('min_i must be >= 0.')
+        if self._max_i is not None and self._max_i < self._min_i:
+            raise ValueError('max_i must be >= min_i.')
 
         self.max_ind = op.max_ind
+        if self.L is not None:
+            if self._max_i is not None and self._max_i >= self.L:
+                raise ValueError('max_i must be < L.')
+
+        if self._min_i < 0:
+            raise ValueError('min_i must be >= 0.')
+
         self.op = op.copy()
 
         if self.op.L is not None and self.L is None:
@@ -698,8 +719,8 @@ class _IndexType(Operator):
 
     def _copy(self):
         o = type(self)(op=self.op,
-                       min_i=self.min_i,
-                       max_i=self.max_i,
+                       min_i=self._min_i,
+                       max_i=self._max_i,
                        index_label=self.index_label,
                        wrap=self.wrap)
         return o
@@ -712,9 +733,9 @@ class _IndexType(Operator):
         if request_parens:
             t += r'\left['
         t += coeff_to_str(self.coeff,signs)
-        t += self._get_sigma_tex()+r'_{'+self.index_label+'='+str(self.min_i)+'}'
-        if self.max_i is not None:
-            t += '^{'+str(self.max_i)+'}'
+        t += self._get_sigma_tex()+r'_{'+self.index_label+'='+str(self._min_i)+'}'
+        if self._max_i is not None:
+            t += '^{'+str(self._max_i)+'}'
         else:
             if self.wrap:
                 t += '^{L-1}'
@@ -732,20 +753,23 @@ class _IndexType(Operator):
         return self.op._replace_index(ind,rep)
 
     def _prop_L(self,L):
-        if self.max_i is not None and L is not None:
-            if self.max_i > L-1:
-                raise IndexError('Cannot set L smaller than '
+        if self.hard_max and L is not None:
+            if self._max_i > L-1:
+                raise ValueError('Cannot set L smaller than '
                                  'max_i+1 of index sum or product.')
-            elif not self.wrap and self.max_i + self.max_ind > L-1:
-                raise IndexError('Index sum or product operator would extend '
+            elif not self.wrap and self._max_i + self.max_ind > L-1:
+                raise ValueError('Index sum or product operator would extend '
                                  'past end of spin chain (L too small).')
 
         self.op.L = L
-        if self.max_i is None and L is not None:
-            if self.wrap:
-                self.max_i = L-1
+        if not self.hard_max:
+            if L is not None:
+                if self.wrap:
+                    self._max_i = L-1
+                else:
+                    self._max_i = L - self.max_ind - 1
             else:
-                self.max_i = L - self.max_ind - 1
+                self._max_i = None
 
     def _get_MSC(self,shift_index=0):
         raise NotImplementedError()
@@ -778,6 +802,10 @@ class IndexSum(_IndexType):
     """
 
     def __init__(self,op,min_i=0,max_i=None,index_label='i',wrap=False,L=None):
+
+        if L is None:
+            L = config.global_L
+
         _IndexType.__init__(self,
                             op=op,
                             min_i=min_i,
@@ -790,16 +818,16 @@ class IndexSum(_IndexType):
         return r'\sum'
 
     def _get_MSC(self,shift_index=0):
-        if self.max_i is None:
+        if self._max_i is None:
             raise Exception('Must set L or max_i before building MSC representation of IndexSum.')
-        all_terms = np.hstack([self.op.get_MSC(shift_index=shift_index+i) for i in range(self.min_i,self.max_i+1)])
+        all_terms = np.hstack([self.op.get_MSC(shift_index=shift_index+i) for i in range(self._min_i,self._max_i+1)])
         all_terms['coeffs'] *= self.coeff
         return condense_terms(all_terms)
 
     def _build_qutip(self,shift_index):
         ret = Zero(L=self.L).build_qutip()
 
-        for i in range(self.min_i,self.max_i+1):
+        for i in range(self._min_i,self._max_i+1):
             ret += self.op.build_qutip(shift_index=i)
 
         return ret
@@ -834,6 +862,10 @@ class IndexProduct(_IndexType):
     """
 
     def __init__(self,op,min_i=0,max_i=None,index_label='i',wrap=False,L=None):
+
+        if L is None:
+            L = config.global_L
+
         _IndexType.__init__(self,
                             op=op,
                             min_i=min_i,
@@ -846,9 +878,9 @@ class IndexProduct(_IndexType):
         return r'\prod'
 
     def _get_MSC(self,shift_index=0):
-        if self.max_i is None:
+        if self._max_i is None:
             raise Exception('Must set L or max_i before building MSC representation of IndexProduct.')
-        terms = (self.op.get_MSC(shift_index=shift_index+i) for i in range(self.min_i,self.max_i+1))
+        terms = (self.op.get_MSC(shift_index=shift_index+i) for i in range(self._min_i,self._max_i+1))
         all_terms = MSC_matrix_product(terms)
         all_terms['coeffs'] *= self.coeff
         return condense_terms(all_terms)
@@ -856,7 +888,7 @@ class IndexProduct(_IndexType):
     def _build_qutip(self,shift_index):
         ret = Identity(L=self.L).build_qutip()
 
-        for i in range(self.min_i,self.max_i+1):
+        for i in range(self._min_i,self._max_i+1):
             ret *= self.op.build_qutip(shift_index=i)
 
         return ret
@@ -865,6 +897,9 @@ class IndexProduct(_IndexType):
 class _Fundamental(Operator):
 
     def __init__(self,index=0,L=None):
+
+        if L is None:
+            L = config.global_L
 
         Operator.__init__(self,L=L)
         self.index = index
@@ -905,6 +940,10 @@ class Sigmax(_Fundamental):
     """
 
     def __init__(self,index=0,L=None):
+
+        if L is None:
+            L = config.global_L
+
         _Fundamental.__init__(self,index,L=L)
         self.tex = [[r'\sigma^x_{',self.index]]
         self.tex_end = r'}'
@@ -929,6 +968,10 @@ class Sigmaz(_Fundamental):
     """
 
     def __init__(self,index=0,L=None):
+
+        if L is None:
+            L = config.global_L
+
         _Fundamental.__init__(self,index,L=L)
         self.tex = [[r'\sigma^z_{',self.index]]
         self.tex_end = r'}'
@@ -953,6 +996,10 @@ class Sigmay(_Fundamental):
     """
 
     def __init__(self,index=0,L=None):
+
+        if L is None:
+            L = config.global_L
+
         _Fundamental.__init__(self,index,L=L)
         self.tex = [[r'\sigma^y_{',self.index]]
         self.tex_end = r'}'
@@ -978,6 +1025,10 @@ class Identity(_Fundamental):
     """
 
     def __init__(self,index=0,L=None):
+
+        if L is None:
+            L = config.global_L
+
         _Fundamental.__init__(self,index,L=L)
         self.tex = []
         self.tex_end = r'I'
@@ -1002,6 +1053,10 @@ class Zero(_Fundamental):
     """
 
     def __init__(self,index=0,L=None):
+
+        if L is None:
+            L = config.global_L
+
         _Fundamental.__init__(self,index,L=L)
         self.tex = []
         self.tex_end = r'0'
