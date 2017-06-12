@@ -540,7 +540,7 @@ class StateBuilding(BaseTest):
                 s = build_state(L=self.L,state=i)
                 qs = qtp.basis(2,0 if i[0] == 'D' else 1)
                 for j in range(1,self.L):
-                    qs = qtp.tensor(qtp.basis(2,0 if i[j] == 'D' else 1),qs)
+                    qs = qtp.tensor(qs,qtp.basis(2,0 if i[j] == 'D' else 1))
                 v = vectonumpy(s)
                 if v is not None:
                     self.assertTrue(np.all(v==qs.full().flatten()))
