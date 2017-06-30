@@ -65,7 +65,7 @@ def extensions():
 class MakeBuildExt(build_ext):
     def run(self):
         # build the backend_impl.o object file
-        make = check_output(['make','backend_impl.o'],cwd='dynamite/backend')
+        make = check_output(['make'],cwd='dynamite/backend')
         print(make.decode())
         build_ext.run(self)
 
