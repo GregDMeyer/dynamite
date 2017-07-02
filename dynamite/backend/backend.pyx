@@ -1,5 +1,6 @@
 from petsc4py.PETSc cimport Vec,  PetscVec
 from petsc4py.PETSc cimport Mat,  PetscMat
+from petsc4py.PETSc cimport Scatter, PetscScatter
 
 from petsc4py.PETSc import Error
 
@@ -27,6 +28,12 @@ cdef extern from "backend_impl.h":
                        PetscMat *A)
 
     int DestroyContext(PetscMat A)
+
+    int ReducedDensityMatrix(PetscInt L,
+                             PetscVec x,
+                             PetscInt cut_size,
+                             bint fillall,
+                             np.complex128_t* m)
 
     int PetscMemoryGetCurrentUsage(PetscLogDouble* mem)
     int PetscMallocGetCurrentUsage(PetscLogDouble* mem)
@@ -178,3 +185,38 @@ def product_of_terms(np.ndarray[MSC_t,ndim=1] factors):
     prod_array[0] = prod
 
     return prod_array
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+def reduced_density_matrix(Vec v,int cut_size,bint fillall=True):
+
+    # cut_size: number of spins to include in reduced system
+    # currently, those will be spins 0 to cut_size-1
+    cdef int red_size,ierr,L
+    cdef np.ndarray[np.complex128_t,ndim=2] reduced
+    cdef Vec v0
+    cdef Scatter sc
+
+    # collect to process 0
+    sc,v0 = Scatter.toZero(v)
+    sc.begin(v,v0)
+    sc.end(v,v0)
+
+    # this function will always return None
+    # on all processes other than 0
+    if v0.getSize() == 0:
+        return None
+
+    # get L from the vector's size
+    L = v0.getSize().bit_length() - 1
+
+    red_size = 2**cut_size
+    reduced = np.zeros((red_size,red_size),dtype=np.complex128,order='C')
+
+    # note: eigvalsh only uses one triangle of the matrix, so allow
+    # to only fill half of it
+    ierr = ReducedDensityMatrix(L,v0.vec,cut_size,fillall,&reduced[0,0])
+    if ierr != 0:
+        raise Error(ierr)
+
+    return reduced

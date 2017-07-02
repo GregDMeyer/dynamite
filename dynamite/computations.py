@@ -2,6 +2,8 @@
 from . import config
 config.initialize()
 
+from .backend import backend as bknd
+
 import numpy as np
 from slepc4py import SLEPc
 from petsc4py import PETSc
@@ -208,3 +210,81 @@ def eigsolve(H,getvecs=False,nev=1,which=None,target=None):
         return (evals,evecs)
     else:
         return evals
+
+def reduced_density_matrix(v,cut_size,fillall=True):
+    """
+    Compute the reduced density matrix of a state vector by
+    tracing out some set of spins. Currently only supports
+    tracing out a certain number of spins, but not specifying
+    which will be removed. (Spins with indices 0 to cut_size-1
+    are traced out in the current implementation).
+
+    The density matrix is returned on process 0, the function
+    returns ``None`` on all other processes.
+
+    Parameters
+    ----------
+
+    v : petsc4py.PETSc.Vec
+        A PETSc vector containing the state.
+
+    cut_size : int
+        The number of spins to keep. So, for ``cut_size``:math:`=n`,
+        :math:`L-n` spins will be traced out, resulting in a density
+        matrix of dimension :math:`2^n {\\times} 2^n`.
+
+    fillall : bool,optional
+        Whether to fill the whole matrix. Since it will be Hermitian,
+        only the lower triangle is necessary to describe the whole matrix.
+        If this option is set to true, only the lower triangle will be filled.
+
+    Returns
+    -------
+    numpy.ndarray[np.complex128]
+        The density matrix
+    """
+
+    L = v.getSize().bit_length() - 1
+    if cut_size != int(cut_size) or not 0 <= cut_size <= L:
+        raise ValueError('cut_size must be an integer between 0 and L, inclusive.')
+
+    return bknd.reduced_density_matrix(v,cut_size,fillall=fillall)
+
+def entanglement_entropy(v,cut_size):
+    """
+    Compute the entanglement of a state across some cut on the
+    spin chain. To be precise, this is the bipartite entropy of
+    entanglement.
+
+    Currently, this quantity is computed entirely on process 0.
+    As a result, the function returns ``-1`` on all other processes.
+    Ideally, at some point a parallelized dense matrix solver will
+    be used in this computation.
+
+    Parameters
+    ----------
+
+    v : petsc4py.PETSc.Vec
+        A vector containing the state
+
+    cut_size : int
+        The number of spins on one side of the cut. To be precise,
+        the cut will be made between the spins at index ``cut_size-1``
+        and ``cut_size``.
+
+    Returns
+    -------
+
+    float
+        The entanglement entropy
+    """
+
+    reduced = reduced_density_matrix(v,cut_size,fillall=False)
+
+    if reduced is None:
+        return -1
+
+    w = np.linalg.eigvalsh(reduced)
+    EE = -np.sum(w * np.log(w,where=w>0))
+
+    return EE

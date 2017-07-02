@@ -270,3 +270,53 @@ PetscErrorCode DestroyContext(Mat A)
 
   return ierr;
 }
+
+#undef  __FUNCT__
+#define __FUNCT__ "ReducedDensityMatrix"
+PetscErrorCode ReducedDensityMatrix(PetscInt L,
+                                    Vec x,
+                                    PetscInt cut_size,
+                                    PetscBool fillall,
+                                    PetscScalar* m)
+{
+  const PetscScalar *x_array;
+  PetscInt i,j,k,jmax;
+  PetscInt cut_N,tr_N,tr_size;
+  PetscScalar a,b;
+  PetscErrorCode ierr;
+
+  /* compute sizes of things */
+  tr_size = L - cut_size; /* in case L is odd */
+  cut_N = 1 << cut_size;
+  tr_N = 1 << tr_size;
+
+  /*
+    Fill the reduced density matrix!
+
+    We only need to fill the lower triangle for the
+    purposes of eigensolving for entanglement entropy.
+    This behavior is controlled by "fillall".
+  */
+  ierr = VecGetArrayRead(x,&x_array);CHKERRQ(ierr);
+
+  for (i=0;i<cut_N;++i) {
+
+    if (fillall) jmax = cut_N;
+    else jmax = i+1;
+
+    for (j=0;j<jmax;++j) {
+
+      for (k=0;k<tr_N;++k) {
+        a = x_array[(i<<tr_size) + k];
+        b = x_array[(j<<tr_size) + k];
+
+        m[i*cut_N + j] += a*PetscConj(b);
+      }
+    }
+  }
+
+  ierr = VecRestoreArrayRead(x,&x_array);CHKERRQ(ierr);
+
+  return ierr;
+
+}

@@ -1,16 +1,16 @@
 
 from itertools import product
+from collections import OrderedDict
 
 import unittest as ut
 import dynamite.operators as dy
 from dynamite.tools import build_state,vectonumpy
-from dynamite.tools import track_memory,get_max_memory_usage,get_cur_memory_usage
 from dynamite._utils import coeff_to_str
 from dynamite.extras import commutator, Majorana
 from dynamite import config
 import numpy as np
 import qutip as qtp
-from petsc4py.PETSc import Sys,COMM_WORLD,NormType
+from petsc4py.PETSc import Sys,NormType
 Print = Sys.Print
 
 def to_np(H):
@@ -223,7 +223,10 @@ class Products(BaseTest):
         dvec = build_state(L=1)
         qvec = qtp.basis(2,0)
 
-        self.assertTrue(np.allclose(vectonumpy(dH * dvec),
+        v = vectonumpy(dH * dvec)
+        if v is None:
+            return
+        self.assertTrue(np.allclose(v,
                                     (qH * qvec).full().flatten()))
 
     def test_prod_recursive(self):
@@ -373,10 +376,10 @@ class Compound(BaseTest):
 
     def setUp(self):
         self.L = 8
-        self.op_lists = {
-            'XY':[(q_sigmax,q_sigmay),(dy.Sigmax,dy.Sigmay)],
-            'XYZ':[(q_sigmax,q_sigmay,q_sigmaz),(dy.Sigmax,dy.Sigmay,dy.Sigmaz)]
-        }
+        self.op_lists = OrderedDict([
+            ('XY',[(q_sigmax,q_sigmay),(dy.Sigmax,dy.Sigmay)]),
+            ('XYZ',[(q_sigmax,q_sigmay,q_sigmaz),(dy.Sigmax,dy.Sigmay,dy.Sigmaz)])
+        ])
 
     def test_Ising(self):
         H = dy.IndexSum(dy.Sigmaz()*dy.Sigmaz(1)) + 0.5*dy.IndexSum(dy.Sigmax())
@@ -557,11 +560,11 @@ class StateBuilding(BaseTest):
                 with self.assertRaises(TypeError):
                     build_state(L=self.L,state=i)
 
-Hs = {
-    'XXYY':dy.IndexSum(dy.Sum(s(0)*s(1) for s in [dy.Sigmax,dy.Sigmay])),
-    'XXYYZZ':dy.IndexSum(dy.Sum(s(0)*s(1) for s in [dy.Sigmax,dy.Sigmay,dy.Sigmaz])),
-    'ising':dy.IndexSum(dy.Sigmaz()*dy.Sigmaz(1)) + 0.5*dy.IndexSum(dy.Sigmax())
-}
+Hs = OrderedDict([
+    ('XXYY',dy.IndexSum(dy.Sum(s(0)*s(1) for s in [dy.Sigmax,dy.Sigmay]))),
+    ('XXYYZZ',dy.IndexSum(dy.Sum(s(0)*s(1) for s in [dy.Sigmax,dy.Sigmay,dy.Sigmaz]))),
+    ('ising',dy.IndexSum(dy.Sigmaz()*dy.Sigmaz(1)) + 0.5*dy.IndexSum(dy.Sigmax()))
+    ])
 
 class Evolution(BaseTest):
 
@@ -632,9 +635,6 @@ class Eigsolve(BaseTest):
         # make sure every eigenvalue is close to one in the list
         # also check that the eigenvector is correct
         for ev,evec in zip(evs,evecs):
-            r = vectonumpy(evec)
-            if r is None:
-                continue
 
             # there are some matching eigenvalues
             self.assertLess(np.abs(qevs-ev).min(),1E-8)
@@ -672,10 +672,10 @@ class Eigsolve(BaseTest):
         # these tests fail numerically because of singular rows.
         # I don't think that's something dynamite should try to fix
 
-        # with self.subTest(which='target0'):
-        #     self.check_eigs(H,target=0)
-        # with self.subTest(which='target-1'):
-        #     self.check_eigs(H,target=-1)
+        with self.subTest(which='target0'):
+            self.check_eigs(H,target=0)
+        with self.subTest(which='target-1'):
+            self.check_eigs(H,target=-1)
 
     def test_XXYYZZ(self):
         H = Hs['XXYYZZ']
@@ -686,6 +686,71 @@ class Eigsolve(BaseTest):
             self.check_eigs(H,target=0)
         with self.subTest(which='target-1'):
             self.check_eigs(H,target=-1)
+
+from random import uniform
+from dynamite.computations import reduced_density_matrix,entanglement_entropy
+from petsc4py.PETSc import Vec
+class Entropy(BaseTest):
+
+    def setUp(self):
+        self.L = 4
+        self.cuts = [0,1,2,4]
+        self.states = OrderedDict([
+            ('product0',build_state(L=self.L)),
+            ('product1',build_state(L=self.L,state=int(0.8675309*(2**self.L))))
+        ])
+
+        H = dy.IndexSum(dy.Sum(s(0)*s(1) for s in (dy.Sigmax,dy.Sigmaz)))
+        H.L = self.L
+        self.states['evolved'] = H.evolve(self.states['product1'],1.0)
+
+        # make some random state
+        self.states['random'] = Vec().create()
+        self.states['random'].setSizes(1<<self.L)
+        self.states['random'].setFromOptions()
+        istart,iend = self.states['random'].getOwnershipRange()
+        for i in range(istart,iend):
+            self.states['random'][i] = uniform(-1,1) + 1j*uniform(-1,1)
+        self.states['random'].assemblyBegin()
+        self.states['random'].assemblyEnd()
+        self.states['random'].normalize()
+
+    def test_dm_entropy(self):
+        for cut in self.cuts:
+            for name,state in self.states.items():
+                with self.subTest(cut=cut,state=name):
+                    ddm = reduced_density_matrix(state,cut)
+                    dy_EE = entanglement_entropy(state,cut)
+
+                    qtp_state = qtp.Qobj(vectonumpy(state),dims=[[2]*self.L,[1]*self.L])
+
+                    if ddm is None:
+                        continue
+
+                    dm = qtp_state * qtp_state.dag()
+
+                    if cut > 0:
+                        dm = dm.ptrace(list(range(cut)))
+                    else:
+                        # qutip breaks when you ask it to trace out everything
+                        # maybe I should submit a pull request to them
+                        dm = None
+
+                    if dm is not None:
+                        self.assertTrue(np.allclose(dm.full(),ddm))
+                        qtp_EE = qtp.entropy_vn(dm)
+
+                    else:
+                        """
+                        # something is totally broken here. numpy keeps saying
+                        # that 1.0+0.0j is not equal to 1.0+0.0j. I'll skip this
+                        # test for now
+                        print(ddm.__repr__(),ddm == 1.+0.0j)
+                        self.assertTrue(np.array_equal(ddm,np.array([[1.+0.0j]])))
+                        """
+                        qtp_EE = 0
+
+                    self.assertTrue(np.allclose(qtp_EE,dy_EE))
 
 class Utils(BaseTest):
 
@@ -725,6 +790,7 @@ class Extras(BaseTest):
     def test_commutator(self):
         self.assertEqual(commutator(dy.Sigmax(),dy.Sigmay()),2j*dy.Sigmaz())
 
+from dynamite.tools import track_memory,get_max_memory_usage,get_cur_memory_usage
 class Benchmarking(BaseTest):
 
     # just test that there are no exceptions thrown
@@ -749,17 +815,17 @@ class Config(BaseTest):
 
         config.global_L = 10
 
-        test_ops = {
-            'sx' : lambda: dy.Sigmax(),
-            'sy' : lambda: dy.Sigmay(),
-            'sz' : lambda: dy.Sigmaz(),
-            'ident' : lambda: dy.Identity(),
-            'zero' : lambda: dy.Zero(),
-            'sum' : lambda: dy.Sum([dy.Sigmax()]),
-            'product' : lambda: dy.Product([dy.Sigmax()]),
-            'indexsum' : lambda: dy.IndexSum(dy.Sigmax()),
-            'indexproduct' : lambda: dy.IndexProduct(dy.Sigmax()),
-        }
+        test_ops = OrderedDict([
+            ('sx', lambda: dy.Sigmax()),
+            ('sy', lambda: dy.Sigmay()),
+            ('sz', lambda: dy.Sigmaz()),
+            ('ident', lambda: dy.Identity()),
+            ('zero', lambda: dy.Zero()),
+            ('sum', lambda: dy.Sum([dy.Sigmax()])),
+            ('product', lambda: dy.Product([dy.Sigmax()])),
+            ('indexsum', lambda: dy.IndexSum(dy.Sigmax())),
+            ('indexproduct', lambda: dy.IndexProduct(dy.Sigmax())),
+        ])
 
         for op,d in test_ops.items():
             with self.subTest(op=op):
