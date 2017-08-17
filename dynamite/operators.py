@@ -490,7 +490,7 @@ class Operator:
 
 
 class _Expression(Operator):
-    def __init__(self,terms,L=None):
+    def __init__(self,terms,copy=True,L=None):
         """
         Base class for Sum and Product classes.
         """
@@ -500,7 +500,10 @@ class _Expression(Operator):
 
         Operator.__init__(self,L=L)
 
-        self.terms = [t.copy() for t in terms]
+        if copy:
+            self.terms = [t.copy() for t in terms]
+        else:
+            self.terms = list(terms)
 
         if len(self.terms) == 0:
             raise ValueError('Term list is empty.')
@@ -562,16 +565,22 @@ class Sum(_Expression):
     terms : list
         A list of operators to sum
 
+    copy : bool, optional
+        Whether to use copies of the operators
+        in ``terms`` list, or just use them as-is. Not making
+        copies could lead to odd behavior if those operators are
+        later modified.
+
     L : int, optional
         The length of the spin chain
     """
 
-    def __init__(self,terms,L=None):
+    def __init__(self,terms,copy=True,L=None):
 
         if L is None:
             L = config.global_L
 
-        _Expression.__init__(self,terms,L=L)
+        _Expression.__init__(self,terms,copy,L=L)
         if len(self.terms) > 1:
             self.needs_parens = True
 
@@ -623,16 +632,22 @@ class Product(_Expression):
     terms : list
         A list of operators to multiply
 
+    copy : bool, optional
+        Whether to use copies of the operators
+        in ``terms`` list, or just use them as-is. Not making
+        copies could lead to odd behavior if those operators are
+        later modified.
+
     L : int, optional
         The length of the spin chain
     """
 
-    def __init__(self,terms,L=None):
+    def __init__(self,terms,copy=True,L=None):
 
         if L is None:
             L = config.global_L
 
-        _Expression.__init__(self,terms,L=L)
+        _Expression.__init__(self,terms,copy,L=L)
         for term in self.terms:
             self.coeff = self.coeff * term.coeff
             term.coeff = 1
