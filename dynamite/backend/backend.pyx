@@ -41,23 +41,40 @@ cdef extern from "backend_impl.h":
     int PetscMemoryGetMaximumUsage(PetscLogDouble* mem)
     int PetscMallocGetMaximumUsage(PetscLogDouble* mem)
 
+cdef extern from "cuda_shell.h":
+    int BuildMat_CUDAShell(PetscInt L,
+                           np.int_t nterms,
+                           PetscInt* masks,
+                           PetscInt* signs,
+                           np.complex128_t* coeffs,
+                           PetscMat *A)
+    int DestroyContext_CUDA(PetscMat A)
+
+cdef extern from "shellcontext.h":
+    ctypedef int PetscBool
+    ctypedef struct shell_context:
+        PetscBool gpu
+
 @cython.boundscheck(False)
 @cython.wraparound(False)
 def build_mat(int L,
               np.ndarray[PetscInt,mode="c"] masks not None,
               np.ndarray[PetscInt,mode="c"] signs not None,
               np.ndarray[np.complex128_t,mode="c"] coeffs not None,
-              bint shell=False):
+              bint shell=False,
+	      bint gpu=False):
 
     cdef int ierr,n
 
     M = Mat()
     n = masks.shape[0]
 
-    if shell:
+    if shell and gpu:
+       	ierr = BuildMat_CUDAShell(L,n,&masks[0],&signs[0],&coeffs[0],&M.mat)
+    elif shell:
         ierr = BuildMat_Shell(L,n,&masks[0],&signs[0],&coeffs[0],&M.mat)
     else:
-        ierr = BuildMat_Full(L,n,&masks[0],&signs[0],&coeffs[0],&M.mat)
+	ierr = BuildMat_Full(L,n,&masks[0],&signs[0],&coeffs[0],&M.mat)
 
     if ierr != 0:
         raise Error(ierr)
@@ -66,7 +83,17 @@ def build_mat(int L,
 
 def destroy_shell_context(Mat A):
     cdef int ierr
-    ierr = DestroyContext(A.mat)
+    cdef shell_context* ctx
+    
+    ierr = MatShellGetContext(A.mat,&ctx)
+    if ierr != 0:
+        raise Error(ierr)
+
+    if ctx.gpu:
+        ierr = DestroyContext_CUDA(A.mat)
+    else:
+        ierr = DestroyContext(A.mat)
+    
     if ierr != 0:
         raise Error(ierr)
 

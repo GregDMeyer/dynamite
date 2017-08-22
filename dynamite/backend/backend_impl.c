@@ -238,6 +238,7 @@ PetscErrorCode BuildContext(PetscInt L,PetscInt nterms,PetscInt* masks,PetscInt*
   ctx->L = L;
   ctx->nterms = nterms;
   ctx->nrm = -1;
+  ctx->gpu = PETSC_FALSE;
 
   /* we need to keep track of this stuff on our own. the numpy array might get garbage collected */
   ierr = PetscMalloc(sizeof(PetscInt)*nterms,&(ctx->masks));CHKERRQ(ierr);

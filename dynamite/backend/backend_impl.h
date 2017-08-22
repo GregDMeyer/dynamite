@@ -2,15 +2,7 @@
 #define BACKEND_H
 
 #include <slepcmfn.h>
-
-typedef struct _shell_context {
-    PetscInt L;
-    PetscInt nterms;
-    PetscInt *masks;
-    PetscInt *signs;
-    PetscScalar *coeffs;
-    PetscReal nrm;
-} shell_context;
+#include "shellcontext.h"
 
 PetscErrorCode BuildMat_Full(PetscInt L,PetscInt nterms,PetscInt* masks,PetscInt* signs,PetscScalar* coeffs,Mat *A);
 PetscErrorCode BuildMat_Shell(PetscInt L,PetscInt nterms,PetscInt* masks,PetscInt* signs,PetscScalar* coeffs,Mat *A);

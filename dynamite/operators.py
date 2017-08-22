@@ -303,7 +303,8 @@ class Operator:
                               np.ascontiguousarray(term_array['masks']),
                               np.ascontiguousarray(term_array['signs']),
                               np.ascontiguousarray(term_array['coeffs']),
-                              self.use_shell)
+                              bool(self.use_shell),
+                              self.use_shell == 'gpu')
 
     ### LaTeX representation of operators
 

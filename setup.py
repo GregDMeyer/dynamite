@@ -2,7 +2,7 @@
 import os
 from os.path import join
 from sys import version
-from subprocess import check_output
+from subprocess import check_output, CalledProcessError
 from setuptools import setup, Extension
 from setuptools.command.build_ext import build_ext
 from Cython.Build import cythonize
@@ -51,22 +51,33 @@ def configure():
         libraries=libs,
         library_dirs=lib_paths,
         runtime_library_dirs=lib_paths,
-        extra_objects=['dynamite/backend/backend_impl.o']
+        extra_objects=['dynamite/backend/backend_impl.o',
+                       'dynamite/backend/cuda_shell.o']
     )
 
 def extensions():
     return [
         Extension('dynamite.backend.backend',
                   sources = ['dynamite/backend/backend.pyx'],
-                  depends = ['dynamite/backend/backend_impl.h'],
+                  depends = ['dynamite/backend/backend_impl.h',
+                             'dynamite/backend/cuda_shell.h'],
                   **configure()),
     ]
 
 class MakeBuildExt(build_ext):
     def run(self):
         # build the backend_impl.o object file
-        make = check_output(['make'],cwd='dynamite/backend')
+        make = check_output(['make','backend_impl.o'],cwd='dynamite/backend')
         print(make.decode())
+
+        # try to build the cuda backend, if it doesn't work (probably because
+        # cuda isn't present), no worries
+        try:
+            make = check_output(['make','cuda_shell.o'],cwd='dynamite/backend')
+            print(make.decode())
+        except CalledProcessError:
+            print('CUDA compilation failed. GPU shell matrices disabled.')
+
         build_ext.run(self)
 
 setup(
