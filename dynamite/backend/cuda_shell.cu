@@ -1,5 +1,6 @@
 
 #include "cuda_shell.h"
+#include "cuda_shell_private.h"
 
 PetscErrorCode BuildMat_CUDAShell(PetscInt L,PetscInt nterms,PetscInt* masks,PetscInt* signs,PetscScalar* coeffs,Mat *A)
 {

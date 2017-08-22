@@ -34,6 +34,8 @@ cdef extern from "backend_impl.h":
                              PetscInt cut_size,
                              bint fillall,
                              np.complex128_t* m)
+    int MatShellGetContext(PetscMat,void* ctx)
+
 
     int PetscMemoryGetCurrentUsage(PetscLogDouble* mem)
     int PetscMallocGetCurrentUsage(PetscLogDouble* mem)
@@ -62,7 +64,7 @@ def build_mat(int L,
               np.ndarray[PetscInt,mode="c"] signs not None,
               np.ndarray[np.complex128_t,mode="c"] coeffs not None,
               bint shell=False,
-	      bint gpu=False):
+              bint gpu=False):
 
     cdef int ierr,n
 
@@ -70,11 +72,11 @@ def build_mat(int L,
     n = masks.shape[0]
 
     if shell and gpu:
-       	ierr = BuildMat_CUDAShell(L,n,&masks[0],&signs[0],&coeffs[0],&M.mat)
+        ierr = BuildMat_CUDAShell(L,n,&masks[0],&signs[0],&coeffs[0],&M.mat)
     elif shell:
         ierr = BuildMat_Shell(L,n,&masks[0],&signs[0],&coeffs[0],&M.mat)
     else:
-	ierr = BuildMat_Full(L,n,&masks[0],&signs[0],&coeffs[0],&M.mat)
+        ierr = BuildMat_Full(L,n,&masks[0],&signs[0],&coeffs[0],&M.mat)
 
     if ierr != 0:
         raise Error(ierr)
