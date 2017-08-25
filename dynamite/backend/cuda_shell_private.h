@@ -3,6 +3,12 @@
 
 #include <cuda_runtime.h>
 #include <thrust/device_ptr.h>
+#include <petscmat.h>
+#include <petsccuda.h>
+#include "shellcontext.h"
+
+#define GPU_BLOCK_SIZE 128
+#define GPU_BLOCK_NUM 128
 
 __global__ void device_MatMult_Shell(PetscInt size,
                                      PetscInt* masks,

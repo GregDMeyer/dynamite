@@ -51,8 +51,8 @@ def configure():
         libraries=libs,
         library_dirs=lib_paths,
         runtime_library_dirs=lib_paths,
-        extra_objects=['dynamite/backend/backend_impl.o',
-                       'dynamite/backend/cuda_shell.o']
+        extra_objects=['dynamite/backend/cuda_shell.o',
+                       'dynamite/backend/backend_impl.o']
     )
 
 def extensions():

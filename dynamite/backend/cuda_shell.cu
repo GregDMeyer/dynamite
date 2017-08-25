@@ -1,6 +1,9 @@
 
-#include "cuda_shell.h"
 #include "cuda_shell_private.h"
+
+extern "C" {
+#include "cuda_shell.h"
+}
 
 PetscErrorCode BuildMat_CUDAShell(PetscInt L,PetscInt nterms,PetscInt* masks,PetscInt* signs,PetscScalar* coeffs,Mat *A)
 {
@@ -18,6 +21,7 @@ PetscErrorCode BuildMat_CUDAShell(PetscInt L,PetscInt nterms,PetscInt* masks,Pet
   ierr = MatCreateShell(PETSC_COMM_WORLD,n,n,N,N,ctx,A);CHKERRQ(ierr);
   ierr = MatShellSetOperation(*A,MATOP_MULT,(void(*)(void))MatMult_CUDAShell);
   ierr = MatShellSetOperation(*A,MATOP_NORM,(void(*)(void))MatNorm_CUDAShell);
+  ierr = MatShellSetOperation(*A,MATOP_GET_VECS,(void(*)(void))MatCreateVecs_CUDAShell);
 
   return ierr;
 }
@@ -40,14 +44,14 @@ PetscErrorCode BuildContext_CUDA(PetscInt L,PetscInt nterms,PetscInt* masks,Pets
   err = cudaMalloc((void **) &(ctx->signs),  sizeof(PetscInt)*nterms);CHKERRCUDA(err);
   err = cudaMalloc((void **) &(ctx->coeffs), sizeof(PetscScalar)*nterms);CHKERRCUDA(err);
 
-  err = cudaMemcpy(masks,ctx->masks,sizeof(PetscInt)*nterms,cudaMemcpyHostToDevice);CHKERRCUDA(err);
-  err = cudaMemcpy(signs,ctx->signs,sizeof(PetscInt)*nterms,cudaMemcpyHostToDevice);CHKERRCUDA(err);
-  err = cudaMemcpy(coeffs,ctx->coeffs,sizeof(PetscScalar)*nterms,cudaMemcpyHostToDevice);CHKERRCUDA(err);
+  err = cudaMemcpy(ctx->masks,masks,sizeof(PetscInt)*nterms,cudaMemcpyHostToDevice);CHKERRCUDA(err);
+  err = cudaMemcpy(ctx->signs,signs,sizeof(PetscInt)*nterms,cudaMemcpyHostToDevice);CHKERRCUDA(err);
+  err = cudaMemcpy(ctx->coeffs,coeffs,sizeof(PetscScalar)*nterms,cudaMemcpyHostToDevice);CHKERRCUDA(err);
 
   return ierr;
 }
 
-PetscErrorCode DestroyContext(Mat A)
+PetscErrorCode DestroyContext_CUDA(Mat A)
 {
   PetscErrorCode ierr;
   cudaError_t err;
@@ -67,6 +71,7 @@ PetscErrorCode DestroyContext(Mat A)
 PetscErrorCode MatMult_CUDAShell(Mat M,Vec x,Vec b)
 {
   PetscErrorCode ierr;
+  cudaError_t err;
   shell_context *ctx;
 
   const PetscScalar* xarray;
@@ -82,6 +87,8 @@ PetscErrorCode MatMult_CUDAShell(Mat M,Vec x,Vec b)
 
   size = 1 << ctx->L;
 
+  err = cudaThreadSynchronize();CHKERRCUDA(err);
+
   device_MatMult_Shell<<<GPU_BLOCK_NUM,GPU_BLOCK_SIZE>>>(size,
                                                          ctx->masks,
                                                          ctx->signs,
@@ -89,6 +96,8 @@ PetscErrorCode MatMult_CUDAShell(Mat M,Vec x,Vec b)
                                                          ctx->nterms,
                                                          xarray,
                                                          barray);
+
+  err = cudaThreadSynchronize();CHKERRCUDA(err);
 
   ierr = VecCUDARestoreArrayRead(x,&xarray);CHKERRQ(ierr);
   ierr = VecCUDARestoreArrayReadWrite(b,&barray);CHKERRQ(ierr);
@@ -111,17 +120,27 @@ __global__ void device_MatMult_Shell(PetscInt size,
   PetscInt vec_start_index = blockIdx.x * entries_per_group;
   PetscInt vec_stop_index  = PetscMin((blockIdx.x + 1) * entries_per_group, size); // don't go beyond vec size
 
-  PetscScalar tmp;
+  PetscScalar tmp,val;
   PetscInt state,ket,mask,next_mask,this_start,i;
 
   this_start = vec_start_index + threadIdx.x;
 
   /* only access mask from global memory once */
-  mask = masks[this_start];
-  for (state=this_start; state<vec_stop_index; state += blockDim.x) {
+
+  /* on the gpu, unlike on parallel CPUs, we have access
+   * to the whole vector from any processor. That's awesome
+   * because it means that we can accumulate results by row
+   * instead of by column, and only do a single memory write 
+   * per entry in the output vector. Then we don't have to worry
+   * about atomic operations either!
+   */
+
+  mask = masks[0];
+  for (ket=this_start; ket<vec_stop_index; ket += blockDim.x) {
+    val = 0;
     for (i=0;i<nterms;) {
-      ket = state ^ mask;
       tmp = 0;
+      state = ket ^ mask;
       /* sum all terms for this matrix element */
       do {
 #if defined(PETSC_USE_64BIT_INDICES)
@@ -135,11 +154,11 @@ __global__ void device_MatMult_Shell(PetscInt size,
       } while (mask == next_mask);
       /* this can be optimized by keeping track of # of terms per matrix element.
          I think that should actually make it a lot faster because it gets rid of
-         a significant chunk of the global memory reads */
-
-      barray[ket] = tmp * xarray[state];
+         a significant chunk of the memory reads */
+      val += tmp * xarray[state];
       mask = next_mask;
     }
+    barray[ket] = val;
   }
 }
 
@@ -173,9 +192,12 @@ PetscErrorCode MatNorm_CUDAShell(Mat A,NormType type,PetscReal *nrm)
   N = 1<<ctx->L;
 
   device_MatNorm_Shell<<<GPU_BLOCK_NUM,GPU_BLOCK_SIZE,sizeof(PetscReal)*GPU_BLOCK_SIZE>>>(N,ctx->masks,ctx->signs,ctx->coeffs,ctx->nterms,d_maxs);
-  err = cudaMemcpy(d_maxs,h_maxs,sizeof(PetscReal)*GPU_BLOCK_NUM,cudaMemcpyDeviceToHost);CHKERRCUDA(err);
 
-  /* now do reduction on h_maxs */
+  err = cudaThreadSynchronize();CHKERRCUDA(err);
+
+  err = cudaMemcpy(h_maxs,d_maxs,sizeof(PetscReal)*GPU_BLOCK_NUM,cudaMemcpyDeviceToHost);CHKERRCUDA(err);
+
+  /* now do max of h_maxs */
   (*nrm) = 0;
   for (i=0;i<GPU_BLOCK_NUM;++i) {
     if (h_maxs[i] > (*nrm)) (*nrm) = h_maxs[i];
@@ -228,7 +250,7 @@ __global__ void device_MatNorm_Shell(PetscInt size,
 	next_mask = masks[i];
       } while (mask == next_mask);
 
-      sum += norm(csum);
+      sum += abs(csum);
     }
     if (sum > threadmax[threadIdx.x]) {
       threadmax[threadIdx.x] = sum;
@@ -248,4 +270,25 @@ __global__ void device_MatNorm_Shell(PetscInt size,
   }
 
   if (threadIdx.x == 0) d_maxs[blockIdx.x] = threadmax[0];
+}
+
+PetscErrorCode MatCreateVecs_CUDAShell(Mat mat, Vec *right, Vec *left)
+{
+  PetscErrorCode ierr;
+  PetscInt N;
+
+  ierr = MatGetSize(mat,&N,NULL);CHKERRQ(ierr);
+
+  if (right) {
+    ierr = VecCreate(PetscObjectComm((PetscObject)mat),right);CHKERRQ(ierr);
+    ierr = VecSetSizes(*right,PETSC_DECIDE,N);CHKERRQ(ierr);
+    ierr = VecSetFromOptions(*right);
+  }
+  if (left) {
+    ierr = VecCreate(PetscObjectComm((PetscObject)mat),left);CHKERRQ(ierr);
+    ierr = VecSetSizes(*left,PETSC_DECIDE,N);CHKERRQ(ierr);
+    ierr = VecSetFromOptions(*left);
+  }
+
+  return 0;
 }
