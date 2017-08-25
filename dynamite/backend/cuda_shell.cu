@@ -135,9 +135,9 @@ __global__ void device_MatMult_Shell(PetscInt size,
    * about atomic operations either!
    */
 
-  mask = masks[0];
   for (ket=this_start; ket<vec_stop_index; ket += blockDim.x) {
     val = 0;
+    mask = masks[0];
     for (i=0;i<nterms;) {
       tmp = 0;
       state = ket ^ mask;
