@@ -43,14 +43,16 @@ cdef extern from "backend_impl.h":
     int PetscMemoryGetMaximumUsage(PetscLogDouble* mem)
     int PetscMallocGetMaximumUsage(PetscLogDouble* mem)
 
-cdef extern from "cuda_shell.h":
-    int BuildMat_CUDAShell(PetscInt L,
-                           np.int_t nterms,
-                           PetscInt* masks,
-                           PetscInt* signs,
-                           np.complex128_t* coeffs,
-                           PetscMat *A)
-    int DestroyContext_CUDA(PetscMat A)
+include "config.pxi"
+IF USE_CUDA:
+    cdef extern from "cuda_shell.h":
+        int BuildMat_CUDAShell(PetscInt L,
+                               np.int_t nterms,
+                               PetscInt* masks,
+                               PetscInt* signs,
+                               np.complex128_t* coeffs,
+                               PetscMat *A)
+        int DestroyContext_CUDA(PetscMat A)
 
 cdef extern from "shellcontext.h":
     ctypedef int PetscBool
@@ -72,7 +74,11 @@ def build_mat(int L,
     n = masks.shape[0]
 
     if shell and gpu:
-        ierr = BuildMat_CUDAShell(L,n,&masks[0],&signs[0],&coeffs[0],&M.mat)
+        IF USE_CUDA:
+            ierr = BuildMat_CUDAShell(L,n,&masks[0],&signs[0],&coeffs[0],&M.mat)
+        ELSE:
+            raise NotImplementedError("dynamite was not built with CUDA shell "
+                                      "functionality (requires nvcc during build).")
     elif shell:
         ierr = BuildMat_Shell(L,n,&masks[0],&signs[0],&coeffs[0],&M.mat)
     else:
@@ -86,16 +92,20 @@ def build_mat(int L,
 def destroy_shell_context(Mat A):
     cdef int ierr
     cdef shell_context* ctx
-    
-    ierr = MatShellGetContext(A.mat,&ctx)
-    if ierr != 0:
-        raise Error(ierr)
 
-    if ctx.gpu:
-        ierr = DestroyContext_CUDA(A.mat)
-    else:
+    IF USE_CUDA:
+        ierr = MatShellGetContext(A.mat,&ctx)
+        if ierr != 0:
+            raise Error(ierr)
+
+        if ctx.gpu:
+            ierr = DestroyContext_CUDA(A.mat)
+        else:
+            ierr = DestroyContext(A.mat)
+
+    ELSE:
         ierr = DestroyContext(A.mat)
-    
+
     if ierr != 0:
         raise Error(ierr)
 

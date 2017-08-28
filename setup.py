@@ -1,10 +1,11 @@
 
 import os
-from os.path import join
+from os.path import join,dirname
 from sys import version
 from subprocess import check_output, CalledProcessError
 from setuptools import setup, Extension
 from setuptools.command.build_ext import build_ext
+from shutil import which
 from Cython.Build import cythonize
 
 import numpy
@@ -14,6 +15,13 @@ import slepc4py
 if version[0] != '3':
     raise RuntimeError('Dynamite is written for Python 3. Please install'
                        'for that version of Python.')
+
+HAVE_NVCC = which('nvcc') is not None
+
+# also write a .pxi that tells the backend
+# to include the CUDA shell functionality
+with open(join(dirname(__file__), 'dynamite', 'backend', 'config.pxi'), 'w') as fd:
+    fd.write('DEF USE_CUDA = %d\n' % int(HAVE_NVCC))
 
 def configure():
 
@@ -46,13 +54,19 @@ def configure():
                 slepc4py.get_include(),
                 numpy.get_include()]
 
+    object_files = ['dynamite/backend/backend_impl.o']
+
+    # check if we have nvcc, and thus should link to
+    # the CUDA code
+    if HAVE_NVCC:
+        object_files = ['dynamite/backend/cuda_shell.o'] + object_files
+
     return dict(
         include_dirs=include,
         libraries=libs,
         library_dirs=lib_paths,
         runtime_library_dirs=lib_paths,
-        extra_objects=['dynamite/backend/cuda_shell.o',
-                       'dynamite/backend/backend_impl.o']
+        extra_objects=object_files
     )
 
 def extensions():
@@ -60,7 +74,9 @@ def extensions():
         Extension('dynamite.backend.backend',
                   sources = ['dynamite/backend/backend.pyx'],
                   depends = ['dynamite/backend/backend_impl.h',
-                             'dynamite/backend/cuda_shell.h'],
+                             'dynamite/backend/backend_impl.c',
+                             'dynamite/backend/cuda_shell.h',
+                             'dynamite/backend/cuda_shell.cu',],
                   **configure()),
     ]
 
@@ -70,13 +86,10 @@ class MakeBuildExt(build_ext):
         make = check_output(['make','backend_impl.o'],cwd='dynamite/backend')
         print(make.decode())
 
-        # try to build the cuda backend, if it doesn't work (probably because
-        # cuda isn't present), no worries
-        try:
+        # if we have nvcc, build the CUDA backend
+        if HAVE_NVCC:
             make = check_output(['make','cuda_shell.o'],cwd='dynamite/backend')
             print(make.decode())
-        except CalledProcessError:
-            print('CUDA compilation failed. GPU shell matrices disabled.')
 
         build_ext.run(self)
 
