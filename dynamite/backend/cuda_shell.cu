@@ -130,7 +130,7 @@ __global__ void device_MatMult_Shell(PetscInt size,
   /* on the gpu, unlike on parallel CPUs, we have access
    * to the whole vector from any processor. That's awesome
    * because it means that we can accumulate results by row
-   * instead of by column, and only do a single memory write 
+   * instead of by column, and only do a single memory write
    * per entry in the output vector. Then we don't have to worry
    * about atomic operations either!
    */
@@ -146,7 +146,7 @@ __global__ void device_MatMult_Shell(PetscInt size,
 #if defined(PETSC_USE_64BIT_INDICES)
         tmp += __popcll(state & signs[i])%2 ? -coeffs[i] : coeffs[i];
 #else
-	tmp += __popc(state & signs[i])%2 ? -coeffs[i] : coeffs[i];
+        tmp += __popc(state & signs[i])%2 ? -coeffs[i] : coeffs[i];
 #endif
         ++i;
         if (i == nterms) break;
@@ -212,11 +212,11 @@ PetscErrorCode MatNorm_CUDAShell(Mat A,NormType type,PetscReal *nrm)
 }
 
 __global__ void device_MatNorm_Shell(PetscInt size,
-		   		     PetscInt* masks,
-			             PetscInt* signs,
-				     PetscScalar* coeffs,
-				     PetscInt nterms,	
-				     PetscReal *d_maxs)	
+                                     PetscInt* masks,
+                                     PetscInt* signs,
+                                     PetscScalar* coeffs,
+                                     PetscInt nterms,
+                                     PetscReal *d_maxs)
 {
   extern __shared__ PetscReal threadmax[];
 
@@ -243,11 +243,11 @@ __global__ void device_MatNorm_Shell(PetscInt size,
 #if defined(PETSC_USE_64BIT_INDICES)
         csum += __popcll(state & signs[i])%2 ? -coeffs[i] : coeffs[i];
 #else
-	csum += __popc(state & signs[i])%2 ? -coeffs[i] : coeffs[i];
+        csum += __popc(state & signs[i])%2 ? -coeffs[i] : coeffs[i];
 #endif
         ++i;
-	if (i >= nterms) break;
-	next_mask = masks[i];
+        if (i >= nterms) break;
+        next_mask = masks[i];
       } while (mask == next_mask);
 
       sum += abs(csum);

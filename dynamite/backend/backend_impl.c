@@ -68,7 +68,7 @@ PetscErrorCode BuildMat_Full(PetscInt L,PetscInt nterms,PetscInt* masks,PetscInt
 
       /* the elements must not be repeated or else INSERT_VALUES is wrong! */
       /* I could just use ADD_VALUES but if they are repeated there is a bug somewhere else */
-      ierr = MatSetValues(*A,1,&state,1,&lstate,&tmp_val,INSERT_VALUES);CHKERRQ(ierr);
+      ierr = MatSetValues(*A,1,&lstate,1,&state,&tmp_val,INSERT_VALUES);CHKERRQ(ierr);
     }
   }
 

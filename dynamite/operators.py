@@ -1024,7 +1024,7 @@ class Sigmay(_Fundamental):
         ind = self.index+shift_index
         if self.L is not None and ind >= self.L:
             raise IndexError('requested too large an index')
-        return np.array([(1<<ind,1<<ind,-1j*self.coeff)],dtype=MSC_dtype)
+        return np.array([(1<<ind,1<<ind,1j*self.coeff)],dtype=MSC_dtype)
 
     def _build_qutip(self,shift_index):
         import qutip as qtp

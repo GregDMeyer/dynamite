@@ -209,7 +209,7 @@ def product_of_terms(np.ndarray[MSC_t,ndim=1] factors):
         # keep the sign correct after spin flips.
         # this is crucial... otherwise everything
         # would commute!
-        flipped = prod.masks & factor.signs
+        flipped = factor.masks & prod.signs
         flip = 1
         while flipped:
             flip *= -1
