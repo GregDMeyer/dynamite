@@ -13,6 +13,8 @@ import qutip as qtp
 from petsc4py.PETSc import Sys,NormType
 Print = Sys.Print
 
+config.global_shell = False
+
 def to_np(H):
     ret = np.ndarray((1<<H.L,1<<H.L),dtype=np.complex128)
     s1 = build_state(H.L)
@@ -158,7 +160,7 @@ class SingleOperators(BaseTest):
         s.L = 1
 
         s.build_mat()
-
+        s.use_shell = False
         s.use_shell = True
         self.assertIs(s._mat,None)
 

@@ -109,6 +109,9 @@ def destroy_shell_context(Mat A):
     if ierr != 0:
         raise Error(ierr)
 
+def have_gpu_shell():
+    return bool(USE_CUDA)
+
 if sizeof(PetscInt) == 4:
     int_dt = np.int32
 elif sizeof(PetscInt) == 8:

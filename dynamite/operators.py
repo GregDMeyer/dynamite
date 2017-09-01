@@ -50,7 +50,7 @@ class Operator:
         self._mat = None
         self._MSC = None
         self._diag_entries = False
-        self._shell = False
+        self._shell = config.global_shell
 
 
     ### computation functions
@@ -272,7 +272,6 @@ class Operator:
 
         self._mat.destroy()
         self._mat = None
-        self._shell = None
 
     def build_mat(self,diag_entries=False):
         """
