@@ -385,7 +385,7 @@ class Operator:
 
     ### mask, sign, coefficient representation of operators
 
-    def get_MSC(self,shift_index=None):
+    def get_MSC(self,shift_index=None,wrap=False):
         """
         Get the representation of the operator in the (mask, sign, coefficient)
         format used internally by :mod:`dynamite`. The representation is saved
@@ -398,6 +398,10 @@ class Operator:
         shift_index : int
             Shift the whole operator along the spin chain by ``shift_index`` spins.
 
+        wrap : bool
+            Whether to wrap around if requesting a shift_index greater than the length
+            of the spin chain (i.e., take ``shift_index`` to ``shift_index % L``).
+
         Returns
         -------
         numpy.ndarray
@@ -405,12 +409,12 @@ class Operator:
         """
         if shift_index is None:
             if self._MSC is None:
-                self._MSC = self._get_MSC()
+                self._MSC = self._get_MSC(wrap=wrap)
             return self._MSC
         else:
-            return self._get_MSC(shift_index)
+            return self._get_MSC(shift_index,wrap=wrap)
 
-    def _get_MSC(self,shift_index):
+    def _get_MSC(self,shift_index,wrap):
         raise NotImplementedError()
 
     def release_MSC(self):
@@ -584,9 +588,9 @@ class Sum(_Expression):
         if len(self.terms) > 1:
             self.needs_parens = True
 
-    def _get_MSC(self,shift_index=0):
+    def _get_MSC(self,shift_index=0,wrap=False):
 
-        all_terms = np.hstack([t.get_MSC(shift_index=shift_index) for t in self.terms])
+        all_terms = np.hstack([t.get_MSC(shift_index=shift_index,wrap=wrap) for t in self.terms])
         all_terms['coeffs'] *= self.coeff
         return condense_terms(all_terms)
 
@@ -652,9 +656,9 @@ class Product(_Expression):
             self.coeff = self.coeff * term.coeff
             term.coeff = 1
 
-    def _get_MSC(self,shift_index=0):
+    def _get_MSC(self,shift_index=0,wrap=False):
 
-        all_terms = MSC_matrix_product(t.get_MSC(shift_index=shift_index) for t in self.terms)
+        all_terms = MSC_matrix_product(t.get_MSC(shift_index=shift_index,wrap=wrap) for t in self.terms)
         all_terms['coeffs'] *= self.coeff
         return condense_terms(all_terms)
 
@@ -786,7 +790,7 @@ class _IndexType(Operator):
             else:
                 self._max_i = None
 
-    def _get_MSC(self,shift_index=0):
+    def _get_MSC(self,shift_index=0,wrap=False):
         raise NotImplementedError()
 
 class IndexSum(_IndexType):
@@ -832,10 +836,12 @@ class IndexSum(_IndexType):
     def _get_sigma_tex(self):
         return r'\sum'
 
-    def _get_MSC(self,shift_index=0):
+    def _get_MSC(self,shift_index=0,wrap=False):
         if self._max_i is None:
             raise Exception('Must set L or max_i before building MSC representation of IndexSum.')
-        all_terms = np.hstack([self.op.get_MSC(shift_index=shift_index+i) for i in range(self._min_i,self._max_i+1)])
+        wrap = wrap or self.wrap
+        all_terms = np.hstack([self.op.get_MSC(shift_index=shift_index+i,wrap=wrap)
+                               for i in range(self._min_i,self._max_i+1)])
         all_terms['coeffs'] *= self.coeff
         return condense_terms(all_terms)
 
@@ -892,10 +898,11 @@ class IndexProduct(_IndexType):
     def _get_sigma_tex(self):
         return r'\prod'
 
-    def _get_MSC(self,shift_index=0):
+    def _get_MSC(self,shift_index=0,wrap=False):
         if self._max_i is None:
             raise Exception('Must set L or max_i before building MSC representation of IndexProduct.')
-        terms = (self.op.get_MSC(shift_index=shift_index+i) for i in range(self._min_i,self._max_i+1))
+        wrap = wrap or self.wrap
+        terms = (self.op.get_MSC(shift_index=shift_index+i,wrap=wrap) for i in range(self._min_i,self._max_i+1))
         all_terms = MSC_matrix_product(terms)
         all_terms['coeffs'] *= self.coeff
         return condense_terms(all_terms)
@@ -925,6 +932,15 @@ class _Fundamental(Operator):
     def _copy(self):
         return type(self)(index=self.index)
 
+    def _calc_ind(self,shift_index,wrap):
+        ind = self.index+shift_index
+        if self.L is not None and ind >= self.L:
+            if wrap:
+                ind = ind % self.L
+            else:
+                raise IndexError('requested too large an index')
+        return ind
+
     def _get_index_set(self):
         indices = set()
         for t in self.tex:
@@ -946,7 +962,7 @@ class _Fundamental(Operator):
     def _prop_L(self,L):
         pass
 
-    def _get_MSC(self,shift_index=0):
+    def _get_MSC(self,shift_index=0,wrap=False):
         raise NotImplementedError()
 
 class Sigmax(_Fundamental):
@@ -963,10 +979,8 @@ class Sigmax(_Fundamental):
         self.tex = [[r'\sigma^x_{',self.index]]
         self.tex_end = r'}'
 
-    def _get_MSC(self,shift_index=0):
-        ind = self.index+shift_index
-        if self.L is not None and ind >= self.L:
-            raise IndexError('requested too large an index')
+    def _get_MSC(self,shift_index=0,wrap=False):
+        ind = self._calc_ind(shift_index,wrap)
         return np.array([(1<<ind,0,self.coeff)],dtype=MSC_dtype)
 
     def _build_qutip(self,shift_index):
@@ -991,10 +1005,8 @@ class Sigmaz(_Fundamental):
         self.tex = [[r'\sigma^z_{',self.index]]
         self.tex_end = r'}'
 
-    def _get_MSC(self,shift_index=0):
-        ind = self.index+shift_index
-        if self.L is not None and ind >= self.L:
-            raise IndexError('requested too large an index')
+    def _get_MSC(self,shift_index=0,wrap=False):
+        ind = self._calc_ind(shift_index,wrap)
         return np.array([(0,1<<ind,self.coeff)],dtype=MSC_dtype)
 
     def _build_qutip(self,shift_index):
@@ -1019,10 +1031,8 @@ class Sigmay(_Fundamental):
         self.tex = [[r'\sigma^y_{',self.index]]
         self.tex_end = r'}'
 
-    def _get_MSC(self,shift_index=0):
-        ind = self.index+shift_index
-        if self.L is not None and ind >= self.L:
-            raise IndexError('requested too large an index')
+    def _get_MSC(self,shift_index=0,wrap=False):
+        ind = self._calc_ind(shift_index,wrap)
         return np.array([(1<<ind,1<<ind,1j*self.coeff)],dtype=MSC_dtype)
 
     def _build_qutip(self,shift_index):
@@ -1049,7 +1059,7 @@ class Identity(_Fundamental):
         self.tex_end = r'I'
         self.max_ind = 0
 
-    def _get_MSC(self,shift_index=0):
+    def _get_MSC(self,shift_index=0,wrap=False):
         return np.array([(0,0,self.coeff)],dtype=MSC_dtype)
 
     def _build_qutip(self,shift_index):
@@ -1077,8 +1087,8 @@ class Zero(_Fundamental):
         self.tex_end = r'0'
         self.max_ind = 0
 
-    def _get_MSC(self,shift_index=0):
-        return np.array([(0,0,0)],dtype=MSC_dtype)
+    def _get_MSC(self,shift_index=0,wrap=False):
+        return np.array([],dtype=MSC_dtype)
 
     def _build_qutip(self,shift_index):
         import qutip as qtp
