@@ -551,6 +551,26 @@ class StateBuilding(BaseTest):
                 if v is not None:
                     self.assertTrue(np.all(v==qs.full().flatten()))
 
+    def test_random(self):
+        # just make sure that we can build random states without exceptions
+        # and that their norm is reasonable.
+        # it would take too long to actually test that they are correctly distributed etc
+        # during the automated tests.
+        s = build_state(L=self.L,state='random')
+        self.assertLess(abs(s.norm()-1),1E-12)
+
+        s = build_state(L=self.L,state='random',seed=0)
+        x = np.random.random()
+        t = build_state(L=self.L,state='random',seed=0)
+        y = np.random.random()
+
+        self.assertLess(abs(s.norm()-1),1E-12)
+        self.assertLess(abs(s.dot(t)-1),1E-12)
+
+        # make sure we aren't screwing with numpy's random
+        # number generator in a way users wouldn't expect
+        self.assertTrue(x != y)
+
     def test_buildstate_exceptions(self):
         for i in ['U','UDDUDUD','DUDE',10000,-1]:
             with self.subTest(state=i):

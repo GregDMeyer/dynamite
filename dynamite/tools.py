@@ -6,6 +6,8 @@ import numpy as np
 from slepc4py import SLEPc
 from petsc4py import PETSc
 
+from os import urandom
+
 from .backend import backend
 
 __all__ = [
@@ -15,9 +17,9 @@ __all__ = [
     'get_max_memory_usage',
     'get_cur_memory_usage']
 
-def build_state(L = None,state = 0):
+def build_state(L = None,state = 0,seed = None):
     '''
-    Build a PETSc vector representing some product state.
+    Build a PETSc vector representing a state.
 
     .. note::
         State indices go from right-to-left. For example,
@@ -31,11 +33,20 @@ def build_state(L = None,state = 0):
         L has been set with :meth:`dynamite.Config.global_L`.
 
     state : int or str, optional
-        The product state. Can either be an integer whose
+        The desired state. Can either be an integer whose
         binary representation represents the spin configuration
-        (0=↓, 1=↑) or a string of the form ``"DUDDU...UDU"``
-        (D=↓, U=↑). If it is a string, the string's length must
-        equal ``L``.
+        (0=↓, 1=↑) of a product state, or a string of the form
+        ``"DUDDU...UDU"`` (D=↓, U=↑). If it is a string, the string's
+        length must equal ``L``. One can also pass ``state='random'``
+        to generate a random, normalized state (not a product state,
+        random values for all components).
+
+    seed : int, optional
+        The seed for the random number generator, when generating
+        a random state. Has no effect without the option ``state='random'``.
+        Note that on multiple processes, the seed is incremented by the process
+        number, to prevent different parts of the vector from having the
+        same random values.
 
     Returns
     -------
@@ -50,27 +61,49 @@ def build_state(L = None,state = 0):
     v.setSizes(1<<L)
     v.setFromOptions()
 
-    if isinstance(state,str):
-        state_str = state
-        state = 0
-        if len(state_str) != L:
-            raise ValueError('state string must have length L')
-        if not all(c in ['U','D'] for c in state_str):
-            raise ValueError('only character U and D allowed in state')
-        for i,c in enumerate(state_str[::-1]):
-            if c == 'U':
-                state += 1<<i
+    if state == 'random':
+        istart,iend = v.getOwnershipRange()
 
-    elif not isinstance(state,int):
-        raise TypeError('State must be an int or str.')
+        R = np.random.RandomState()
 
-    if not 0 <= state < 2**L:
-        raise ValueError('Requested state out of bounds (0,2**L).')
+        if seed is None:
+            try:
+                seed = int.from_bytes(urandom(4),'big',signed=False)
+            except NotImplementedError:
+                raise RuntimeError('Could not access urandom for random number '
+                                   'initialization. Please manually set a seed.')
 
-    v[state] = 1
+        R.seed(seed + PETSc.COMM_WORLD.rank)
+
+        local_size = iend-istart
+        v[istart:iend] = R.standard_normal(local_size) + \
+                            1j*R.standard_normal(local_size)
+
+    else:
+        if isinstance(state,str):
+            state_str = state
+            state = 0
+            if len(state_str) != L:
+                raise ValueError('state string must have length L')
+            if not all(c in ['U','D'] for c in state_str):
+                raise ValueError('only character U and D allowed in state')
+            for i,c in enumerate(state_str[::-1]):
+                if c == 'U':
+                    state += 1<<i
+
+        elif not isinstance(state,int):
+            raise TypeError('State must be an int or str.')
+
+        if not 0 <= state < 2**L:
+            raise ValueError('Requested state out of bounds (0,2**L).')
+
+        v[state] = 1
 
     v.assemblyBegin()
     v.assemblyEnd()
+
+    if state == 'random':
+        v.normalize()
 
     return v
 
