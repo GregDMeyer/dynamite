@@ -473,7 +473,7 @@ class Operator:
     def _op_add(self,o):
 
         if isinstance(o,Sum):
-            return Sum(terms = [self] + o.terms)
+            return Sum(terms = [self] + [o.coeff*t for t in o.terms])
         elif isinstance(o,Operator):
             return Sum(terms = [self,o])
         else:
@@ -482,7 +482,7 @@ class Operator:
     def _op_mul(self,o):
 
         if isinstance(o,Product):
-            return Product(terms = [self] + o.terms)
+            return Product(terms = [self] + [o.coeff*t for t in o.terms])
         elif isinstance(o,Operator):
             return Product(terms = [self,o])
         else:
@@ -616,9 +616,10 @@ class Sum(_Expression):
 
     def _op_add(self,o):
         if isinstance(o,Sum):
-            return Sum(terms = self.terms + o.terms)
+            return Sum(terms = [self.coeff*t for t in self.terms] + \
+                               [o.coeff*t for t in o.terms])
         elif isinstance(o,Operator):
-            return Sum(terms = self.terms + [o])
+            return Sum(terms = [self.coeff*t for t in self.terms] + [o])
         else:
             raise TypeError('Cannot sum expression with type '+type(o))
 
@@ -678,9 +679,10 @@ class Product(_Expression):
 
     def _op_mul(self,o):
         if isinstance(o,Product):
-            return Product(terms = self.terms + o.terms)
+            return Product(terms = [self.coeff*t for t in self.terms] + \
+                                   [o.coeff*t for t in o.terms])
         elif isinstance(o,Operator):
-            return Product(terms = self.terms + [o])
+            return Product(terms = [self.coeff*t for t in self.terms] + [o])
         else:
             raise TypeError('Cannot sum expression with type '+type(o))
 
