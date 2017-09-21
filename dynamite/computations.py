@@ -161,8 +161,19 @@ def eigsolve(H,getvecs=False,nev=1,which=None,target=None):
             which = 'smallest'
 
     eps = SLEPc.EPS().create()
-    eps.setOperators(H.get_mat())
     eps.setProblemType(SLEPc.EPS.ProblemType.HEP)
+
+    if target is not None:
+        st = eps.getST()
+        st.setType(SLEPc.ST.Type.SINVERT)
+
+        eps.setTarget(target)
+
+        # fix for "bug" discussed here: https://www.mail-archive.com/petsc-users@mcs.anl.gov/msg22867.html
+        eps.setOperators(H.get_mat(diag_entries=True))
+    else:
+        eps.setOperators(H.get_mat())
+
     eps.setDimensions(nev)
 
     eps.setWhichEigenpairs({
@@ -173,17 +184,6 @@ def eigsolve(H,getvecs=False,nev=1,which=None,target=None):
 
     if target is None and which=='target':
         raise ValueError("Must specify target when setting which='target'")
-
-    if target is not None:
-        st = eps.getST()
-        st.setType(SLEPc.ST.Type.SINVERT)
-        ksp = st.getKSP()
-        ksp.setType(PETSc.KSP.Type.PREONLY)
-        pc = ksp.getPC()
-        pc.setType(PETSc.PC.Type.CHOLESKY)
-
-        # fix for "bug" discussed here: https://www.mail-archive.com/petsc-users@mcs.anl.gov/msg22867.html
-        eps.setOperators(H.get_mat(diag_entries=True))
 
     eps.setFromOptions()
 
