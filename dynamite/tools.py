@@ -55,6 +55,9 @@ def build_state(L = None,state = 0,seed = None):
     '''
 
     if L is None:
+        if config.global_L is None:
+            raise ValueError('Must set state size L explicitly '
+                             'or through config.global_L')
         L = config.global_L
 
     v = PETSc.Vec().create()

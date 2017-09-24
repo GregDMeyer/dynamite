@@ -353,7 +353,7 @@ class Operator:
 
     ### qutip representation of operators
 
-    def build_qutip(self,shift_index=0):
+    def build_qutip(self,shift_index=0,wrap=False):
         """
         Build a representation of the operator as a qutip.Qobj. This functionality
         is mostly useful for testing and checking correctness, though also perhaps
@@ -369,6 +369,10 @@ class Operator:
         shift_index : int
             Shift the whole operator along the spin chain by ``shift_index`` spins.
 
+        wrap : bool
+            Whether to wrap around if requesting a ``shift_index`` greater than the length
+            of the spin chain (i.e., take ``shift_index`` to ``shift_index % L``).
+
         Returns
         -------
         qutip.Qobj
@@ -378,9 +382,9 @@ class Operator:
 
         if self.L is None:
             raise ValueError('Must set L before building qutip representation.')
-        return self.coeff * self._build_qutip(shift_index)
+        return self.coeff * self._build_qutip(shift_index,wrap=wrap)
 
-    def _build_qutip(self,shift_index):
+    def _build_qutip(self,shift_index,wrap):
         raise NotImplementedError()
 
     ### mask, sign, coefficient representation of operators
@@ -399,7 +403,7 @@ class Operator:
             Shift the whole operator along the spin chain by ``shift_index`` spins.
 
         wrap : bool
-            Whether to wrap around if requesting a shift_index greater than the length
+            Whether to wrap around if requesting a ``shift_index`` greater than the length
             of the spin chain (i.e., take ``shift_index`` to ``shift_index % L``).
 
         Returns
@@ -491,6 +495,15 @@ class Operator:
     def _num_mul(self,x):
         self.coeff = self.coeff * x
         return self
+
+    ### cleanup
+
+    def __del__(self):
+        # petsc4py will destroy the matrix object by itself,
+        # but for shell matrices the context will not be automatically
+        # freed! therefore we need to explicitly call this on object
+        # deletion.
+        self.destroy_mat()
 
 
 class _Expression(Operator):
@@ -606,11 +619,11 @@ class Sum(_Expression):
             t += r'\right)'
         return t
 
-    def _build_qutip(self,shift_index):
-        ret = Zero(L=self.L).build_qutip(shift_index)
+    def _build_qutip(self,shift_index,wrap):
+        ret = Zero(L=self.L).build_qutip()
 
         for term in self.terms:
-            ret += term.build_qutip(shift_index)
+            ret += term.build_qutip(shift_index,wrap=wrap)
 
         return ret
 
@@ -669,11 +682,11 @@ class Product(_Expression):
             t += term.build_tex(request_parens=True)
         return t
 
-    def _build_qutip(self,shift_index):
-        ret = Identity(L=self.L).build_qutip(shift_index)
+    def _build_qutip(self,shift_index,wrap):
+        ret = Identity(L=self.L).build_qutip()
 
         for term in self.terms:
-            ret *= term.build_qutip(shift_index)
+            ret *= term.build_qutip(shift_index,wrap)
 
         return ret
 
@@ -847,11 +860,13 @@ class IndexSum(_IndexType):
         all_terms['coeffs'] *= self.coeff
         return condense_terms(all_terms)
 
-    def _build_qutip(self,shift_index):
+    def _build_qutip(self,shift_index,wrap):
         ret = Zero(L=self.L).build_qutip()
 
+        wrap = wrap or self.wrap
+
         for i in range(self._min_i,self._max_i+1):
-            ret += self.op.build_qutip(shift_index=i)
+            ret += self.op.build_qutip(shift_index=i,wrap=wrap)
 
         return ret
 
@@ -909,11 +924,13 @@ class IndexProduct(_IndexType):
         all_terms['coeffs'] *= self.coeff
         return condense_terms(all_terms)
 
-    def _build_qutip(self,shift_index):
+    def _build_qutip(self,shift_index,wrap):
         ret = Identity(L=self.L).build_qutip()
 
+        wrap = wrap or self.wrap
+
         for i in range(self._min_i,self._max_i+1):
-            ret *= self.op.build_qutip(shift_index=i)
+            ret *= self.op.build_qutip(shift_index=i,wrap=wrap)
 
         return ret
 
@@ -985,9 +1002,9 @@ class Sigmax(_Fundamental):
         ind = self._calc_ind(shift_index,wrap)
         return np.array([(1<<ind,0,self.coeff)],dtype=MSC_dtype)
 
-    def _build_qutip(self,shift_index):
+    def _build_qutip(self,shift_index,wrap):
         import qutip as qtp
-        ind = self.index+shift_index
+        ind = self._calc_ind(shift_index,wrap)
         if ind >= self.L:
             raise IndexError('requested too large an index')
 
@@ -1011,9 +1028,9 @@ class Sigmaz(_Fundamental):
         ind = self._calc_ind(shift_index,wrap)
         return np.array([(0,1<<ind,self.coeff)],dtype=MSC_dtype)
 
-    def _build_qutip(self,shift_index):
+    def _build_qutip(self,shift_index,wrap):
         import qutip as qtp
-        ind = self.index+shift_index
+        ind = self._calc_ind(shift_index,wrap)
         if ind >= self.L:
             raise IndexError('requested too large an index')
 
@@ -1037,9 +1054,9 @@ class Sigmay(_Fundamental):
         ind = self._calc_ind(shift_index,wrap)
         return np.array([(1<<ind,1<<ind,1j*self.coeff)],dtype=MSC_dtype)
 
-    def _build_qutip(self,shift_index):
+    def _build_qutip(self,shift_index,wrap):
         import qutip as qtp
-        ind = self.index+shift_index
+        ind = self._calc_ind(shift_index,wrap)
         if ind >= self.L:
             raise IndexError('requested too large an index')
 
@@ -1064,13 +1081,13 @@ class Identity(_Fundamental):
     def _get_MSC(self,shift_index=0,wrap=False):
         return np.array([(0,0,self.coeff)],dtype=MSC_dtype)
 
-    def _build_qutip(self,shift_index):
+    def _build_qutip(self,shift_index,wrap):
         import qutip as qtp
-        ind = self.index+shift_index
+        ind = self._calc_ind(shift_index,wrap)
         if ind >= self.L:
             raise IndexError('requested too large an index')
 
-        return qtp_identity_product(qtp.identity(2),ind,self.L)
+        return qtp_identity_product(qtp.identity(2),0,self.L)
 
 # also should hide this tex when appropriate
 class Zero(_Fundamental):
@@ -1092,10 +1109,13 @@ class Zero(_Fundamental):
     def _get_MSC(self,shift_index=0,wrap=False):
         return np.array([],dtype=MSC_dtype)
 
-    def _build_qutip(self,shift_index):
+    def _build_qutip(self,shift_index,wrap):
         import qutip as qtp
-        ind = self.index+shift_index
+        ind = self._calc_ind(shift_index,wrap)
         if ind >= self.L:
             raise IndexError('requested too large an index')
 
-        return qtp_identity_product(qtp.Qobj([[0,0],[0,0]]),ind,self.L)
+        q = z = qtp.Qobj([[0,0],[0,0]])
+        for _ in range(1,self.L):
+            q = qtp.tensor(q,z)
+        return q
