@@ -691,13 +691,16 @@ class Entropy(ut.TestCase):
                         dm = None
 
                     if dm is not None:
-                        self.assertTrue(np.allclose(dm.full(),ddm))
+                        r,msg = check_allclose(dm.full(),ddm)
+                        self.assertTrue(r,msg=msg)
                         qtp_EE = qtp.entropy_vn(dm)
                     else:
-                        self.assertTrue(np.allclose(ddm,np.array([[1.+0.0j]])))
+                        r,msg = check_allclose(ddm,np.array([[1.+0.0j]]))
+                        self.assertTrue(r,msg=msg)
                         qtp_EE = 0
 
-                    self.assertTrue(np.allclose(qtp_EE,dy_EE))
+                    r,msg = check_close(qtp_EE,dy_EE)
+                    self.assertTrue(r,msg=msg)
 
 class Utils(ut.TestCase):
 
@@ -764,11 +767,11 @@ class Config(ut.TestCase):
         config.global_L = 10
 
         test_ops = OrderedDict([
-            ('sx', lambda: do.Sigmax()),
-            ('sy', lambda: do.Sigmay()),
-            ('sz', lambda: do.Sigmaz()),
-            ('ident', lambda: do.Identity()),
-            ('zero', lambda: do.Zero()),
+            ('sx', do.Sigmax),
+            ('sy', do.Sigmay),
+            ('sz', do.Sigmaz),
+            ('ident', do.Identity),
+            ('zero', do.Zero),
             ('sum', lambda: do.Sum([do.Sigmax()])),
             ('product', lambda: do.Product([do.Sigmax()])),
             ('indexsum', lambda: do.IndexSum(do.Sigmax())),

@@ -102,6 +102,18 @@ def check_evolve(d,n,state,t=0.1):
 def check_close(a,b,tol=1E-12):
     return compare_and_scatter(_close,a,b,tol)
 
+def check_allclose(a,b):
+    return compare_and_scatter(_allclose,a,b)
+
+def _allclose(a,b):
+    msg = ''
+    r = np.allclose(a,b)
+    if not r:
+        msg += 'numpy matrices fail np.allclose\n'
+        msg += 'differences:\n'
+        msg += str_differences(a,b)
+    return r,msg
+
 def _close(a,b,tol):
     msg = ''
     r = abs(a-b) < tol
@@ -162,13 +174,7 @@ numpy matrix: %s
 
         # print some nonzero elements of difference
         msg += 'nonzero elements of difference:\n'
-        diff = dnm_np-n
-        nz = np.transpose(np.nonzero(diff))
-        for i,(idx,idy) in enumerate(nz):
-            # don't blow up the output if there are a lot
-            if i > 20:
-                break
-            msg += '%d %d %s\n' % (idx,idy,diff[idx,idy])
+        msg += str_differences(dnm_np,n)
 
     r = r and tmp
 
@@ -210,7 +216,20 @@ numpy matrix: %s
 qutip matrix: %s
 dynamite matrix: %s
 ''' % (str(qtp_o),str(dnm_np))
+            msg += str_differences(qtp_o,dnm_np)
 
         r = r and tmp
 
     return r,msg
+
+
+def str_differences(a,b):
+    diff = a-b
+    nz = np.transpose(np.nonzero(diff))
+    msg = ''
+    for i,(idx,idy) in enumerate(nz):
+        # don't blow up the output if there are a lot
+        if i > 20:
+            break
+        msg += '%d %d %s\n' % (idx,idy,diff[idx,idy])
+    return msg
