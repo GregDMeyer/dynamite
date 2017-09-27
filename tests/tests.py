@@ -589,16 +589,21 @@ class Eigsolve(ut.TestCase):
                 # --download-mumps option to ./configure)
                 # TODO: check if package exists, if not don't run these tests
 
-                if name != 'XXYY':
-                    with self.subTest(which='target0'):
-                        self.check_eigs(d,n,target=0,nev=2)
+                if not config.global_shell:
+                    if name != 'XXYY':
+                        with self.subTest(which='target0'):
+                            self.check_eigs(d,n,target=0,nev=2)
 
-                    with self.subTest(which='target-1.2'):
-                        self.check_eigs(d,n,target=-1.2,nev=2)
+                        with self.subTest(which='target-1.2'):
+                            self.check_eigs(d,n,target=-1.2,nev=2)
 
-                    with self.subTest(which='targetexcept'):
-                        with self.assertRaises(ValueError):
-                            self.check_eigs(d,n,which='target')
+                        with self.subTest(which='targetexcept'):
+                            with self.assertRaises(ValueError):
+                                self.check_eigs(d,n,which='target')
+                else:
+                    with self.subTest(which='target'):
+                        with self.assertRaises(TypeError):
+                            self.check_eigs(d,n,target=0)
 
 
     def check_eigs(self,d,n,**kwargs):

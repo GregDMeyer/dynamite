@@ -164,6 +164,10 @@ def eigsolve(H,getvecs=False,nev=1,which=None,target=None):
     eps.setProblemType(SLEPc.EPS.ProblemType.HEP)
 
     if target is not None:
+        # shift-invert not supported for shell matrices
+        if H.use_shell:
+            raise TypeError('Shift-invert ("target") not supported for shell matrices.')
+
         st = eps.getST()
         st.setType(SLEPc.ST.Type.SINVERT)
 
