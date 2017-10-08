@@ -12,7 +12,8 @@ __all__ = ['Sigmax',
            'Sum',
            'Product',
            'IndexSum',
-           'IndexProduct']
+           'IndexProduct',
+           'Load']
 
 from . import config
 config.initialize()
@@ -234,6 +235,59 @@ class Operator:
 
     def _copy(self):
         raise NotImplementedError()
+
+    ### save to disk
+
+    def save(self,fout):
+        """
+        Save the MSC representation of the operator to disk.
+        Can be loaded again through :class:`Load`, or through the
+        C API.
+
+        Parameters
+        ----------
+        fout : str or file-like
+            The file to save the operator in. Can be either a string
+            containing the path to the desired file, or an open file-like
+            object.
+        """
+
+        # The file format is:
+        # L,nterms,masks,signs,coefficients
+        # where each is just a binary blob, one after the other.
+
+        # do this first so that we haven't already created the file if
+        # it fails for some reason
+        msc = self.get_MSC()
+
+        if isinstance(fout,str):
+            f = open(fout,mode='wb')
+        else:
+            f = fout
+
+        # write the chain length to the file. This is the only parameter
+        # that we save other than the MSC representation.
+        L = self.L
+        if L is None:
+            L = -1
+
+        # cast it to the type that C will be looking for
+        int_t = msc.dtype[0].type
+        L = int_t(L)
+
+        f.write(L.tobytes())
+
+        # write out the length of the MSC representation
+        size = int_t(msc.size)
+        f.write(size.tobytes())
+
+        f.write(msc['masks'].tobytes())
+        f.write(msc['signs'].tobytes())
+        f.write(msc['coeffs'].tobytes())
+
+        # close the file only if we opened it
+        if isinstance(fout,str):
+            f.close()
 
     ### interface with PETSc
 
@@ -505,6 +559,29 @@ class Operator:
         # deletion.
         self.destroy_mat()
 
+class Load(Operator):
+    """
+    Class for operator loaded from memory.
+    Only the MSC representation of the operator
+    is saved; LaTeX, QuTiP, etc. are all currently
+    disabled for this type.
+
+    Files should be created with the :meth:`Operator.save`
+    method.
+
+    Parameters
+    ----------
+    filename : str or file object
+        The file from which to load the operator.
+
+    L : int, optional
+        Length of the spin chain
+    """
+    def __init__(self,filename,L=None):
+        # figure out L if its not set
+        Operator.__init__(self,L)
+
+        raise TypeError('build this biz')
 
 class _Expression(Operator):
     def __init__(self,terms,copy=True,L=None):
