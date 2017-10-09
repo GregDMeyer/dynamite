@@ -1,9 +1,6 @@
 
 #include "backend_impl.h"
 
-/* allow us to set many values at once */
-#define VECSET_CACHE_SIZE 1000
-
 #undef  __FUNCT__
 #define __FUNCT__ "BuildMat_Full"
 PetscErrorCode BuildMat_Full(PetscInt L,PetscInt nterms,PetscInt* masks,PetscInt* signs,PetscScalar* coeffs,Mat *A)
@@ -102,21 +99,27 @@ PetscErrorCode BuildMat_Shell(PetscInt L,PetscInt nterms,PetscInt* masks,PetscIn
 
 }
 
+static inline PetscInt map_back(PetscInt *choose_array,PetscInt s)
+{
+  /* TODO */
+  return 0;
+}
+
 #undef  __FUNCT__
 #define __FUNCT__ "MatMult_Shell"
 PetscErrorCode MatMult_Shell(Mat A,Vec x,Vec b)
 {
   PetscErrorCode ierr;
-  PetscInt state,i,Istart,Iend,sign;
-  PetscScalar tmp_val;
-  const PetscScalar *x_array;
+  PetscInt lstate,lstate_idx,state,i,Istart,Iend,block_start,sign,m,s;
+  PetscInt *sub_map;
+  const PetscScalar *x_array,*sub_x;
+  PetscScalar c;
   shell_context *ctx;
 
   /* cache */
-  PetscInt *indices,cache_index;
+  PetscInt *indices,cache_idx,cache_idx_max;
   PetscScalar *values;
 
-  /* create a cache to keep our values in */
   ierr = PetscMalloc(sizeof(PetscInt) * VECSET_CACHE_SIZE,&indices);CHKERRQ(ierr);
   ierr = PetscMalloc(sizeof(PetscScalar) * VECSET_CACHE_SIZE,&values);CHKERRQ(ierr);
 
@@ -128,43 +131,78 @@ PetscErrorCode MatMult_Shell(Mat A,Vec x,Vec b)
   ierr = VecGetOwnershipRange(x,&Istart,&Iend);CHKERRQ(ierr);
   ierr = VecGetArrayRead(x,&x_array);CHKERRQ(ierr);
 
-  /* TODO: get b array and use that directly to set local values */
-  cache_index = 0;
-  for (state=Istart;state<Iend;++state) {
-    for (i=0;i<ctx->nterms;) {
-      indices[cache_index] = state ^ ctx->masks[i];
-      tmp_val = 0;
-      /* sum all terms for this matrix element */
-      do {
-        /* this requires gcc builtins */
-        sign = 1 - 2*(__builtin_popcount(state & ctx->signs[i]) % 2);
-        tmp_val += sign * ctx->coeffs[i];
-        ++i;
-      } while (i<ctx->nterms && ctx->masks[i-1] == ctx->masks[i]);
+  for (i=0;i<ctx->nterms;++i) {
 
-      values[cache_index] = tmp_val * x_array[state-Istart];
+    m = ctx->masks[i];
+    s = ctx->signs[i];
+    c = ctx->coeffs[i];
 
-      ++cache_index;
+    for (block_start=Istart;
+         block_start<Iend;
+         block_start+=VECSET_CACHE_SIZE) {
 
-      if (cache_index >= VECSET_CACHE_SIZE) {
-        ierr = VecSetValues(b,cache_index,indices,values,ADD_VALUES);CHKERRQ(ierr);
-        cache_index = 0;
+      cache_idx_max = PetscMin(Iend-block_start,VECSET_CACHE_SIZE);
+
+      // so that we can index from 0
+      sub_x = x_array + (block_start-Istart);
+      if (ctx->state_map != NULL) {
+        sub_map = ctx->state_map + block_start;
       }
+
+      /*
+       * the goal is that the following for loops will be vectorized by the
+       * compiler. Everything should be pretty trivially
+       * vectorizable, though __builtin_popcount may or may not be depending
+       * on the compiler--maybe it will be worth it to write a vectorizable
+       * popcount. (I guess I can check the assembly to see if it vectorizes)
+       */
+      if (ctx->state_map == NULL) {
+        for (cache_idx=0;cache_idx<cache_idx_max;++cache_idx) {
+          state = block_start + cache_idx;
+          indices[cache_idx] = state ^ m;
+          sign = 1 - 2*(__builtin_popcount(state & s)&1);
+          values[cache_idx] = sub_x[cache_idx] * sign * c;
+        }
+      }
+      else {
+        /* this hopefully is vectorized */
+        for (cache_idx=0;cache_idx<cache_idx_max;++cache_idx) {
+          state = sub_map[cache_idx];
+          sign = 1 - 2*(__builtin_popcount(state & s)&1);
+          values[cache_idx] = sub_x[cache_idx] * sign * c;
+        }
+        /* it's not clear how to make this next part vectorizable.
+         * I leave it for now, and perhaps figure out if I
+         * can cleverly make it vectorizable in the future
+         */
+        for (cache_idx=0;cache_idx<cache_idx_max;++cache_idx) {
+          lstate = sub_map[cache_idx] ^ m;
+          lstate_idx = map_back(ctx->choose_array,lstate);
+          indices[cache_idx] = lstate_idx;
+        }
+      }
+      /*
+       * here will need to add some functions for spin > 1/2 systems
+       * they will involve more complicated logic for how to compute
+       * what the matrix element is
+       */
+      ierr = VecSetValues(b,cache_idx_max,indices,values,ADD_VALUES);CHKERRQ(ierr);
     }
+    /*
+     * For some operators the stash of values waiting to be sent to other processes
+     * may grow to a huge number if we wait too long. Maybe we should
+     * call VecAssembly* functions here and clear out the stash, to save some memory
+     */
   }
-  /* set the final few values */
-  ierr = VecSetValues(b,cache_index,indices,values,ADD_VALUES);CHKERRQ(ierr);
-
-  ierr = VecRestoreArrayRead(x,&x_array);CHKERRQ(ierr);
-
   ierr = VecAssemblyBegin(b);CHKERRQ(ierr);
   ierr = VecAssemblyEnd(b);CHKERRQ(ierr);
+
+  ierr = VecRestoreArrayRead(x,&x_array);CHKERRQ(ierr);
 
   ierr = PetscFree(indices);CHKERRQ(ierr);
   ierr = PetscFree(values);CHKERRQ(ierr);
 
   return ierr;
-
 }
 
 #undef  __FUNCT__
@@ -172,7 +210,7 @@ PetscErrorCode MatMult_Shell(Mat A,Vec x,Vec b)
 PetscErrorCode MatNorm_Shell(Mat A,NormType type,PetscReal *nrm)
 {
   PetscErrorCode ierr;
-  PetscInt state,N,i,sign;
+  PetscInt m,idx,state,N,i,sign,map;
   PetscScalar csum;
   PetscReal sum,max_sum;
   shell_context *ctx;
@@ -199,17 +237,23 @@ PetscErrorCode MatNorm_Shell(Mat A,NormType type,PetscReal *nrm)
 
   N = 1<<ctx->L;
   max_sum = 0;
-  for (state=0;state<N;++state) {
+  map = ctx->state_map != NULL;
+  for (idx=0;idx<N;++idx) {
     sum = 0;
     for (i=0;i<ctx->nterms;) {
       csum = 0;
+      m = ctx->masks[i];
+      if (map) {
+        state = ctx->state_map[idx];
+      }
+      else state = idx;
       /* sum all terms for this matrix element */
       do {
         /* this requires gcc builtins */
         sign = 1 - 2*(__builtin_popcount(state & ctx->signs[i]) % 2);
         csum += sign * ctx->coeffs[i];
         ++i;
-      } while (i<ctx->nterms && ctx->masks[i-1] == ctx->masks[i]);
+      } while (i<ctx->nterms && m == ctx->masks[i]);
 
       sum += PetscAbsComplex(csum);
     }
@@ -239,6 +283,9 @@ PetscErrorCode BuildContext(PetscInt L,PetscInt nterms,PetscInt* masks,PetscInt*
   ctx->nterms = nterms;
   ctx->nrm = -1;
   ctx->gpu = PETSC_FALSE;
+
+  /* TODO: implement this logic */
+  ctx->state_map = NULL;
 
   /* we need to keep track of this stuff on our own. the numpy array might get garbage collected */
   ierr = PetscMalloc(sizeof(PetscInt)*nterms,&(ctx->masks));CHKERRQ(ierr);
