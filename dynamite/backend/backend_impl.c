@@ -110,20 +110,29 @@ static inline PetscInt map_back(PetscInt *choose_array,PetscInt s)
 PetscErrorCode MatMult_Shell(Mat A,Vec x,Vec b)
 {
   PetscErrorCode ierr;
-  PetscInt lstate,lstate_idx,state,i,Istart,Iend,block_start,sign,m,s;
-  PetscInt *sub_map;
-  const PetscScalar *x_array,*sub_x;
+  PetscInt state,i,Istart,Iend,start,block_start,sign,m,s;
+  PetscInt proc,proc_idx,proc_mask,proc_size,log2size;
+  PetscInt *mask_starts;
+  PetscBool map,assembling;
+  const PetscScalar *x_array;
   PetscScalar c;
   shell_context *ctx;
 
   /* cache */
-  PetscInt *indices,cache_idx,cache_idx_max;
+  PetscInt *lidx;
+  PetscInt cache_idx,cache_idx_max;
   PetscScalar *values;
 
-  ierr = PetscMalloc(sizeof(PetscInt) * VECSET_CACHE_SIZE,&indices);CHKERRQ(ierr);
-  ierr = PetscMalloc(sizeof(PetscScalar) * VECSET_CACHE_SIZE,&values);CHKERRQ(ierr);
+  PetscInt mpi_rank,mpi_size;
+  MPI_Comm_rank(PETSC_COMM_WORLD,&mpi_rank);
+  MPI_Comm_size(PETSC_COMM_WORLD,&mpi_size);
 
   ierr = MatShellGetContext(A,&ctx);CHKERRQ(ierr);
+
+  map = (ctx->state_map != NULL);
+
+  ierr = PetscMalloc1(VECSET_CACHE_SIZE,&lidx);CHKERRQ(ierr);
+  ierr = PetscMalloc1(VECSET_CACHE_SIZE,&values);CHKERRQ(ierr);
 
   /* clear out the b vector */
   ierr = VecSet(b,0);CHKERRQ(ierr);
@@ -131,76 +140,89 @@ PetscErrorCode MatMult_Shell(Mat A,Vec x,Vec b)
   ierr = VecGetOwnershipRange(x,&Istart,&Iend);CHKERRQ(ierr);
   ierr = VecGetArrayRead(x,&x_array);CHKERRQ(ierr);
 
-  for (i=0;i<ctx->nterms;++i) {
+  /* first need to compute some constants etc */
+  log2size = __builtin_ctz(mpi_size);
 
-    m = ctx->masks[i];
-    s = ctx->signs[i];
-    c = ctx->coeffs[i];
+  /* this computes a mask over the indices that define the processor */
+  proc_mask = ((1 << log2size)-1) << (ctx->L - log2size);
+  proc_idx = mpi_rank << (ctx->L - log2size);
+  proc_size = Iend-Istart;
 
-    for (block_start=Istart;
-         block_start<Iend;
+  /* count the number of masks going to each processor */
+  /* should really do this in BuildContext */
+  ierr = PetscMalloc1(mpi_size+1,&mask_starts);CHKERRQ(ierr);
+
+  mask_starts[0] = 0;
+  m = proc_size;
+  for (i=1;i<ctx->nterms;++i) {
+    for (;m<=ctx->masks[i];m += proc_size) {
+      mask_starts[m / proc_size] = i;
+    }
+  }
+  /* maybe a few of the last ones had none, have
+   * to iterate through those
+   */
+  for (i=m/proc_size;i<mpi_size+1;++i) {
+    mask_starts[i] = ctx->nterms;
+  }
+
+  /* we are not already sending values to another processor */
+  assembling = PETSC_FALSE;
+
+  for (proc=0;proc < mpi_size;++proc) {
+
+    /* if there are none for this process, skip it */
+    if (mask_starts[proc] == mask_starts[proc+1]) continue;
+
+    /* if we've hit the end of the masks, stop */
+    if (mask_starts[proc] == ctx->nterms) break;
+
+    start = proc_mask & (proc_idx ^ ctx->masks[mask_starts[proc]]);
+    for (block_start=start;
+         block_start<start+proc_size;
          block_start+=VECSET_CACHE_SIZE) {
 
-      cache_idx_max = PetscMin(Iend-block_start,VECSET_CACHE_SIZE);
+      cache_idx_max = PetscMin((start+proc_size)-block_start,VECSET_CACHE_SIZE);
 
-      // so that we can index from 0
-      sub_x = x_array + (block_start-Istart);
-      if (ctx->state_map != NULL) {
-        sub_map = ctx->state_map + block_start;
+      PetscMemzero(values,sizeof(PetscScalar)*VECSET_CACHE_SIZE);
+      for (cache_idx=0;cache_idx<cache_idx_max;++cache_idx) {
+        lidx[cache_idx] = block_start + cache_idx;
       }
 
-      /*
-       * the goal is that the following for loops will be vectorized by the
-       * compiler. Everything should be pretty trivially
-       * vectorizable, though __builtin_popcount may or may not be depending
-       * on the compiler--maybe it will be worth it to write a vectorizable
-       * popcount. (I guess I can check the assembly to see if it vectorizes)
-       */
-      if (ctx->state_map == NULL) {
+      for (i=mask_starts[proc];i<mask_starts[proc+1];++i) {
+
+        m = ctx->masks[i];
+        s = ctx->signs[i];
+        c = ctx->coeffs[i];
+
         for (cache_idx=0;cache_idx<cache_idx_max;++cache_idx) {
-          state = block_start + cache_idx;
-          indices[cache_idx] = state ^ m;
+          state = (block_start + cache_idx) ^ m;
           sign = 1 - 2*(__builtin_popcount(state & s)&1);
-          values[cache_idx] = sub_x[cache_idx] * sign * c;
+          values[cache_idx] += x_array[state - Istart] * sign * c;
         }
       }
-      else {
-        /* this hopefully is vectorized */
-        for (cache_idx=0;cache_idx<cache_idx_max;++cache_idx) {
-          state = sub_map[cache_idx];
-          sign = 1 - 2*(__builtin_popcount(state & s)&1);
-          values[cache_idx] = sub_x[cache_idx] * sign * c;
-        }
-        /* it's not clear how to make this next part vectorizable.
-         * I leave it for now, and perhaps figure out if I
-         * can cleverly make it vectorizable in the future
-         */
-        for (cache_idx=0;cache_idx<cache_idx_max;++cache_idx) {
-          lstate = sub_map[cache_idx] ^ m;
-          lstate_idx = map_back(ctx->choose_array,lstate);
-          indices[cache_idx] = lstate_idx;
-        }
+
+      /* set the last values that weren't set at the end there */
+      if (assembling) {
+        ierr = VecAssemblyEnd(b);CHKERRQ(ierr);
+        assembling = PETSC_FALSE;
       }
-      /*
-       * here will need to add some functions for spin > 1/2 systems
-       * they will involve more complicated logic for how to compute
-       * what the matrix element is
-       */
-      ierr = VecSetValues(b,cache_idx_max,indices,values,ADD_VALUES);CHKERRQ(ierr);
+      ierr = VecSetValues(b,cache_idx_max,lidx,values,ADD_VALUES);CHKERRQ(ierr);
+
+      ierr = VecAssemblyBegin(b);CHKERRQ(ierr);
+      assembling = PETSC_TRUE;
     }
-    /*
-     * For some operators the stash of values waiting to be sent to other processes
-     * may grow to a huge number if we wait too long. Maybe we should
-     * call VecAssembly* functions here and clear out the stash, to save some memory
-     */
   }
-  ierr = VecAssemblyBegin(b);CHKERRQ(ierr);
-  ierr = VecAssemblyEnd(b);CHKERRQ(ierr);
+
+  if (assembling) {
+    ierr = VecAssemblyEnd(b);CHKERRQ(ierr);
+  }
 
   ierr = VecRestoreArrayRead(x,&x_array);CHKERRQ(ierr);
 
-  ierr = PetscFree(indices);CHKERRQ(ierr);
+  ierr = PetscFree(lidx);CHKERRQ(ierr);
   ierr = PetscFree(values);CHKERRQ(ierr);
+  ierr = PetscFree(mask_starts);CHKERRQ(ierr);
 
   return ierr;
 }
@@ -276,7 +298,7 @@ PetscErrorCode BuildContext(PetscInt L,PetscInt nterms,PetscInt* masks,PetscInt*
   shell_context *ctx;
   PetscInt i;
 
-  ierr = PetscMalloc(sizeof(shell_context),ctx_p);CHKERRQ(ierr);
+  ierr = PetscMalloc1(1,ctx_p);CHKERRQ(ierr);
   ctx = (*ctx_p);
 
   ctx->L = L;
@@ -288,9 +310,9 @@ PetscErrorCode BuildContext(PetscInt L,PetscInt nterms,PetscInt* masks,PetscInt*
   ctx->state_map = NULL;
 
   /* we need to keep track of this stuff on our own. the numpy array might get garbage collected */
-  ierr = PetscMalloc(sizeof(PetscInt)*nterms,&(ctx->masks));CHKERRQ(ierr);
-  ierr = PetscMalloc(sizeof(PetscInt)*nterms,&(ctx->signs));CHKERRQ(ierr);
-  ierr = PetscMalloc(sizeof(PetscScalar)*nterms,&(ctx->coeffs));CHKERRQ(ierr);
+  ierr = PetscMalloc1(nterms,&(ctx->masks));CHKERRQ(ierr);
+  ierr = PetscMalloc1(nterms,&(ctx->signs));CHKERRQ(ierr);
+  ierr = PetscMalloc1(nterms,&(ctx->coeffs));CHKERRQ(ierr);
 
   for (i=0;i<nterms;++i) {
     ctx->masks[i] = masks[i];

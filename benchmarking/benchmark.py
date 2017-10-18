@@ -8,7 +8,8 @@ parser = ap.ArgumentParser(description='Benchmarking test for dynamite.')
 
 parser.add_argument('-L', type=int, help='Size of the spin chain.', required=True)
 
-parser.add_argument('-H', choices=['MBL','long_range','SYK'], default='MBL', help='Hamiltonian to use', required=True)
+parser.add_argument('-H', choices=['MBL','long_range','SYK','ising','XX'],
+                    default='MBL', help='Hamiltonian to use', required=True)
 
 parser.add_argument('-w', type=int, default=1, help='Magnitude of the disorder for MBL Hamiltonian.')
 
@@ -18,6 +19,9 @@ parser.add_argument('--slepc_args',type=str,default='',help='Arguments to pass t
 parser.add_argument('--evolve',action='store_true',help='Request that the Hamiltonian evolves a state.')
 parser.add_argument('--init_state',type=int,default=0,help='The initial state for the evolution.')
 parser.add_argument('-t',type=float,default=1.0,help='The time to evolve for.')
+
+parser.add_argument('--mult',action='store_true',help='Simply multiply the Hamiltonian by a vector.')
+parser.add_argument('--mult_count',type=int,default=1,help='Number of times to repeat the multiplication.')
 
 parser.add_argument('--eigsolve',action='store_true',help='Request to solve for eigenvalues of the Hamiltonian.')
 parser.add_argument('--nev',type=int,default=1,help='The number of eigenpairs to solve for.')
@@ -36,13 +40,16 @@ from dynamite.extras import Majorana as X
 from petsc4py.PETSc import Sys
 Print = Sys.Print
 
-stats = {
-    'MSC_build_time':None,
-    'mat_build_time':None,
-    'evolve_time':None,
-    'eigsolve_time':None,
-    'MaxRSS':None,
-}
+stats = {}
+
+# stats = {
+#     'MSC_build_time':None,
+#     'mat_build_time':None,
+#     'mult_time':None,
+#     'evolve_time':None,
+#     'eigsolve_time':None,
+#     'MaxRSS':None,
+# }
 
 track_memory()
 mem_type = 'all'
@@ -73,8 +80,10 @@ elif args.H == 'long_range':
 elif args.H == 'SYK':
     seed(0)
     H = Sum(uniform(-1,1)*Product(X(idx) for idx in idxs) for idxs in combinations(range(args.L*2),4))
-
-H.use_shell = args.shell
+elif args.H == 'ising':
+    H = IndexSum(Sigmaz(0)*Sigmaz(1)) + 0.2*IndexSum(Sigmax())
+elif args.H == 'XX':
+    H = IndexSum(Sigmax(0)*Sigmax(1))
 
 start = default_timer()
 
@@ -83,6 +92,11 @@ if __debug__:
     Print('dynamite operator built. building PETSc matrix...')
 
 stats['MSC_build_time'] = default_timer() - start
+
+# build a dummy matrix first to have equal profiling data
+
+H.build_mat()
+H.use_shell = args.shell
 
 start = default_timer()
 H.build_mat()
@@ -109,6 +123,19 @@ if args.evolve:
     stats['evolve_time'] = default_timer() - start
     if __debug__:
         Print('evolution complete.')
+
+if args.mult:
+    if __debug__:
+        Print('beginning multiplication...')
+    start = default_timer()
+    s = build_state()
+    r = s.copy()
+    for _ in range(args.mult_count):
+        H.get_mat().mult(s,r)
+        H.get_mat().mult(r,s)
+    stats['mult_time'] = default_timer() - start
+    if __debug__:
+        Print('multiplication complete.')
 
 H.destroy_mat()
 

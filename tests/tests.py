@@ -6,10 +6,15 @@ from collections import OrderedDict
 from tempfile import TemporaryFile
 from os import remove
 
-dnm_args = []
+slepc_args = []
+if __name__ == '__main__':
+    from sys import argv
+
+    if argv[-1].startswith('-slepc_args='):
+        slepc_args = argv.pop(-1)[len('-slepc_args='):].split(' ')
 
 from dynamite import config
-config.initialize(dnm_args)
+config.initialize(slepc_args)
 config.global_shell = True
 
 import dynamite.operators as do
@@ -847,6 +852,4 @@ if __name__ == '__main__':
     #     stream = stderr
     # else:
     #     stream = open(devnull,'w')
-    # ut.main(testRunner=ut.TextTestRunner(stream=stream))
-
-    ut.main()
+    ut.main(argv=argv)
