@@ -683,9 +683,6 @@ class Entropy(ut.TestCase):
                                          dims=[[2]*self.L,
                                                [1]*self.L])
 
-                    if ddm is None:
-                        continue
-
                     dm = qtp_state * qtp_state.dag()
 
                     if cut > 0:
