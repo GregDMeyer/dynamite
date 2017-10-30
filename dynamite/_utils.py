@@ -64,17 +64,17 @@ def qtp_identity_product(op, index, L):
 
 def MSC_matrix_product(terms):
 
-    arrays = np.vstack(terms)
+    arrays = list(terms)
 
     sizes = np.array([a.shape[0] for a in arrays])
     all_terms = np.ndarray((np.prod(sizes),),dtype=MSC_dtype)
 
     prod_idxs = _pi.idxs(sizes) # see class _PermIndices below
 
-    aT = arrays.T
-
+    t = np.ndarray((len(arrays),),dtype=MSC_dtype)
     for n,idxs in enumerate(prod_idxs):
-        t = np.choose(idxs,aT)
+        for i,a in enumerate(arrays):
+            t[i] = a[idxs[i]]
         all_terms[n] = product_of_terms(t)
 
     return all_terms
