@@ -706,7 +706,7 @@ class Entropy(ut.TestCase):
 
 class Save(ut.TestCase):
     def test_SaveAndLoad(self):
-        H,n = Hamiltonians.longrange(10)
+        H,n = Hamiltonians.longrange(7)
 
         # test saving and loading by both file name
         # and file object
