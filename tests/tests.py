@@ -706,7 +706,7 @@ class Entropy(ut.TestCase):
 
 class Save(ut.TestCase):
     def test_SaveAndLoad(self):
-        H,_ = Hamiltonians.longrange(10)
+        H,n = Hamiltonians.longrange(10)
 
         # test saving and loading by both file name
         # and file object
@@ -730,6 +730,11 @@ class Save(ut.TestCase):
                 with self.subTest(m='load'):
                     Hf = do.Load(f)
                     self.assertEqual(H,Hf)
+
+                    # also make sure that the generated PETSc matrix
+                    # works
+                    r,msg = check_dnm_np(Hf,n)
+                    self.assertTrue(r,msg=msg)
 
                 if not isinstance(fg,str):
                     f.close()
@@ -829,10 +834,12 @@ class Config(ut.TestCase):
 if __name__ == '__main__':
 
     # only get output from one process
-    from sys import stderr
-    from os import devnull
-    if PROC_0:
-        stream = stderr
-    else:
-        stream = open(devnull,'w')
-    ut.main(testRunner=ut.TextTestRunner(stream=stream))
+    # from sys import stderr
+    # from os import devnull
+    # if PROC_0:
+    #     stream = stderr
+    # else:
+    #     stream = open(devnull,'w')
+    # ut.main(testRunner=ut.TextTestRunner(stream=stream))
+
+    ut.main()
