@@ -412,8 +412,9 @@ class Operator:
             A numpy array containing the representation.
         """
         if shift_index is None:
+            # the value of wrap doesn't matter if no shift index
             if self._MSC is None:
-                self._MSC = self._get_MSC(wrap=wrap)
+                self._MSC = self._get_MSC()
             return self._MSC
         else:
             return self._get_MSC(shift_index,wrap=wrap)
@@ -493,8 +494,9 @@ class Operator:
             raise TypeError('Cannot sum expression with type '+type(o))
 
     def _num_mul(self,x):
-        self.coeff = self.coeff * x
-        return self
+        o = self.copy()
+        o.coeff *= x
+        return o
 
     ### cleanup
 
