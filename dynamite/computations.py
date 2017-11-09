@@ -129,7 +129,9 @@ def eigsolve(H,getvecs=False,nev=1,which=None,target=None):
     which : str
         Which eigenvalues to seek. Options are\:
 
-        - ``"smallest"``, to find the eigenvalues with smallest real part
+        - ``"smallest"``, to find the eigenvalues with smallest real part (i.e. most negative)
+
+        - ``"largest"``, to find the eigenvalues with largest real part (i.e. most positive)
 
         - ``"exterior"``, to find eigenvalues largest in absolute magnitude
 
@@ -182,6 +184,7 @@ def eigsolve(H,getvecs=False,nev=1,which=None,target=None):
 
     eps.setWhichEigenpairs({
         'smallest':SLEPc.EPS.Which.SMALLEST_REAL,
+        'largest':SLEPc.EPS.Which.LARGEST_REAL,
         'exterior':SLEPc.EPS.Which.LARGEST_MAGNITUDE,
         'target':SLEPc.EPS.Which.TARGET_MAGNITUDE,
         }[which])

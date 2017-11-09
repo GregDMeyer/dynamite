@@ -574,6 +574,12 @@ class Eigsolve(ut.TestCase):
                 with self.subTest(which='smallest_4'):
                     self.check_eigs(d,n,nev=4)
 
+                with self.subTest(which='largest'):
+                    self.check_eigs(d,n,which='largest')
+
+                with self.subTest(which='largest_4'):
+                    self.check_eigs(d,n,nev=4,which='largest')
+
                 with self.subTest(which='exterior'):
                     self.check_eigs(d,n,which='exterior')
 
