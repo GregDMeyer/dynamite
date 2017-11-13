@@ -245,48 +245,44 @@ class Operator:
 
         Parameters
         ----------
-        fout : str or file-like
-            The file to save the operator in. Can be either a string
-            containing the path to the desired file, or an open file-like
-            object.
+        fout : str
+            The path to the file to save the operator in.
         """
 
-        # The file format is:
-        # L,nterms,masks,signs,coefficients
-        # where each is just a binary blob, one after the other.
+        # only process 0 should save
+        if COMM_WORLD.rank == 0:
 
-        # do this first so that we haven't already created the file if
-        # it fails for some reason
-        msc = self.get_MSC()
+            # The file format is:
+            # L,nterms,masks,signs,coefficients
+            # where each is just a binary blob, one after the other.
 
-        if isinstance(fout,str):
-            f = open(fout,mode='wb')
-        else:
-            f = fout
+            # do this first so that we haven't already created the file if
+            # it fails for some reason
+            msc = self.get_MSC()
 
-        # write the chain length to the file. This is the only parameter
-        # that we save other than the MSC representation.
-        L = self.L
-        if L is None:
-            raise ValueError('L must be set before saving to disk.')
+            with open(fout,mode='wb') as f:
 
-        # cast it to the type that C will be looking for
-        int_t = msc.dtype[0].type
-        L = int_t(L)
+                # write the chain length to the file. This is the only parameter
+                # that we save other than the MSC representation.
+                L = self.L
+                if L is None:
+                    raise ValueError('L must be set before saving to disk.')
 
-        f.write(L.tobytes())
+                # cast it to the type that C will be looking for
+                int_t = msc.dtype[0].type
+                L = int_t(L)
 
-        # write out the length of the MSC representation
-        size = int_t(msc.size)
-        f.write(size.tobytes())
+                f.write(L.tobytes())
 
-        f.write(msc['masks'].tobytes())
-        f.write(msc['signs'].tobytes())
-        f.write(msc['coeffs'].tobytes())
+                # write out the length of the MSC representation
+                size = int_t(msc.size)
+                f.write(size.tobytes())
 
-        # close the file only if we opened it
-        if isinstance(fout,str):
-            f.close()
+                f.write(msc['masks'].tobytes())
+                f.write(msc['signs'].tobytes())
+                f.write(msc['coeffs'].tobytes())
+
+        COMM_WORLD.barrier()
 
     ### interface with PETSc
 

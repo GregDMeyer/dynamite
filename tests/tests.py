@@ -3,20 +3,21 @@ import unittest as ut
 
 from itertools import product
 from collections import OrderedDict
-from tempfile import TemporaryFile,NamedTemporaryFile
+from tempfile import TemporaryFile
+from os import remove
 
 dnm_args = []
 
 from dynamite import config
 config.initialize(dnm_args)
-config.global_shell = False
+config.global_shell = True
 
 import dynamite.operators as do
 from dynamite.tools import build_state,vectonumpy
 from dynamite._utils import coeff_to_str
 from dynamite.extras import commutator, Majorana
 import numpy as np
-from petsc4py.PETSc import Sys,NormType
+from petsc4py.PETSc import Sys,NormType,COMM_WORLD
 Print = Sys.Print
 
 from helpers import *
@@ -716,34 +717,34 @@ class Save(ut.TestCase):
 
         # test saving and loading by both file name
         # and file object
-        files = [('by_file',TemporaryFile),
-                 ('by_name','save_test.msc')]
+        f = 'save_test.msc'
 
-        for t,fg in files:
-            with self.subTest(ftype=t):
+        with self.subTest(m='save'):
+            H.save(f)
 
-                if isinstance(fg,str):
-                    f = fg
-                else:
-                    f = fg()
+        with self.subTest(m='load_str'):
+            Hf = do.Load(f)
+            self.assertEqual(H,Hf)
 
-                with self.subTest(m='save'):
-                    H.save(f)
+            # also make sure that the generated PETSc matrix
+            # works
+            r,msg = check_dnm_np(Hf,n)
+            self.assertTrue(r,msg=msg)
 
-                if not isinstance(f,str):
-                    f.seek(0)
+        with self.subTest(m='load_file'):
 
-                with self.subTest(m='load'):
-                    Hf = do.Load(f)
-                    self.assertEqual(H,Hf)
+            with open(f,'rb') as fd:
+                Hf = do.Load(fd)
+                self.assertEqual(H,Hf)
 
-                    # also make sure that the generated PETSc matrix
-                    # works
-                    r,msg = check_dnm_np(Hf,n)
-                    self.assertTrue(r,msg=msg)
+                # also make sure that the generated PETSc matrix
+                # works
+                r,msg = check_dnm_np(Hf,n)
+                self.assertTrue(r,msg=msg)
 
-                if not isinstance(fg,str):
-                    f.close()
+        COMM_WORLD.barrier()
+        if COMM_WORLD.rank == 0:
+            remove(f)
 
 class Utils(ut.TestCase):
 
