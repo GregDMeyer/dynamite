@@ -47,6 +47,11 @@ defaults to a value such that the operator extends to the end of the spin chain.
 .. autoclass:: dynamite.operators.IndexProduct
     :members:
 
+Saved Operators
+---------------
+
+.. autoclass:: dynamite.operators.Load
+
 Member Functions
 ----------------
 

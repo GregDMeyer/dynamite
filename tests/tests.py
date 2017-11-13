@@ -3,6 +3,7 @@ import unittest as ut
 
 from itertools import product
 from collections import OrderedDict
+from tempfile import TemporaryFile,NamedTemporaryFile
 
 dnm_args = []
 
@@ -558,7 +559,6 @@ class Evolve(ut.TestCase):
                     r,msg = check_evolve(d,n,state)
                     self.assertTrue(r,msg=msg)
 
-
 class Eigsolve(ut.TestCase):
 
     def setUp(self):
@@ -710,6 +710,41 @@ class Entropy(ut.TestCase):
                     r,msg = check_close(qtp_EE,dy_EE)
                     self.assertTrue(r,msg=msg)
 
+class Save(ut.TestCase):
+    def test_SaveAndLoad(self):
+        H,n = Hamiltonians.longrange(7)
+
+        # test saving and loading by both file name
+        # and file object
+        files = [('by_file',TemporaryFile),
+                 ('by_name','save_test.msc')]
+
+        for t,fg in files:
+            with self.subTest(ftype=t):
+
+                if isinstance(fg,str):
+                    f = fg
+                else:
+                    f = fg()
+
+                with self.subTest(m='save'):
+                    H.save(f)
+
+                if not isinstance(f,str):
+                    f.seek(0)
+
+                with self.subTest(m='load'):
+                    Hf = do.Load(f)
+                    self.assertEqual(H,Hf)
+
+                    # also make sure that the generated PETSc matrix
+                    # works
+                    r,msg = check_dnm_np(Hf,n)
+                    self.assertTrue(r,msg=msg)
+
+                if not isinstance(fg,str):
+                    f.close()
+
 class Utils(ut.TestCase):
 
     def setUp(self):
@@ -805,10 +840,12 @@ class Config(ut.TestCase):
 if __name__ == '__main__':
 
     # only get output from one process
-    from sys import stderr
-    from os import devnull
-    if PROC_0:
-        stream = stderr
-    else:
-        stream = open(devnull,'w')
-    ut.main(testRunner=ut.TextTestRunner(stream=stream))
+    # from sys import stderr
+    # from os import devnull
+    # if PROC_0:
+    #     stream = stderr
+    # else:
+    #     stream = open(devnull,'w')
+    # ut.main(testRunner=ut.TextTestRunner(stream=stream))
+
+    ut.main()

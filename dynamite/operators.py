@@ -12,7 +12,8 @@ __all__ = ['Sigmax',
            'Sum',
            'Product',
            'IndexSum',
-           'IndexProduct']
+           'IndexProduct',
+           'Load']
 
 from . import config
 config.initialize()
@@ -165,10 +166,10 @@ class Operator:
         Read-only attribute returning the dimension :math:`d = 2^L` of the matrix,
         or ``None`` if ``L`` is ``None``.
         """
-        if self._L is None:
+        if self.L is None:
             return None
         else:
-            return 1<<self._L
+            return 1<<self.L
 
     @property
     def nnz(self):
@@ -235,6 +236,58 @@ class Operator:
     def _copy(self):
         raise NotImplementedError()
 
+    ### save to disk
+
+    def save(self,fout):
+        """
+        Save the MSC representation of the operator to disk.
+        Can be loaded again through :class:`Load`.
+
+        Parameters
+        ----------
+        fout : str or file-like
+            The file to save the operator in. Can be either a string
+            containing the path to the desired file, or an open file-like
+            object.
+        """
+
+        # The file format is:
+        # L,nterms,masks,signs,coefficients
+        # where each is just a binary blob, one after the other.
+
+        # do this first so that we haven't already created the file if
+        # it fails for some reason
+        msc = self.get_MSC()
+
+        if isinstance(fout,str):
+            f = open(fout,mode='wb')
+        else:
+            f = fout
+
+        # write the chain length to the file. This is the only parameter
+        # that we save other than the MSC representation.
+        L = self.L
+        if L is None:
+            raise ValueError('L must be set before saving to disk.')
+
+        # cast it to the type that C will be looking for
+        int_t = msc.dtype[0].type
+        L = int_t(L)
+
+        f.write(L.tobytes())
+
+        # write out the length of the MSC representation
+        size = int_t(msc.size)
+        f.write(size.tobytes())
+
+        f.write(msc['masks'].tobytes())
+        f.write(msc['signs'].tobytes())
+        f.write(msc['coeffs'].tobytes())
+
+        # close the file only if we opened it
+        if isinstance(fout,str):
+            f.close()
+
     ### interface with PETSc
 
     def get_mat(self,diag_entries=False):
@@ -287,8 +340,6 @@ class Operator:
         self.destroy_mat()
 
         term_array = self.get_MSC()
-        # the thing might be big---should allow it to be freed to give a bit more memory for PETSc
-        self.release_MSC()
 
         if diag_entries and not np.any(term_array['masks'] == 0):
             term_array = np.hstack([np.array([(0,0,0)],dtype=MSC_dtype),term_array])
@@ -507,6 +558,75 @@ class Operator:
         # deletion.
         self.destroy_mat()
 
+class Load(Operator):
+    """
+    Class for operator loaded from memory.
+    Only the MSC representation of the operator
+    is saved; LaTeX, QuTiP, etc. are all currently
+    disabled for this type.
+
+    Files should be created with the :meth:`Operator.save`
+    method.
+
+    Parameters
+    ----------
+    fin : str or file object
+        The file from which to load the operator.
+    """
+    def __init__(self,fin):
+
+        Operator.__init__(self)
+
+        if isinstance(fin,str):
+            f = open(fin,mode='rb')
+        else:
+            f = fin
+
+        # figure out the datatype for int
+        int_t = MSC_dtype[0]
+        int_size = int_t.itemsize
+
+        self._L = int(np.fromstring(f.read(int_size),dtype=int_t))
+        msc_size = int(np.fromstring(f.read(int_size),dtype=int_t))
+
+        self._MSC = np.ndarray(msc_size,dtype=MSC_dtype)
+
+        self._MSC['masks'] = np.fromstring(f.read(int_size*msc_size),dtype=int_t)
+        self._MSC['signs'] = np.fromstring(f.read(int_size*msc_size),dtype=int_t)
+        self._MSC['coeffs'] = np.fromstring(f.read(np.complex128().itemsize*msc_size),dtype=np.complex128)
+
+        if isinstance(fin,str):
+            f.close()
+
+    @Operator.L.setter
+    def L(self,value):
+        raise TypeError('Cannot set L for operator loaded from file. Value from file: L='+str(self.L))
+
+    def _copy(self):
+        raise TypeError('Copy currently not implemented for operator loaded from file.')
+
+    def _build_tex(self,signs=None,request_parens=None):
+        raise TypeError('LaTeX not supported for operator loaded from file.')
+
+    def _build_qutip(self,shift_index,wrap):
+        raise TypeError('QuTiP not support for operator loaded from file.')
+
+    def _get_MSC(self,shift_index=0,wrap=False):
+        if shift_index != 0 or wrap:
+            raise TypeError('MSC shifts not supported for operator loaded from file.')
+        return self._MSC
+
+    def release_MSC(self):
+        raise TypeError('Cannot delete MSC representation for operator loaded from file.')
+
+    def _op_add(self,o):
+        raise TypeError('Cannot use operators loaded from file in expressions.')
+
+    def _op_mul(self,o):
+        raise TypeError('Cannot use operators loaded from file in expressions.')
+
+    def _num_mul(self,x):
+        self._MSC['coeffs'] *= x
 
 class _Expression(Operator):
     def __init__(self,terms,copy=True,L=None):

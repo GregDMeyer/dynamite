@@ -3,7 +3,7 @@ import numpy as np
 from scipy.linalg import expm
 from dynamite import config
 from dynamite.tools import build_state,vectonumpy
-from dynamite.operators import Sigmax,Sigmay,Sigmaz
+from dynamite.operators import Sigmax,Sigmay,Sigmaz,Load
 from petsc4py.PETSc import COMM_WORLD,NormType
 
 from numpy_operators import *
@@ -208,7 +208,8 @@ numpy matrix: %s
 
     ### qutip
 
-    if qtp is not None:
+    # not supported for matrices loaded from file
+    if qtp is not None and not isinstance(d,Load):
         qtp_o = d.build_qutip().full()
         tmp = np.allclose(qtp_o,dnm_np)
         if not tmp:
