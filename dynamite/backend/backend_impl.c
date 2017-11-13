@@ -3,7 +3,10 @@
 
 #undef  __FUNCT__
 #define __FUNCT__ "BuildMat_Full"
-PetscErrorCode BuildMat_Full(PetscInt L,PetscInt nterms,PetscInt* masks,PetscInt* signs,PetscScalar* coeffs,Mat *A)
+PetscErrorCode BuildMat_Full(PetscInt L,PetscInt nterms,
+                             const PetscInt* masks,
+                             const PetscInt* signs,
+                             const PetscScalar* coeffs,Mat *A)
 {
   PetscErrorCode ierr;
   PetscInt N,i,state,Istart,Iend,nrows,local_bits,nonlocal_mask;
@@ -78,7 +81,10 @@ PetscErrorCode BuildMat_Full(PetscInt L,PetscInt nterms,PetscInt* masks,PetscInt
 
 #undef  __FUNCT__
 #define __FUNCT__ "BuildMat_Shell"
-PetscErrorCode BuildMat_Shell(PetscInt L,PetscInt nterms,PetscInt* masks,PetscInt* signs,PetscScalar* coeffs,Mat *A)
+PetscErrorCode BuildMat_Shell(PetscInt L,PetscInt nterms,
+                              const PetscInt* masks,
+                              const PetscInt* signs,
+                              const PetscScalar* coeffs,Mat *A)
 {
   PetscErrorCode ierr;
   PetscInt N,n;
@@ -99,12 +105,6 @@ PetscErrorCode BuildMat_Shell(PetscInt L,PetscInt nterms,PetscInt* masks,PetscIn
 
 }
 
-static inline PetscInt map_back(PetscInt *choose_array,PetscInt s)
-{
-  /* TODO */
-  return 0;
-}
-
 #undef  __FUNCT__
 #define __FUNCT__ "MatMult_Shell"
 PetscErrorCode MatMult_Shell(Mat A,Vec x,Vec b)
@@ -112,8 +112,7 @@ PetscErrorCode MatMult_Shell(Mat A,Vec x,Vec b)
   PetscErrorCode ierr;
   PetscInt state,i,Istart,Iend,start,block_start,sign,m,s;
   PetscInt proc,proc_idx,proc_mask,proc_size,log2size;
-  PetscInt *mask_starts;
-  PetscBool map,assembling;
+  PetscBool assembling;
   const PetscScalar *x_array;
   PetscScalar c;
   shell_context *ctx;
@@ -128,8 +127,6 @@ PetscErrorCode MatMult_Shell(Mat A,Vec x,Vec b)
   MPI_Comm_size(PETSC_COMM_WORLD,&mpi_size);
 
   ierr = MatShellGetContext(A,&ctx);CHKERRQ(ierr);
-
-  map = (ctx->state_map != NULL);
 
   ierr = PetscMalloc1(VECSET_CACHE_SIZE,&lidx);CHKERRQ(ierr);
   ierr = PetscMalloc1(VECSET_CACHE_SIZE,&values);CHKERRQ(ierr);
@@ -148,36 +145,23 @@ PetscErrorCode MatMult_Shell(Mat A,Vec x,Vec b)
   proc_idx = mpi_rank << (ctx->L - log2size);
   proc_size = Iend-Istart;
 
-  /* count the number of masks going to each processor */
-  /* should really do this in BuildContext */
-  ierr = PetscMalloc1(mpi_size+1,&mask_starts);CHKERRQ(ierr);
-
-  mask_starts[0] = 0;
-  m = proc_size;
-  for (i=1;i<ctx->nterms;++i) {
-    for (;m<=ctx->masks[i];m += proc_size) {
-      mask_starts[m / proc_size] = i;
-    }
-  }
-  /* maybe a few of the last ones had none, have
-   * to iterate through those
-   */
-  for (i=m/proc_size;i<mpi_size+1;++i) {
-    mask_starts[i] = ctx->nterms;
-  }
-
   /* we are not already sending values to another processor */
   assembling = PETSC_FALSE;
 
   for (proc=0;proc < mpi_size;++proc) {
 
+    /* NOTE: these breaks and continues are dangerous if
+     * the data doesn't divide perfectly across processors.
+     * When switching to a subspace need to be careful!
+     */
+
     /* if there are none for this process, skip it */
-    if (mask_starts[proc] == mask_starts[proc+1]) continue;
+    if (ctx->mask_starts[proc] == ctx->mask_starts[proc+1]) continue;
 
     /* if we've hit the end of the masks, stop */
-    if (mask_starts[proc] == ctx->nterms) break;
+    if (ctx->mask_starts[proc] == ctx->nterms) break;
 
-    start = proc_mask & (proc_idx ^ ctx->masks[mask_starts[proc]]);
+    start = proc_mask & (proc_idx ^ ctx->masks[ctx->mask_starts[proc]]);
     for (block_start=start;
          block_start<start+proc_size;
          block_start+=VECSET_CACHE_SIZE) {
@@ -189,7 +173,7 @@ PetscErrorCode MatMult_Shell(Mat A,Vec x,Vec b)
         lidx[cache_idx] = block_start + cache_idx;
       }
 
-      for (i=mask_starts[proc];i<mask_starts[proc+1];++i) {
+      for (i=ctx->mask_starts[proc];i<ctx->mask_starts[proc+1];++i) {
 
         m = ctx->masks[i];
         s = ctx->signs[i];
@@ -222,7 +206,6 @@ PetscErrorCode MatMult_Shell(Mat A,Vec x,Vec b)
 
   ierr = PetscFree(lidx);CHKERRQ(ierr);
   ierr = PetscFree(values);CHKERRQ(ierr);
-  ierr = PetscFree(mask_starts);CHKERRQ(ierr);
 
   return ierr;
 }
@@ -232,7 +215,7 @@ PetscErrorCode MatMult_Shell(Mat A,Vec x,Vec b)
 PetscErrorCode MatNorm_Shell(Mat A,NormType type,PetscReal *nrm)
 {
   PetscErrorCode ierr;
-  PetscInt m,idx,state,N,i,sign,map;
+  PetscInt m,idx,state,N,i,sign;
   PetscScalar csum;
   PetscReal sum,max_sum;
   shell_context *ctx;
@@ -259,16 +242,12 @@ PetscErrorCode MatNorm_Shell(Mat A,NormType type,PetscReal *nrm)
 
   N = 1<<ctx->L;
   max_sum = 0;
-  map = ctx->state_map != NULL;
   for (idx=0;idx<N;++idx) {
     sum = 0;
     for (i=0;i<ctx->nterms;) {
       csum = 0;
       m = ctx->masks[i];
-      if (map) {
-        state = ctx->state_map[idx];
-      }
-      else state = idx;
+      state = idx;
       /* sum all terms for this matrix element */
       do {
         /* this requires gcc builtins */
@@ -292,11 +271,16 @@ PetscErrorCode MatNorm_Shell(Mat A,NormType type,PetscReal *nrm)
 
 #undef  __FUNCT__
 #define __FUNCT__ "BuildContext"
-PetscErrorCode BuildContext(PetscInt L,PetscInt nterms,PetscInt* masks,PetscInt* signs,PetscScalar* coeffs,shell_context **ctx_p)
+PetscErrorCode BuildContext(PetscInt L,
+                            PetscInt nterms,
+                            const PetscInt* masks,
+                            const PetscInt* signs,
+                            const PetscScalar* coeffs,
+                            shell_context **ctx_p)
 {
   PetscErrorCode ierr;
   shell_context *ctx;
-  PetscInt i;
+  PetscInt i,mpi_size,proc_size,N,m;
 
   ierr = PetscMalloc1(1,ctx_p);CHKERRQ(ierr);
   ctx = (*ctx_p);
@@ -305,9 +289,6 @@ PetscErrorCode BuildContext(PetscInt L,PetscInt nterms,PetscInt* masks,PetscInt*
   ctx->nterms = nterms;
   ctx->nrm = -1;
   ctx->gpu = PETSC_FALSE;
-
-  /* TODO: implement this logic */
-  ctx->state_map = NULL;
 
   /* we need to keep track of this stuff on our own. the numpy array might get garbage collected */
   ierr = PetscMalloc1(nterms,&(ctx->masks));CHKERRQ(ierr);
@@ -318,6 +299,29 @@ PetscErrorCode BuildContext(PetscInt L,PetscInt nterms,PetscInt* masks,PetscInt*
     ctx->masks[i] = masks[i];
     ctx->signs[i] = signs[i];
     ctx->coeffs[i] = coeffs[i];
+  }
+
+  ierr = MPI_Comm_size(PETSC_COMM_WORLD,&mpi_size);
+
+  /* count the number of masks going to each processor */
+  ierr = PetscMalloc1(mpi_size+1,&(ctx->mask_starts));CHKERRQ(ierr);
+
+  proc_size = PETSC_DECIDE;
+  N = 1<<L;
+  ierr = PetscSplitOwnership(PETSC_COMM_WORLD,&proc_size,&N);CHKERRQ(ierr);
+
+  ctx->mask_starts[0] = 0;
+  m = proc_size;
+  for (i=1;i<ctx->nterms;++i) {
+    for (;m<=ctx->masks[i];m += proc_size) {
+      ctx->mask_starts[m / proc_size] = i;
+    }
+  }
+  /* maybe a few of the last ones had none, have
+   * to iterate through those
+   */
+  for (i=m/proc_size;i<mpi_size+1;++i) {
+    ctx->mask_starts[i] = ctx->nterms;
   }
 
   return ierr;

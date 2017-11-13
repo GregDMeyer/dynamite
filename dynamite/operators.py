@@ -269,18 +269,19 @@ class Operator:
                     raise ValueError('L must be set before saving to disk.')
 
                 # cast it to the type that C will be looking for
-                int_t = msc.dtype[0].type
-                L = int_t(L)
+                int_t = msc.dtype[0].newbyteorder('>')
+                complex_t = msc.dtype[2].newbyteorder('>')
 
+                L = np.array(L,dtype=int_t)
                 f.write(L.tobytes())
 
                 # write out the length of the MSC representation
-                size = int_t(msc.size)
+                size = np.array(msc.size,dtype=int_t)
                 f.write(size.tobytes())
 
-                f.write(msc['masks'].tobytes())
-                f.write(msc['signs'].tobytes())
-                f.write(msc['coeffs'].tobytes())
+                f.write(msc['masks'].astype(int_t,casting='equiv',copy=False).tobytes())
+                f.write(msc['signs'].astype(int_t,casting='equiv',copy=False).tobytes())
+                f.write(msc['coeffs'].astype(complex_t,casting='equiv',copy=False).tobytes())
 
         COMM_WORLD.barrier()
 
@@ -579,7 +580,8 @@ class Load(Operator):
             f = fin
 
         # figure out the datatype for int
-        int_t = MSC_dtype[0]
+        int_t = MSC_dtype[0].newbyteorder('>')
+        complex_t = MSC_dtype[2].newbyteorder('>')
         int_size = int_t.itemsize
 
         self._L = int(np.fromstring(f.read(int_size),dtype=int_t))
@@ -589,7 +591,7 @@ class Load(Operator):
 
         self._MSC['masks'] = np.fromstring(f.read(int_size*msc_size),dtype=int_t)
         self._MSC['signs'] = np.fromstring(f.read(int_size*msc_size),dtype=int_t)
-        self._MSC['coeffs'] = np.fromstring(f.read(np.complex128().itemsize*msc_size),dtype=np.complex128)
+        self._MSC['coeffs'] = np.fromstring(f.read(complex_t.itemsize*msc_size),dtype=complex_t)
 
         if isinstance(fin,str):
             f.close()
