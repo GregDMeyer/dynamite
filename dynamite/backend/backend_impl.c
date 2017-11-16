@@ -215,19 +215,14 @@ PetscErrorCode MatMult_Shell(Mat A,Vec x,Vec b)
 PetscErrorCode MatNorm_Shell(Mat A,NormType type,PetscReal *nrm)
 {
   PetscErrorCode ierr;
-  PetscInt m,idx,state,N,i,sign;
+  PetscInt m,idx,state,i,sign,Istart,Iend;
   PetscScalar csum;
-  PetscReal sum,max_sum;
+  PetscReal sum,local_max,global_max;
   shell_context *ctx;
 
   if (type != NORM_INFINITY) {
     SETERRQ(PETSC_COMM_WORLD,PETSC_ERR_ARG_OUTOFRANGE,"Only NORM_INFINITY is implemented for shell matrices.");
   }
-
-  /* TODO: this whole computation can be done in parallel, with
-     each process doing a chunk of the matrix. it wouldn't be a
-     totally crazy speedup since we only do this once. but still
-     probably would be helpful, especially for really big matrices */
 
   ierr = MatShellGetContext(A,&ctx);CHKERRQ(ierr);
 
@@ -240,9 +235,10 @@ PetscErrorCode MatNorm_Shell(Mat A,NormType type,PetscReal *nrm)
     return ierr;
   }
 
-  N = 1<<ctx->L;
-  max_sum = 0;
-  for (idx=0;idx<N;++idx) {
+  ierr = MatGetOwnershipRange(A,&Istart,&Iend);CHKERRQ(ierr);
+
+  local_max = 0;
+  for (idx=Istart;idx<Iend;++idx) {
     sum = 0;
     for (i=0;i<ctx->nterms;) {
       csum = 0;
@@ -258,12 +254,15 @@ PetscErrorCode MatNorm_Shell(Mat A,NormType type,PetscReal *nrm)
 
       sum += PetscAbsComplex(csum);
     }
-    if (sum > max_sum) {
-      max_sum = sum;
+    if (sum > local_max) {
+      local_max = sum;
     }
   }
 
-  ctx->nrm = (*nrm) = max_sum;
+  ierr = MPIU_Allreduce(&local_max,&global_max,1,MPIU_REAL,MPI_MAX,PETSC_COMM_WORLD);CHKERRQ(ierr);
+
+  ctx->nrm = global_max;
+  (*nrm) = global_max;
 
   return ierr;
 

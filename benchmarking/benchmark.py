@@ -23,6 +23,8 @@ parser.add_argument('-t',type=float,default=1.0,help='The time to evolve for.')
 parser.add_argument('--mult',action='store_true',help='Simply multiply the Hamiltonian by a vector.')
 parser.add_argument('--mult_count',type=int,default=1,help='Number of times to repeat the multiplication.')
 
+parser.add_argument('--norm',action='store_true',help='Compute the norm of the matrix.')
+
 parser.add_argument('--eigsolve',action='store_true',help='Request to solve for eigenvalues of the Hamiltonian.')
 parser.add_argument('--nev',type=int,default=1,help='The number of eigenpairs to solve for.')
 parser.add_argument('--target',type=int,help='The target for a shift-invert eigensolve.')
@@ -37,7 +39,7 @@ config.initialize(slepc_args)
 from dynamite.operators import Sum,Product,IndexSum,Sigmax,Sigmay,Sigmaz
 from dynamite.tools import build_state,track_memory,get_max_memory_usage
 from dynamite.extras import Majorana as X
-from petsc4py.PETSc import Sys
+from petsc4py.PETSc import Sys,NormType
 Print = Sys.Print
 
 stats = {}
@@ -93,9 +95,6 @@ if __debug__:
 
 stats['MSC_build_time'] = default_timer() - start
 
-# build a dummy matrix first to have equal profiling data
-
-H.build_mat()
 H.use_shell = args.shell
 
 start = default_timer()
@@ -104,6 +103,16 @@ stats['mat_build_time'] = default_timer() - start
 
 if __debug__:
     Print('PETSc matrix built.')
+
+# compute the norm
+if args.norm:
+    if __debug__:
+        Print('computing norm...')
+    start = default_timer()
+    H.get_mat().norm(NormType.INFINITY)
+    stats['norm_time'] = default_timer() - start
+    if __debug__:
+        Print('norm compute complete.')
 
 if args.eigsolve:
     if __debug__:
