@@ -105,6 +105,16 @@ PetscErrorCode BuildMat_Shell(PetscInt L,PetscInt nterms,
 
 }
 
+static inline PetscScalar cix(PetscReal c,const PetscScalar *x)
+{
+  PetscScalar y;
+  PetscReal* yp;
+  yp = (PetscReal*)&y;
+  yp[0] = -c*((PetscReal*)x)[1];
+  yp[1] = c*((PetscReal*)x)[0];
+  return y;
+}
+
 #undef  __FUNCT__
 #define __FUNCT__ "MatMult_Shell"
 PetscErrorCode MatMult_Shell(Mat A,Vec x,Vec b)
@@ -112,15 +122,16 @@ PetscErrorCode MatMult_Shell(Mat A,Vec x,Vec b)
   PetscErrorCode ierr;
   PetscInt state,i,Istart,Iend,start,block_start,sign,m,s;
   PetscInt proc,proc_idx,proc_mask,proc_size,log2size;
-  PetscBool assembling;
-  const PetscScalar *x_array;
+  PetscBool assembling,real;
+  const PetscScalar *x_array, *x_begin, *xp;
   PetscScalar c;
+  PetscReal cr;
   shell_context *ctx;
 
   /* cache */
   PetscInt *lidx;
-  PetscInt cache_idx,cache_idx_max;
-  PetscScalar *values;
+  PetscInt cache_idx,cache_idx_max,cache_idx_submax,iterate_max;
+  PetscScalar *summed_c,*values,*vp;
 
   PetscInt mpi_rank,mpi_size;
   MPI_Comm_rank(PETSC_COMM_WORLD,&mpi_rank);
@@ -144,6 +155,7 @@ PetscErrorCode MatMult_Shell(Mat A,Vec x,Vec b)
   proc_mask = ((1 << log2size)-1) << (ctx->L - log2size);
   proc_idx = mpi_rank << (ctx->L - log2size);
   proc_size = Iend-Istart;
+  x_begin = x_array - Istart;
 
   /* we are not already sending values to another processor */
   assembling = PETSC_FALSE;
@@ -179,10 +191,61 @@ PetscErrorCode MatMult_Shell(Mat A,Vec x,Vec b)
         s = ctx->signs[i];
         c = ctx->coeffs[i];
 
-        for (cache_idx=0;cache_idx<cache_idx_max;++cache_idx) {
-          state = (block_start + cache_idx) ^ m;
-          sign = 1 - 2*(__builtin_popcount(state & s)&1);
-          values[cache_idx] += x_array[state - Istart] * sign * c;
+        iterate_max = 1<<PetscMin(__builtin_ctz(m),__builtin_ctz(s));
+
+        cr = PetscRealPart(c);
+        real = (cr != 0);
+        if (!real) cr = PetscImaginaryPart(c);
+
+        if (real) {
+          if (iterate_max < 1<<3) {
+            for (cache_idx=0;cache_idx<cache_idx_max;++cache_idx) {
+              state = (block_start+cache_idx) ^ m;
+              sign = __builtin_popcount(state & s)&1;
+              values[cache_idx] -= ((sign^(sign-1))*cr)*x_begin[state];
+            }
+          }
+          else {
+            for (cache_idx=0;cache_idx<cache_idx_max;++cache_idx) {
+              state = (block_start+cache_idx) ^ m;
+              sign = __builtin_popcount(state & s)&1;
+
+              vp = values + cache_idx;
+              xp = x_begin + state;
+              (*vp) -= ((sign^(sign-1))*cr)*(*xp);
+
+              cache_idx_submax = PetscMin(cache_idx+(iterate_max-(state%iterate_max)),cache_idx_max);
+              for (++cache_idx,++xp,++vp;cache_idx<cache_idx_submax;++cache_idx,++xp,++vp) {
+                (*vp) -= ((sign^(sign-1))*cr)*(*xp);
+              }
+              --cache_idx;
+            }
+          }
+        }
+        else {
+          if (iterate_max < 1<<3) {
+            for (cache_idx=0;cache_idx<cache_idx_max;++cache_idx) {
+              state = (block_start+cache_idx) ^ m;
+              sign = __builtin_popcount(state & s)&1;
+              values[cache_idx] -= (sign^(sign-1))*cix(cr,x_begin + state);
+            }
+          }
+          else {
+            for (cache_idx=0;cache_idx<cache_idx_max;++cache_idx) {
+              state = (block_start+cache_idx) ^ m;
+              sign = __builtin_popcount(state & s)&1;
+
+              vp = values + cache_idx;
+              xp = x_begin + state;
+              (*vp) -= (sign^(sign-1))*cix(cr,xp);
+
+              cache_idx_submax = PetscMin(cache_idx+(iterate_max-(state%iterate_max)),cache_idx_max);
+              for (++cache_idx,++xp,++vp;cache_idx<cache_idx_submax;++cache_idx,++xp,++vp) {
+                (*vp) -= (sign^(sign-1))*cix(cr,xp);
+              }
+              --cache_idx;
+            }
+          }
         }
       }
 
