@@ -8,8 +8,9 @@ parser = ap.ArgumentParser(description='Benchmarking test for dynamite.')
 
 parser.add_argument('-L', type=int, help='Size of the spin chain.', required=True)
 
-parser.add_argument('-H', choices=['MBL','long_range','SYK','ising','XX'],
+parser.add_argument('-H', choices=['MBL','long_range','SYK','ising','XX','Load'],
                     default='MBL', help='Hamiltonian to use', required=True)
+parser.add_argument('--file', help='The file from which to load the operator.')
 
 parser.add_argument('-w', type=int, default=1, help='Magnitude of the disorder for MBL Hamiltonian.')
 
@@ -36,7 +37,7 @@ slepc_args = args.slepc_args.split(' ')
 from dynamite import config
 config.initialize(slepc_args)
 
-from dynamite.operators import Sum,Product,IndexSum,Sigmax,Sigmay,Sigmaz
+from dynamite.operators import Sum,Product,IndexSum,Sigmax,Sigmay,Sigmaz,Load
 from dynamite.tools import build_state,track_memory,get_max_memory_usage
 from dynamite.extras import Majorana as X
 from petsc4py.PETSc import Sys,NormType
@@ -53,7 +54,7 @@ stats = {}
 #     'MaxRSS':None,
 # }
 
-track_memory()
+#track_memory()
 mem_type = 'all'
 
 config.global_L = args.L
@@ -86,6 +87,10 @@ elif args.H == 'ising':
     H = IndexSum(Sigmaz(0)*Sigmaz(1)) + 0.2*IndexSum(Sigmax())
 elif args.H == 'XX':
     H = IndexSum(Sigmax(0)*Sigmax(1))
+elif args.H == 'Load':
+    H = Load(args.file)
+else:
+    raise ValueError('Unrecognized Hamiltonian.')
 
 start = default_timer()
 
@@ -148,7 +153,7 @@ if args.mult:
 
 H.destroy_mat()
 
-stats['MaxRSS'] = get_max_memory_usage(mem_type)
+#stats['MaxRSS'] = get_max_memory_usage(mem_type)
 
 Print('---RESULTS---')
 for k,v in stats.items():
