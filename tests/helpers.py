@@ -174,7 +174,7 @@ numpy matrix: %s
 
         # print some nonzero elements of difference
         msg += 'nonzero elements of difference:\n'
-        msg += str_differences(dnm_np,n)
+        msg += str_differences(n,dnm_np)
 
     r = r and tmp
 
@@ -224,13 +224,13 @@ dynamite matrix: %s
     return r,msg
 
 
-def str_differences(a,b):
-    diff = a-b
+def str_differences(n,d):
+    diff = n-d
     nz = np.transpose(np.nonzero(diff))
     msg = ''
     for i,(idx,idy) in enumerate(nz):
         # don't blow up the output if there are a lot
         if i > 20:
             break
-        msg += '%d %d %s\n' % (idx,idy,diff[idx,idy])
+        msg += '%d %d n:%s d:%s\n' % (idx,idy,n[idx,idy],d[idx,idy])
     return msg

@@ -105,14 +105,14 @@ PetscErrorCode BuildMat_Shell(PetscInt L,PetscInt nterms,
 
 }
 
-static inline PetscScalar cix(PetscReal c,const PetscScalar *x)
+static inline void _rsub(PetscScalar *x,PetscReal c)
 {
-  PetscScalar y;
-  PetscReal* yp;
-  yp = (PetscReal*)&y;
-  yp[0] = -c*((PetscReal*)x)[1];
-  yp[1] = c*((PetscReal*)x)[0];
-  return y;
+  (*x) -= c;
+}
+
+static inline void _csub(PetscScalar *x,PetscReal c)
+{
+  (*x) -= I*c;
 }
 
 #undef  __FUNCT__
@@ -124,14 +124,14 @@ PetscErrorCode MatMult_Shell(Mat A,Vec x,Vec b)
   PetscInt proc,proc_idx,proc_mask,proc_size,log2size;
   PetscBool assembling,real;
   const PetscScalar *x_array, *x_begin, *xp;
-  PetscScalar c;
+  PetscScalar c,sc;
   PetscReal cr;
   shell_context *ctx;
 
   /* cache */
   PetscInt *lidx;
   PetscInt cache_idx,cache_idx_max,cache_idx_submax,iterate_max;
-  PetscScalar *summed_c,*values,*vp;
+  PetscScalar *summed_c,*cp,*values,*vp;
 
   PetscInt mpi_rank,mpi_size;
   MPI_Comm_rank(PETSC_COMM_WORLD,&mpi_rank);
@@ -141,6 +141,7 @@ PetscErrorCode MatMult_Shell(Mat A,Vec x,Vec b)
 
   ierr = PetscMalloc1(VECSET_CACHE_SIZE,&lidx);CHKERRQ(ierr);
   ierr = PetscMalloc1(VECSET_CACHE_SIZE,&values);CHKERRQ(ierr);
+  ierr = PetscMalloc1(VECSET_CACHE_SIZE,&summed_c);CHKERRQ(ierr);
 
   /* clear out the b vector */
   ierr = VecSet(b,0);CHKERRQ(ierr);
@@ -180,7 +181,9 @@ PetscErrorCode MatMult_Shell(Mat A,Vec x,Vec b)
 
       cache_idx_max = PetscMin((start+proc_size)-block_start,VECSET_CACHE_SIZE);
 
-      PetscMemzero(values,sizeof(PetscScalar)*VECSET_CACHE_SIZE);
+      ierr = PetscMemzero(values,sizeof(PetscScalar)*VECSET_CACHE_SIZE);CHKERRQ(ierr);
+      ierr = PetscMemzero(summed_c,sizeof(PetscScalar)*VECSET_CACHE_SIZE);CHKERRQ(ierr);
+
       for (cache_idx=0;cache_idx<cache_idx_max;++cache_idx) {
         lidx[cache_idx] = block_start + cache_idx;
       }
@@ -197,55 +200,74 @@ PetscErrorCode MatMult_Shell(Mat A,Vec x,Vec b)
         real = (cr != 0);
         if (!real) cr = PetscImaginaryPart(c);
 
-        if (real) {
-          if (iterate_max < 1<<3) {
+        if (iterate_max < 1<<3) {
+          if (real) {
             for (cache_idx=0;cache_idx<cache_idx_max;++cache_idx) {
               state = (block_start+cache_idx) ^ m;
               sign = __builtin_popcount(state & s)&1;
-              values[cache_idx] -= ((sign^(sign-1))*cr)*x_begin[state];
+              _rsub(summed_c + cache_idx,((sign^(sign-1))*cr));
             }
           }
           else {
             for (cache_idx=0;cache_idx<cache_idx_max;++cache_idx) {
               state = (block_start+cache_idx) ^ m;
               sign = __builtin_popcount(state & s)&1;
-
-              vp = values + cache_idx;
-              xp = x_begin + state;
-              (*vp) -= ((sign^(sign-1))*cr)*(*xp);
-
-              cache_idx_submax = PetscMin(cache_idx+(iterate_max-(state%iterate_max)),cache_idx_max);
-              for (++cache_idx,++xp,++vp;cache_idx<cache_idx_submax;++cache_idx,++xp,++vp) {
-                (*vp) -= ((sign^(sign-1))*cr)*(*xp);
-              }
-              --cache_idx;
+              _csub(summed_c + cache_idx,((sign^(sign-1))*cr));
             }
           }
         }
         else {
+          for (cache_idx=0;cache_idx<cache_idx_max;++cache_idx) {
+            state = (block_start+cache_idx) ^ m;
+            sign = __builtin_popcount(state & s)&1;
+
+            cp = summed_c + cache_idx;
+            sc = (sign^(sign-1))*cr;
+
+            cache_idx_submax = PetscMin(cache_idx+(iterate_max-(state%iterate_max)),cache_idx_max);
+
+            if (real) {
+              _rsub(cp,sc);
+              for (++cache_idx,++cp;cache_idx<cache_idx_submax;++cache_idx,++cp) {
+                _rsub(cp,sc);
+              }
+            }
+            else {
+              _csub(cp,sc);
+              for (++cache_idx,++cp;cache_idx<cache_idx_submax;++cache_idx,++cp) {
+                _csub(cp,sc);
+              }
+            }
+            --cache_idx;
+          }
+        }
+
+        /* need to finally multiply by x */
+        if ((i+1) == ctx->mask_starts[proc+1] || m != ctx->masks[i+1]) {
           if (iterate_max < 1<<3) {
             for (cache_idx=0;cache_idx<cache_idx_max;++cache_idx) {
               state = (block_start+cache_idx) ^ m;
-              sign = __builtin_popcount(state & s)&1;
-              values[cache_idx] -= (sign^(sign-1))*cix(cr,x_begin + state);
+              values[cache_idx] += summed_c[cache_idx]*x_begin[state];
             }
           }
           else {
             for (cache_idx=0;cache_idx<cache_idx_max;++cache_idx) {
               state = (block_start+cache_idx) ^ m;
-              sign = __builtin_popcount(state & s)&1;
 
               vp = values + cache_idx;
               xp = x_begin + state;
-              (*vp) -= (sign^(sign-1))*cix(cr,xp);
+              cp = summed_c + cache_idx;
+              (*vp) += (*cp)*(*xp);
 
               cache_idx_submax = PetscMin(cache_idx+(iterate_max-(state%iterate_max)),cache_idx_max);
-              for (++cache_idx,++xp,++vp;cache_idx<cache_idx_submax;++cache_idx,++xp,++vp) {
-                (*vp) -= (sign^(sign-1))*cix(cr,xp);
+              for (++cache_idx,++xp,++vp,++cp;cache_idx<cache_idx_submax;++cache_idx,++xp,++vp,++cp) {
+                (*vp) += (*cp)*(*xp);
               }
               --cache_idx;
             }
           }
+
+          ierr = PetscMemzero(summed_c,sizeof(PetscScalar)*VECSET_CACHE_SIZE);CHKERRQ(ierr);
         }
       }
 
@@ -269,6 +291,7 @@ PetscErrorCode MatMult_Shell(Mat A,Vec x,Vec b)
 
   ierr = PetscFree(lidx);CHKERRQ(ierr);
   ierr = PetscFree(values);CHKERRQ(ierr);
+  ierr = PetscFree(summed_c);CHKERRQ(ierr);
 
   return ierr;
 }
