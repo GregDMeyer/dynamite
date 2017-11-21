@@ -130,7 +130,7 @@ PetscErrorCode MatMult_Shell(Mat A,Vec x,Vec b)
 
   /* cache */
   PetscInt *lidx;
-  PetscInt cache_idx,cache_idx_max,cache_idx_submax,iterate_max;
+  PetscInt cache_idx,cache_idx_max,stop_count,cache_idx_submax,iterate_max;
   PetscScalar *summed_c,*cp,*values,*vp;
 
   PetscInt mpi_rank,mpi_size;
@@ -200,7 +200,7 @@ PetscErrorCode MatMult_Shell(Mat A,Vec x,Vec b)
         real = (cr != 0);
         if (!real) cr = PetscImaginaryPart(c);
 
-        if (iterate_max < 1<<3) {
+        if (iterate_max < 3) {
           if (real) {
             for (cache_idx=0;cache_idx<cache_idx_max;++cache_idx) {
               state = (block_start+cache_idx) ^ m;
@@ -224,27 +224,29 @@ PetscErrorCode MatMult_Shell(Mat A,Vec x,Vec b)
             cp = summed_c + cache_idx;
             sc = (sign^(sign-1))*cr;
 
-            cache_idx_submax = PetscMin(cache_idx+(iterate_max-(state%iterate_max)),cache_idx_max);
+            stop_count = PetscMin(iterate_max-(state%iterate_max),cache_idx_max-cache_idx);
+            cache_idx += stop_count - 1;
 
             if (real) {
               _rsub(cp,sc);
-              for (++cache_idx,++cp;cache_idx<cache_idx_submax;++cache_idx,++cp) {
+              while (--stop_count) {
+                ++cp;
                 _rsub(cp,sc);
               }
             }
             else {
               _csub(cp,sc);
-              for (++cache_idx,++cp;cache_idx<cache_idx_submax;++cache_idx,++cp) {
+              while (--stop_count) {
+                ++cp;
                 _csub(cp,sc);
               }
             }
-            --cache_idx;
           }
         }
 
         /* need to finally multiply by x */
         if ((i+1) == ctx->mask_starts[proc+1] || m != ctx->masks[i+1]) {
-          if (iterate_max < 1<<3) {
+          if (iterate_max < 3) {
             for (cache_idx=0;cache_idx<cache_idx_max;++cache_idx) {
               state = (block_start+cache_idx) ^ m;
               values[cache_idx] += summed_c[cache_idx]*x_begin[state];
@@ -259,11 +261,15 @@ PetscErrorCode MatMult_Shell(Mat A,Vec x,Vec b)
               cp = summed_c + cache_idx;
               (*vp) += (*cp)*(*xp);
 
-              cache_idx_submax = PetscMin(cache_idx+(iterate_max-(state%iterate_max)),cache_idx_max);
-              for (++cache_idx,++xp,++vp,++cp;cache_idx<cache_idx_submax;++cache_idx,++xp,++vp,++cp) {
+              stop_count = PetscMin(iterate_max-(state%iterate_max),cache_idx_max-cache_idx);
+              cache_idx += stop_count - 1;
+
+              while (--stop_count) {
+                ++xp;
+                ++vp;
+                ++cp;
                 (*vp) += (*cp)*(*xp);
               }
-              --cache_idx;
             }
           }
 
