@@ -6,7 +6,8 @@
 
 /* allow us to set many values at once */
 #define VECSET_CACHE_SIZE 2048
-#define FIRST_ITER (-1)
+#define ITER_CUTOFF 8
+#define intmin(a,b) ((a)^(((a)^(b))&(((a)<(b))-1)))
 
 PetscErrorCode BuildMat_Full(PetscInt L,PetscInt nterms,
                              const PetscInt* masks,

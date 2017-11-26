@@ -130,7 +130,7 @@ PetscErrorCode MatMult_Shell(Mat A,Vec x,Vec b)
 
   /* cache */
   PetscInt *lidx;
-  PetscInt cache_idx,cache_idx_max,stop_count,cache_idx_submax,iterate_max;
+  PetscInt cache_idx,cache_idx_max,stop_count,iterate_max;
   PetscScalar *summed_c,*cp,*values,*vp;
 
   PetscInt mpi_rank,mpi_size;
@@ -179,7 +179,7 @@ PetscErrorCode MatMult_Shell(Mat A,Vec x,Vec b)
          block_start<start+proc_size;
          block_start+=VECSET_CACHE_SIZE) {
 
-      cache_idx_max = PetscMin((start+proc_size)-block_start,VECSET_CACHE_SIZE);
+      cache_idx_max = intmin((start+proc_size)-block_start,VECSET_CACHE_SIZE);
 
       ierr = PetscMemzero(values,sizeof(PetscScalar)*VECSET_CACHE_SIZE);CHKERRQ(ierr);
       ierr = PetscMemzero(summed_c,sizeof(PetscScalar)*VECSET_CACHE_SIZE);CHKERRQ(ierr);
@@ -194,13 +194,13 @@ PetscErrorCode MatMult_Shell(Mat A,Vec x,Vec b)
         s = ctx->signs[i];
         c = ctx->coeffs[i];
 
-        iterate_max = 1<<PetscMin(__builtin_ctz(m),__builtin_ctz(s));
+        iterate_max = 1<<intmin(__builtin_ctz(m),__builtin_ctz(s));
 
         cr = PetscRealPart(c);
         real = (cr != 0);
         if (!real) cr = PetscImaginaryPart(c);
 
-        if (iterate_max < 3) {
+        if (iterate_max < ITER_CUTOFF) {
           if (real) {
             for (cache_idx=0;cache_idx<cache_idx_max;++cache_idx) {
               state = (block_start+cache_idx) ^ m;
@@ -224,7 +224,7 @@ PetscErrorCode MatMult_Shell(Mat A,Vec x,Vec b)
             cp = summed_c + cache_idx;
             sc = (sign^(sign-1))*cr;
 
-            stop_count = PetscMin(iterate_max-(state%iterate_max),cache_idx_max-cache_idx);
+            stop_count = intmin(iterate_max-(state%iterate_max),cache_idx_max-cache_idx);
             cache_idx += stop_count - 1;
 
             if (real) {
@@ -246,7 +246,7 @@ PetscErrorCode MatMult_Shell(Mat A,Vec x,Vec b)
 
         /* need to finally multiply by x */
         if ((i+1) == ctx->mask_starts[proc+1] || m != ctx->masks[i+1]) {
-          if (iterate_max < 3) {
+          if (iterate_max < ITER_CUTOFF) {
             for (cache_idx=0;cache_idx<cache_idx_max;++cache_idx) {
               state = (block_start+cache_idx) ^ m;
               values[cache_idx] += summed_c[cache_idx]*x_begin[state];
@@ -261,7 +261,7 @@ PetscErrorCode MatMult_Shell(Mat A,Vec x,Vec b)
               cp = summed_c + cache_idx;
               (*vp) += (*cp)*(*xp);
 
-              stop_count = PetscMin(iterate_max-(state%iterate_max),cache_idx_max-cache_idx);
+              stop_count = intmin(iterate_max-(state%iterate_max),cache_idx_max-cache_idx);
               cache_idx += stop_count - 1;
 
               while (--stop_count) {
