@@ -105,14 +105,14 @@ PetscErrorCode BuildMat_Shell(PetscInt L,PetscInt nterms,
 
 }
 
-static inline void _rsub(PetscScalar *x,PetscReal c)
+static inline void _radd(PetscScalar *x,PetscReal c)
 {
-  (*x) -= c;
+  (*x) += c;
 }
 
-static inline void _csub(PetscScalar *x,PetscReal c)
+static inline void _cadd(PetscScalar *x,PetscReal c)
 {
-  (*x) -= I*c;
+  (*x) += I*c;
 }
 
 #undef  __FUNCT__
@@ -122,9 +122,9 @@ PetscErrorCode MatMult_Shell(Mat A,Vec x,Vec b)
   PetscErrorCode ierr;
   PetscInt state,i,Istart,Iend,start,block_start,sign,m,s,*l;
   PetscInt proc,proc_idx,proc_mask,proc_size,log2size;
-  PetscBool assembling;
+  PetscBool assembling,r;
   const PetscScalar *x_array, *x_begin, *xp;
-  PetscScalar c,tmp_c;
+  PetscReal c,tmp_c;
   shell_context *ctx;
 
   /* cache */
@@ -194,9 +194,7 @@ PetscErrorCode MatMult_Shell(Mat A,Vec x,Vec b)
         s = ctx->signs[i];
         ms_parity = __builtin_popcount(m&s)&1;
         c = -(ms_parity^(ms_parity-1))*ctx->coeffs[i];
-
-        /* optimize to take advantage of this later */
-        c *= (ctx->creal[i] ? 1 : I);
+        r = ctx->creal[i];
 
         l = ctx->lookup[s&LKP_MASK];
 
@@ -204,24 +202,41 @@ PetscErrorCode MatMult_Shell(Mat A,Vec x,Vec b)
          * the lookup table and process distribution run into each other
          * for very small matrices, so just compute those in a boring way
          * NOTE that this means bugs in the optimized large-matrix code will
-         * NOT show up when testing on matrices smaller than the lookup table
-         * size + log2(nproc)!!
+         * NOT show up when testing on small matrices!
          */
-        if (cache_idx_max != VECSET_CACHE_SIZE || (block_start&LKP_SIZE) != 0) {
+        if (cache_idx_max != VECSET_CACHE_SIZE || (block_start&LKP_MASK) != 0) {
           for (cache_idx=0;cache_idx<cache_idx_max;++cache_idx) {
             sign = __builtin_popcount(lidx[cache_idx]&s)&1;
             tmp_c = -(sign^(sign-1))*c;
-            summed_c[cache_idx] += tmp_c;
+            if (r) summed_c[cache_idx] += tmp_c;
+            else summed_c[cache_idx] += I*tmp_c;
           }
         }
         /* otherwise we can really blaze. the loop limits are all #defined! */
         else {
-          for (cache_idx=0;cache_idx<VECSET_CACHE_SIZE;) {
-            sign = __builtin_popcount((cache_idx+block_start)&(~LKP_MASK)&s)&1;
-            tmp_c = -(sign^(sign-1))*c;
-            for (lkp_idx=0;lkp_idx<LKP_SIZE;++lkp_idx,++cache_idx) {
-              summed_c[cache_idx] += l[lkp_idx]*tmp_c;
-            }
+
+/* this is the interior of the for loop. The compiler wasn't
+ * doing a good enough job unswitching it so I write a macro
+ * to unswitch it manually.
+ */
+/**********/
+#define INNER_LOOP(sign_flip,add_func)                                          \
+          for (cache_idx=0;cache_idx<VECSET_CACHE_SIZE;) {                      \
+            sign = __builtin_popcount((cache_idx+block_start)&(~LKP_MASK)&s)&1; \
+            tmp_c = -(sign^(sign-1))*c;                                         \
+            for (lkp_idx=0;lkp_idx<LKP_SIZE;++lkp_idx,++cache_idx) {            \
+              add_func(summed_c+cache_idx,(sign_flip)*tmp_c);                   \
+            }                                                                   \
+          }
+/**********/
+
+          if (s&LKP_MASK) {
+            if (r) {INNER_LOOP(l[lkp_idx],_radd)}
+            else {INNER_LOOP(l[lkp_idx],_cadd)}
+          }
+          else {
+            if (r) {INNER_LOOP(1,_radd)}
+            else {INNER_LOOP(1,_cadd)}
           }
         }
 

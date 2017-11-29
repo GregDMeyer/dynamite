@@ -7,7 +7,7 @@
 /* allow us to set many values at once */
 #define VECSET_CACHE_SIZE 2048
 #define ITER_CUTOFF 8
-#define LKP_SIZE (1<<5)
+#define LKP_SIZE (1<<6)
 #define LKP_MASK (LKP_SIZE-1)
 #define intmin(a,b) ((a)^(((a)^(b))&(((a)<(b))-1)))
 
