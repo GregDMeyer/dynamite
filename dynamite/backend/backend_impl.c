@@ -120,17 +120,17 @@ static inline void _csub(PetscScalar *x,PetscReal c)
 PetscErrorCode MatMult_Shell(Mat A,Vec x,Vec b)
 {
   PetscErrorCode ierr;
-  PetscInt state,i,Istart,Iend,start,block_start,sign,m,s;
+  PetscInt state,i,Istart,Iend,start,block_start,sign,m,s,*l;
   PetscInt proc,proc_idx,proc_mask,proc_size,log2size;
-  PetscBool assembling,real;
+  PetscBool assembling;
   const PetscScalar *x_array, *x_begin, *xp;
-  PetscScalar c,sc;
-  PetscReal cr;
+  PetscScalar c,tmp_c;
   shell_context *ctx;
 
   /* cache */
   PetscInt *lidx;
-  PetscInt cache_idx,cache_idx_max,stop_count,iterate_max;
+  PetscInt cache_idx,lkp_idx,cache_idx_max,stop_count;
+  PetscInt iterate_max, ms_parity;
   PetscScalar *summed_c,*cp,*values,*vp;
 
   PetscInt mpi_rank,mpi_size;
@@ -192,60 +192,42 @@ PetscErrorCode MatMult_Shell(Mat A,Vec x,Vec b)
 
         m = ctx->masks[i];
         s = ctx->signs[i];
-        c = ctx->coeffs[i];
+        ms_parity = __builtin_popcount(m&s)&1;
+        c = -(ms_parity^(ms_parity-1))*ctx->coeffs[i];
 
-        iterate_max = 1<<intmin(__builtin_ctz(m),__builtin_ctz(s));
+        /* optimize to take advantage of this later */
+        c *= (ctx->creal[i] ? 1 : I);
 
-        cr = PetscRealPart(c);
-        real = (cr != 0);
-        if (!real) cr = PetscImaginaryPart(c);
+        l = ctx->lookup[s&LKP_MASK];
 
-        if (iterate_max < ITER_CUTOFF) {
-          if (real) {
-            for (cache_idx=0;cache_idx<cache_idx_max;++cache_idx) {
-              state = (block_start+cache_idx) ^ m;
-              sign = __builtin_popcount(state & s)&1;
-              _rsub(summed_c + cache_idx,((sign^(sign-1))*cr));
-            }
-          }
-          else {
-            for (cache_idx=0;cache_idx<cache_idx_max;++cache_idx) {
-              state = (block_start+cache_idx) ^ m;
-              sign = __builtin_popcount(state & s)&1;
-              _csub(summed_c + cache_idx,((sign^(sign-1))*cr));
-            }
+        /*
+         * the lookup table and process distribution run into each other
+         * for very small matrices, so just compute those in a boring way
+         * NOTE that this means bugs in the optimized large-matrix code will
+         * NOT show up when testing on matrices smaller than the lookup table
+         * size + log2(nproc)!!
+         */
+        if (cache_idx_max != VECSET_CACHE_SIZE || (block_start&LKP_SIZE) != 0) {
+          for (cache_idx=0;cache_idx<cache_idx_max;++cache_idx) {
+            sign = __builtin_popcount(lidx[cache_idx]&s)&1;
+            tmp_c = -(sign^(sign-1))*c;
+            summed_c[cache_idx] += tmp_c;
           }
         }
+        /* otherwise we can really blaze. the loop limits are all #defined! */
         else {
-          for (cache_idx=0;cache_idx<cache_idx_max;++cache_idx) {
-            state = (block_start+cache_idx) ^ m;
-            sign = __builtin_popcount(state & s)&1;
-
-            cp = summed_c + cache_idx;
-            sc = (sign^(sign-1))*cr;
-
-            stop_count = intmin(iterate_max-(state%iterate_max),cache_idx_max-cache_idx);
-            cache_idx += stop_count - 1;
-
-            if (real) {
-              _rsub(cp,sc);
-              while (--stop_count) {
-                ++cp;
-                _rsub(cp,sc);
-              }
-            }
-            else {
-              _csub(cp,sc);
-              while (--stop_count) {
-                ++cp;
-                _csub(cp,sc);
-              }
+          for (cache_idx=0;cache_idx<VECSET_CACHE_SIZE;) {
+            sign = __builtin_popcount((cache_idx+block_start)&(~LKP_MASK)&s)&1;
+            tmp_c = -(sign^(sign-1))*c;
+            for (lkp_idx=0;lkp_idx<LKP_SIZE;++lkp_idx,++cache_idx) {
+              summed_c[cache_idx] += l[lkp_idx]*tmp_c;
             }
           }
         }
 
         /* need to finally multiply by x */
         if ((i+1) == ctx->mask_starts[proc+1] || m != ctx->masks[i+1]) {
+          iterate_max = 1<<__builtin_ctz(m);
           if (iterate_max < ITER_CUTOFF) {
             for (cache_idx=0;cache_idx<cache_idx_max;++cache_idx) {
               state = (block_start+cache_idx) ^ m;
@@ -307,8 +289,8 @@ PetscErrorCode MatMult_Shell(Mat A,Vec x,Vec b)
 PetscErrorCode MatNorm_Shell(Mat A,NormType type,PetscReal *nrm)
 {
   PetscErrorCode ierr;
-  PetscInt m,idx,state,i,sign,Istart,Iend;
-  PetscScalar csum;
+  PetscInt m,idx,state,i,Istart,Iend;
+  PetscScalar csum,sign;
   PetscReal sum,local_max,global_max;
   shell_context *ctx;
 
@@ -340,6 +322,7 @@ PetscErrorCode MatNorm_Shell(Mat A,NormType type,PetscReal *nrm)
       do {
         /* this requires gcc builtins */
         sign = 1 - 2*(__builtin_popcount(state & ctx->signs[i]) % 2);
+        if (!ctx->creal[i]) sign *= I;
         csum += sign * ctx->coeffs[i];
         ++i;
       } while (i<ctx->nterms && m == ctx->masks[i]);
@@ -371,7 +354,7 @@ PetscErrorCode BuildContext(PetscInt L,
 {
   PetscErrorCode ierr;
   shell_context *ctx;
-  PetscInt i,mpi_size,proc_size,N,m;
+  PetscInt i,j,mpi_size,proc_size,N,m,tmp;
 
   ierr = PetscMalloc1(1,ctx_p);CHKERRQ(ierr);
   ctx = (*ctx_p);
@@ -385,11 +368,25 @@ PetscErrorCode BuildContext(PetscInt L,
   ierr = PetscMalloc1(nterms,&(ctx->masks));CHKERRQ(ierr);
   ierr = PetscMalloc1(nterms,&(ctx->signs));CHKERRQ(ierr);
   ierr = PetscMalloc1(nterms,&(ctx->coeffs));CHKERRQ(ierr);
+  ierr = PetscMalloc1(nterms,&(ctx->creal));CHKERRQ(ierr);
 
   for (i=0;i<nterms;++i) {
     ctx->masks[i] = masks[i];
     ctx->signs[i] = signs[i];
-    ctx->coeffs[i] = coeffs[i];
+
+    ctx->coeffs[i] = PetscRealPart(coeffs[i]);
+    ctx->creal[i] = (ctx->coeffs[i] != 0);
+    if (!ctx->creal[i]) ctx->coeffs[i] = PetscImaginaryPart(coeffs[i]);
+  }
+
+  /* compute the sign lookup tables */
+  ierr = PetscMalloc1(LKP_SIZE,&(ctx->lookup));CHKERRQ(ierr);
+  for (i=0;i<LKP_SIZE;++i) {
+    ierr = PetscMalloc1(LKP_SIZE,ctx->lookup+i);CHKERRQ(ierr);
+    for (j=0;j<LKP_SIZE;++j) {
+      tmp = __builtin_popcount(i&j)&1;
+      ctx->lookup[i][j] = -(tmp^(tmp-1));
+    }
   }
 
   ierr = MPI_Comm_size(PETSC_COMM_WORLD,&mpi_size);
@@ -423,6 +420,7 @@ PetscErrorCode BuildContext(PetscInt L,
 PetscErrorCode DestroyContext(Mat A)
 {
   PetscErrorCode ierr;
+  PetscInt i;
   shell_context *ctx;
 
   ierr = MatShellGetContext(A,&ctx);CHKERRQ(ierr);
@@ -430,6 +428,11 @@ PetscErrorCode DestroyContext(Mat A)
   ierr = PetscFree(ctx->masks);CHKERRQ(ierr);
   ierr = PetscFree(ctx->signs);CHKERRQ(ierr);
   ierr = PetscFree(ctx->coeffs);CHKERRQ(ierr);
+
+  for (i=0;i<LKP_SIZE;++i) {
+    ierr = PetscFree(ctx->lookup[i]);CHKERRQ(ierr);
+  }
+  ierr = PetscFree(ctx->lookup);CHKERRQ(ierr);
 
   ierr = PetscFree(ctx);CHKERRQ(ierr);
 

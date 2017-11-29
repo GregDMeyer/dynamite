@@ -35,21 +35,24 @@ class SingleOperators(ut.TestCase):
 
     def test_sigmax(self):
         for i in range(self.L):
-            d,n = dnm_np_operator('x',index=i,L=self.L)
-            r,msg = check_dnm_np(d,n)
-            self.assertTrue(r,msg=msg)
+            with self.subTest(i=i):
+                d,n = dnm_np_operator('x',index=i,L=self.L)
+                r,msg = check_dnm_np(d,n)
+                self.assertTrue(r,msg=msg)
 
     def test_sigmay(self):
         for i in range(self.L):
-            d,n = dnm_np_operator('y',index=i,L=self.L)
-            r,msg = check_dnm_np(d,n)
-            self.assertTrue(r,msg=msg)
+            with self.subTest(i=i):
+                d,n = dnm_np_operator('y',index=i,L=self.L)
+                r,msg = check_dnm_np(d,n)
+                self.assertTrue(r,msg=msg)
 
     def test_sigmaz(self):
         for i in range(self.L):
-            d,n = dnm_np_operator('z',index=i,L=self.L)
-            r,msg = check_dnm_np(d,n)
-            self.assertTrue(r,msg=msg)
+            with self.subTest(i=i):
+                d,n = dnm_np_operator('z',index=i,L=self.L)
+                r,msg = check_dnm_np(d,n)
+                self.assertTrue(r,msg=msg)
 
     def test_coeffs(self):
         for t in ['x','y','z']:
