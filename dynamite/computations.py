@@ -3,12 +3,14 @@ from . import config
 config.initialize()
 
 from .backend import backend as bknd
+from ._utils import estimate_compute_time,get_tstep
 
 import numpy as np
 from slepc4py import SLEPc
 from petsc4py import PETSc
 
-def evolve(state,H=None,t=None,result=None,tol=None,mfn=None):
+def evolve(state,H=None,t=None,result=None,tol=1E-15,algo='expokit',
+           check_trivial=False,ncv_max=40,mfn=None):
     """
     Evolve a quantum state according to the Schrodinger equation
     under the Hamiltonian H. The units are natural, that is, the
@@ -43,6 +45,20 @@ def evolve(state,H=None,t=None,result=None,tol=None,mfn=None):
         be somewhat close to ``tol``. There is no guarantee that it will
         actually be smaller.
 
+    algo : string, optional
+        Allowed options: 'krylov' or 'expokit'. Which SLEPc algorithm to
+        use to compute the matrix exponential.
+
+    check_trivial : bool, optional
+        A switch whether to check whether the evolution is trivial. If
+        H*s == 0, evolution fails, but this just means that the evolution
+        is the identity. A check for this takes a (short) time.
+
+    ncv_max : int, optional
+        The maximum subspace size to use. Increasing subspace size can
+        increase performance by reducing the number of iterations necessary,
+        but also linearly increases memory usage.
+
     mfn : slepc4py.SLEPc.MFN, optional
         Advanced users can pass their own matrix function object from
         SLEPc. In that case the arguments ``H`` and ``t`` can be omitted
@@ -57,16 +73,11 @@ def evolve(state,H=None,t=None,result=None,tol=None,mfn=None):
     if result is None:
         result = H.get_mat().createVecs(side='l')
 
-    if H is not None:
+    if H is not None and check_trivial:
         # check if the evolution is trivial. if H*state = 0,
         # then the evolution does nothing and state is unchanged.
         # In this case MFNSolve fails. to avoid that, we check if
         # we have that condition.
-
-        # TODO: this is really fast because it's just a matrix-vector
-        # multiply, but it takes a non-negligible amount of time for
-        # really big matrices. Should think of a better way or add a
-        # switch to remove this check
 
         H.get_mat().mult(state,result)
         if result.norm() == 0:
@@ -76,10 +87,18 @@ def evolve(state,H=None,t=None,result=None,tol=None,mfn=None):
     if mfn is None:
 
         mfn = SLEPc.MFN().create()
-        mfn.setType('expokit')
+        mfn.setType(algo)
 
         f = mfn.getFN()
         f.setType(SLEPc.FN.Type.EXP)
+
+        if algo == 'expokit':
+            # optimize the size of the subspace!
+            nrm = H.get_mat().norm(PETSc.NormType.INFINITY)
+            ncvs = np.arange(1,ncv_max)
+            ct = estimate_compute_time(np.abs(t),ncvs,nrm,tol)
+            ncv = np.argmin(ct)+1
+            mfn.setDimensions(ncv)
 
         mfn.setFromOptions()
 
