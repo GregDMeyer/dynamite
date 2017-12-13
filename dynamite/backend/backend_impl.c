@@ -189,11 +189,18 @@ PetscErrorCode MatMult_Shell(Mat A,Vec x,Vec b)
   log2size = __builtin_ctz(mpi_size);
 
   /* this computes a mask over the indices that define the processor */
-  if (ctx->s.left_type == FULL) {
-    local_size = ctx->L - log2size;
-  }
-  else if (ctx->s.left_type == PARITY) {
-    local_size = ctx->L - log2size - 1;
+  switch (ctx->s.left_type) {
+    case FULL:
+      local_size = ctx->L - log2size;
+      break;
+
+    case PARITY:
+      local_size = ctx->L - log2size - 1;
+      break;
+
+    default:
+      SETERRQ(PETSC_COMM_WORLD,PETSC_ERR_ARG_OUTOFRANGE,"bad subspace type.");
+      break;
   }
 
   proc_mask = ((1 << log2size)-1) << local_size;
