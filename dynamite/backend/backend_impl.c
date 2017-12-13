@@ -74,7 +74,7 @@ PetscErrorCode BuildMat_Full(PetscInt L,PetscInt nterms,
   for (ketidx=Istart;ketidx<Iend;++ketidx) {
     ket = ketidx;
     if (s.left_type == PARITY) {
-      ket = ketidx | (((__builtin_popcount(ketidx)&1)^(s.left_space)) << L);
+      ket = ketidx | (((__builtin_popcount(ketidx)&1)^(s.left_space)) << (L-1));
     }
     for (i=0;i<nterms;) {
       bra = ket ^ masks[i];

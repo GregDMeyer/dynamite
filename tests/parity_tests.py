@@ -6,8 +6,9 @@ from dynamite.operators import Sigmax,Sigmay,Sigmaz
 from dynamite.subspace import Parity
 from dynamite.tools import build_state,vectonumpy
 
-config.L = 12
-config.shell = True
+if __name__ == '__main__':
+    config.L = 12
+    config.shell = True
 
 class Mapping(ut.TestCase):
 
