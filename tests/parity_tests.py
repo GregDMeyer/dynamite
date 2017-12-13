@@ -6,7 +6,8 @@ from dynamite.operators import Sigmax,Sigmay,Sigmaz
 from dynamite.subspace import Parity
 from dynamite.tools import build_state,vectonumpy
 
-config.L = 15
+config.L = 12
+config.shell = True
 
 class Mapping(ut.TestCase):
 
@@ -59,7 +60,7 @@ class PtoP(ut.TestCase):
     def test_same(self):
         # this Hamiltonian conserves parity
         H = Sigmaz() + 0.1*Sigmax(0)*Sigmay(2) + 0.3*Sigmay(1)*Sigmay(2) \
-                + 0.7*Sigmay(0)*Sigmax(1)*Sigmax(2)*Sigmay(3)
+                + 0.7*Sigmay(0)*Sigmax(1)*Sigmax(2)*Sigmay(3) + Sigmaz(config.L-1)
         r1 = H*self.s
 
         for p in (0,1):
@@ -68,22 +69,25 @@ class PtoP(ut.TestCase):
                 H.subspace = Parity(p,L=config.L)
                 r2 = H*sp
 
+                # if not np.abs(r2.norm()**2-convert_state(r1,p).dot(r2)) < 1E-15:
+                #     convert_state(r1,p).view()
+                #     r2.view()
                 self.assertLess(np.abs(r2.norm()**2-convert_state(r1,p).dot(r2)),1E-15)
 
     def test_anti(self):
         # this one anti-conserves parity
         H = Sigmay() + 0.1*Sigmaz(0)*Sigmay(2) + 0.3*Sigmax(1)*Sigmaz(2) \
-                + 0.7*Sigmay(0)*Sigmax(1)*Sigmaz(2)*Sigmay(3)
+                + 0.7*Sigmay(0)*Sigmax(1)*Sigmaz(2)*Sigmay(3) + Sigmay(config.L-1)
         r1 = H*self.s
 
-        for p1,p2 in ((0,1),(0,1)):
-            with self.subTest(p1=p1,p2=p2):
-                sp = convert_state(self.s,p1)
-                H.right_subspace = Parity(p1,L=config.L)
-                H.left_subspace = Parity(p2,L=config.L)
+        for pr,pl in ((0,1),(1,0)):
+            with self.subTest(pr=pr,pl=pl):
+                sp = convert_state(self.s,pr)
+                H.right_subspace = Parity(pr,L=config.L)
+                H.left_subspace = Parity(pl,L=config.L)
                 r2 = H*sp
 
-                self.assertLess(np.abs(r2.norm()**2-convert_state(r1,p2).dot(r2)),1E-15)
+                self.assertLess(np.abs(r2.norm()**2-convert_state(r1,pl).dot(r2)),1E-15)
 
 def convert_state(s,p):
     sn = vectonumpy(s,toall=True)

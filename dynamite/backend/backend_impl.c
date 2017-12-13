@@ -511,7 +511,7 @@ PetscErrorCode BuildContext(PetscInt L,
   m = proc_size;
   if (s.left_type == PARITY) {
     for (i=1;i<ctx->nterms;++i) {
-      for (;m <= PARITY_ItoS(ctx->masks[i],s.left_space,L);m += proc_size) {
+      for (;m <= PARITY_StoI(ctx->masks[i],s.left_space,L);m += proc_size) {
         ctx->mask_starts[m / proc_size] = i;
       }
     }

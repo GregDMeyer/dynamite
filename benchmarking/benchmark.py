@@ -16,6 +16,7 @@ parser.add_argument('-w', type=int, default=1, help='Magnitude of the disorder f
 
 parser.add_argument('--shell',action='store_true',help='Make a shell matrix instead of a regular matrix.')
 parser.add_argument('--slepc_args',type=str,default='',help='Arguments to pass to SLEPc.')
+parser.add_argument('--parity',type=int,choices=[0,1],default=-1,help='Work in a parity subspace.')
 
 parser.add_argument('--evolve',action='store_true',help='Request that the Hamiltonian evolves a state.')
 parser.add_argument('--init_state',type=int,default=0,help='The initial state for the evolution.')
@@ -40,6 +41,7 @@ config.initialize(slepc_args)
 from dynamite.operators import Sum,Product,IndexSum,Sigmax,Sigmay,Sigmaz,Load
 from dynamite.tools import build_state,track_memory,get_max_memory_usage
 from dynamite.extras import Majorana as X
+from dynamite.subspace import Parity
 from petsc4py.PETSc import Sys,NormType
 Print = Sys.Print
 
@@ -57,7 +59,7 @@ stats = {}
 #track_memory()
 mem_type = 'all'
 
-config.global_L = args.L
+config.L = args.L
 
 if __debug__:
     Print('begin building dynamite operator')
@@ -101,6 +103,8 @@ if __debug__:
 stats['MSC_build_time'] = default_timer() - start
 
 H.use_shell = args.shell
+if args.parity != -1:
+    H.subspace = Parity(L=args.L,space=args.parity)
 
 start = default_timer()
 H.build_mat()
@@ -132,7 +136,7 @@ if args.evolve:
     if __debug__:
         Print('beginning evolution...')
     start = default_timer()
-    s = build_state(state=args.init_state)
+    s = build_state(state=args.init_state,L=args.L if args.parity == -1 else args.L-1)
     H.evolve(s,t=args.t)
     stats['evolve_time'] = default_timer() - start
     if __debug__:
@@ -142,7 +146,7 @@ if args.mult:
     if __debug__:
         Print('beginning multiplication...')
     start = default_timer()
-    s = build_state()
+    s = build_state(L=args.L if args.parity == -1 else args.L-1)
     r = s.copy()
     for _ in range(args.mult_count):
         H.get_mat().mult(s,r)
