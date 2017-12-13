@@ -1,9 +1,11 @@
 
 #pragma once
 #include <petscsys.h>
+#include "subspace.h"
 
 typedef struct _shell_context {
   PetscInt L;
+  Subspaces s;
   PetscInt nterms;
   PetscInt *masks;
   PetscInt *signs;

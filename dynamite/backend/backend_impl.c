@@ -6,23 +6,27 @@
 PetscErrorCode BuildMat_Full(PetscInt L,PetscInt nterms,
                              const PetscInt* masks,
                              const PetscInt* signs,
-                             const PetscScalar* coeffs,Mat *A)
+                             const PetscScalar* coeffs,
+                             Subspaces s,
+                             Mat *A)
 {
   PetscErrorCode ierr;
-  PetscInt N,i,state,Istart,Iend,nrows,local_bits,nonlocal_mask;
+  PetscInt N,M,i,Istart,Iend,nrows,local_bits,nonlocal_mask;
   int mpi_rank,mpi_size;
   PetscInt d_nz,o_nz;
 
-  PetscInt lstate,sign;
+  PetscInt ket,ketidx,bra,braidx,sign;
   PetscScalar tmp_val;
 
-  N = 1<<L;
+  /* N is dimension of right subspace, M of left */
+  N = get_dimension(L,s.right_type,s.right_space);
+  M = get_dimension(L,s.left_type,s.left_space);
 
   MPI_Comm_rank(PETSC_COMM_WORLD,&mpi_rank);
   MPI_Comm_size(PETSC_COMM_WORLD,&mpi_size);
 
   ierr = MatCreate(PETSC_COMM_WORLD,A);CHKERRQ(ierr);
-  ierr = MatSetSizes(*A,PETSC_DECIDE,PETSC_DECIDE,N,N);CHKERRQ(ierr);
+  ierr = MatSetSizes(*A,PETSC_DECIDE,PETSC_DECIDE,M,N);CHKERRQ(ierr);
   ierr = MatSetFromOptions(*A);CHKERRQ(ierr);
 
   nrows = PETSC_DECIDE;
@@ -36,6 +40,11 @@ PetscErrorCode BuildMat_Full(PetscInt L,PetscInt nterms,
 
   /* this creates something that looks like 111110000000 */
   nonlocal_mask = (-1) << local_bits;
+
+  /* if we are going to parity subspace, the leftmost bit doesn't matter */
+  if (s.left_type == PARITY) {
+    nonlocal_mask &= PARITY_MASK(L);
+  }
 
   d_nz = o_nz = 0;
   for (i=0;i<nterms;++i) {
@@ -54,21 +63,43 @@ PetscErrorCode BuildMat_Full(PetscInt L,PetscInt nterms,
   ierr = MatGetOwnershipRange(*A,&Istart,&Iend);CHKERRQ(ierr);
 
   /* this is where the magic happens */
-  for (state=Istart;state<Iend;++state) {
+
+  /*
+   * the subspace operations in these loops aren't very well optimized, but matrix
+   * building isn't usually a big bottleneck, so it should be OK. at some point they
+   * could be optimized further for some weird cases where matrix building is a
+   * bottleneck.
+   */
+
+  for (ketidx=Istart;ketidx<Iend;++ketidx) {
+    ket = ketidx;
+    if (s.left_type == PARITY) {
+      ket = ketidx | (((__builtin_popcount(ketidx)&1)^(s.left_space)) << L);
+    }
     for (i=0;i<nterms;) {
-      lstate = state ^ masks[i];
+      bra = ket ^ masks[i];
+      braidx = bra;
+
+      if (s.right_type == PARITY) {
+        /*
+         * if this value doesn't fit into our subspace, skip it!
+         * we assume in this backend code that the operation has
+         * already been checked to obey the subspaces
+         */
+        if ((__builtin_popcount(bra)&1) != s.right_space) continue;
+        else braidx = bra & PARITY_MASK(L);
+      }
+
       tmp_val = 0;
       /* sum all terms for this matrix element */
       do {
         /* this requires gcc builtins */
-        sign = 1 - 2*(__builtin_popcount(state & signs[i]) % 2);
+        sign = 1 - 2*(__builtin_popcount(bra & signs[i]) % 2);
         tmp_val += sign * coeffs[i];
         ++i;
       } while (i<nterms && masks[i-1] == masks[i]);
 
-      /* the elements must not be repeated or else INSERT_VALUES is wrong! */
-      /* I could just use ADD_VALUES but if they are repeated there is a bug somewhere else */
-      ierr = MatSetValues(*A,1,&lstate,1,&state,&tmp_val,INSERT_VALUES);CHKERRQ(ierr);
+      ierr = MatSetValues(*A,1,&ketidx,1,&braidx,&tmp_val,INSERT_VALUES);CHKERRQ(ierr);
     }
   }
 
@@ -84,20 +115,25 @@ PetscErrorCode BuildMat_Full(PetscInt L,PetscInt nterms,
 PetscErrorCode BuildMat_Shell(PetscInt L,PetscInt nterms,
                               const PetscInt* masks,
                               const PetscInt* signs,
-                              const PetscScalar* coeffs,Mat *A)
+                              const PetscScalar* coeffs,
+                              Subspaces s,
+                              Mat *A)
 {
   PetscErrorCode ierr;
-  PetscInt N,n;
+  PetscInt N,M,n,m;
   shell_context *ctx;
 
-  N = 1<<L;
+  N = get_dimension(L,s.right_type,s.right_space);
+  M = get_dimension(L,s.left_type,s.left_space);
 
   n = PETSC_DECIDE;
+  m = PETSC_DECIDE;
   PetscSplitOwnership(PETSC_COMM_WORLD,&n,&N);
+  PetscSplitOwnership(PETSC_COMM_WORLD,&m,&M);
 
-  ierr = BuildContext(L,nterms,masks,signs,coeffs,&ctx);CHKERRQ(ierr);
+  ierr = BuildContext(L,nterms,masks,signs,coeffs,s,&ctx);CHKERRQ(ierr);
 
-  ierr = MatCreateShell(PETSC_COMM_WORLD,n,n,N,N,ctx,A);CHKERRQ(ierr);
+  ierr = MatCreateShell(PETSC_COMM_WORLD,m,n,M,N,ctx,A);CHKERRQ(ierr);
   ierr = MatShellSetOperation(*A,MATOP_MULT,(void(*)(void))MatMult_Shell);
   ierr = MatShellSetOperation(*A,MATOP_NORM,(void(*)(void))MatNorm_Shell);
 
@@ -120,9 +156,9 @@ static inline void _cadd(PetscScalar *x,PetscReal c)
 PetscErrorCode MatMult_Shell(Mat A,Vec x,Vec b)
 {
   PetscErrorCode ierr;
-  PetscInt state,i,Istart,Iend,start,block_start,sign,m,s,*l;
-  PetscInt proc,proc_idx,proc_mask,proc_size,log2size;
-  PetscBool assembling,r;
+  PetscInt state,i,Istart,Iend,start,block_start,sign,m,mt,s,*l;
+  PetscInt proc,proc_idx,proc_mask,proc_size,log2size,local_size;
+  PetscBool assembling,r,do_xmul;
   const PetscScalar *x_array, *x_begin, *xp;
   PetscReal c,tmp_c;
   shell_context *ctx;
@@ -153,8 +189,15 @@ PetscErrorCode MatMult_Shell(Mat A,Vec x,Vec b)
   log2size = __builtin_ctz(mpi_size);
 
   /* this computes a mask over the indices that define the processor */
-  proc_mask = ((1 << log2size)-1) << (ctx->L - log2size);
-  proc_idx = mpi_rank << (ctx->L - log2size);
+  if (ctx->s.left_type == FULL) {
+    local_size = ctx->L - log2size;
+  }
+  else if (ctx->s.left_type == PARITY) {
+    local_size = ctx->L - log2size - 1;
+  }
+
+  proc_mask = ((1 << log2size)-1) << local_size;
+  proc_idx = mpi_rank << local_size;
   proc_size = Iend-Istart;
   x_begin = x_array - Istart;
 
@@ -163,9 +206,11 @@ PetscErrorCode MatMult_Shell(Mat A,Vec x,Vec b)
 
   for (proc=0;proc < mpi_size;++proc) {
 
-    /* NOTE: these breaks and continues are dangerous if
+    /*
+     * NOTE: these breaks and continues are dangerous if
      * the data doesn't divide perfectly across processors.
-     * When switching to a subspace need to be careful!
+     * When switching to a subspace that's not a power of 2
+     * need to be careful!
      */
 
     /* if there are none for this process, skip it */
@@ -211,6 +256,7 @@ PetscErrorCode MatMult_Shell(Mat A,Vec x,Vec b)
             if (r) summed_c[cache_idx] += tmp_c;
             else summed_c[cache_idx] += I*tmp_c;
           }
+          ierr = PetscInfo(A,"Using small-matrix shell code...");CHKERRQ(ierr);
         }
         /* otherwise we can really blaze. the loop limits are all #defined! */
         else {
@@ -230,6 +276,11 @@ PetscErrorCode MatMult_Shell(Mat A,Vec x,Vec b)
           }
 /**********/
 
+          /* if the sign mask cares about the leftmost bit and we're in a parity
+           * conserving subspace, this will get the sign wrong sometimes. it takes
+           * too long to fix it here, we just check later and flip the ones that
+           * need flipping!
+           */
           if (s&LKP_MASK) {
             if (r) {INNER_LOOP(l[lkp_idx],_radd)}
             else {INNER_LOOP(l[lkp_idx],_cadd)}
@@ -240,18 +291,55 @@ PetscErrorCode MatMult_Shell(Mat A,Vec x,Vec b)
           }
         }
 
+        do_xmul = (i+1) == ctx->mask_starts[proc+1] || m != ctx->masks[i+1];
+
+        /*
+         * if we are finalizing this one, or if the next sign has a different value
+         * for the parity bit, we should flip all the signs that are wrong.
+         */
+        if (ctx->s.left_type == PARITY) {
+          /* make sure the signs are right */
+
+          /*
+           * this is honestly extremely confusing so it warrants a paragraph comment.
+           *
+           * in the case that the sign mask cares about the bit that we're ignoring when
+           * we conserve parity, all of the ones in which that bit should be set to 1 will
+           * be wrong. fortunately, it's the same ones all the time. So the plan is to just
+           * let them be wrong, until we encounter a sign flip mask that doesn't care about that
+           * bit. Before we change whether we care about it, or before we multiply by the x
+           * vector, we should flip the signs of those terms. that's what the for loop in here does.
+           */
+
+
+          /* about to multiply and it's wrong  ||  not about to multiply, but next sign changes whether we care */
+          if ((do_xmul && (s&PARITY_BIT(ctx->L))) || (!do_xmul && ((s^(ctx->signs[i+1]))&PARITY_BIT(ctx->L)) )) {
+            for (cache_idx=0;cache_idx<cache_idx_max;++cache_idx) {
+              sign = (__builtin_popcount(cache_idx+block_start)&1) ^ ctx->s.left_space;
+              summed_c[cache_idx] *= -(sign^(sign-1));
+            }
+          }
+        }
+
         /* need to finally multiply by x */
-        if ((i+1) == ctx->mask_starts[proc+1] || m != ctx->masks[i+1]) {
-          iterate_max = 1<<__builtin_ctz(m);
+        if (do_xmul) {
+
+          /* TODO: need to be careful here if going from full space to a subspace */
+          if (ctx->s.left_type == PARITY) {
+            mt = m & PARITY_MASK(ctx->L);
+          }
+          else mt = m;
+
+          iterate_max = 1<<__builtin_ctz(mt);
           if (iterate_max < ITER_CUTOFF) {
             for (cache_idx=0;cache_idx<cache_idx_max;++cache_idx) {
-              state = (block_start+cache_idx) ^ m;
+              state = (block_start+cache_idx) ^ mt;
               values[cache_idx] += summed_c[cache_idx]*x_begin[state];
             }
           }
           else {
             for (cache_idx=0;cache_idx<cache_idx_max;++cache_idx) {
-              state = (block_start+cache_idx) ^ m;
+              state = (block_start+cache_idx) ^ mt;
 
               vp = values + cache_idx;
               xp = x_begin + state;
@@ -332,7 +420,11 @@ PetscErrorCode MatNorm_Shell(Mat A,NormType type,PetscReal *nrm)
     for (i=0;i<ctx->nterms;) {
       csum = 0;
       m = ctx->masks[i];
-      state = idx;
+      if (ctx->s.right_type == PARITY) {
+        state = PARITY_ItoS(idx,ctx->s.right_space,ctx->L);
+      }
+      else state = idx;
+
       /* sum all terms for this matrix element */
       do {
         /* this requires gcc builtins */
@@ -365,6 +457,7 @@ PetscErrorCode BuildContext(PetscInt L,
                             const PetscInt* masks,
                             const PetscInt* signs,
                             const PetscScalar* coeffs,
+                            Subspaces s,
                             shell_context **ctx_p)
 {
   PetscErrorCode ierr;
@@ -377,6 +470,7 @@ PetscErrorCode BuildContext(PetscInt L,
   ctx->L = L;
   ctx->nterms = nterms;
   ctx->nrm = -1;
+  ctx->s = s;
   ctx->gpu = PETSC_FALSE;
 
   /* we need to keep track of this stuff on our own. the numpy array might get garbage collected */
@@ -410,14 +504,23 @@ PetscErrorCode BuildContext(PetscInt L,
   ierr = PetscMalloc1(mpi_size+1,&(ctx->mask_starts));CHKERRQ(ierr);
 
   proc_size = PETSC_DECIDE;
-  N = 1<<L;
+  N = get_dimension(L,s.left_type,s.left_space);
   ierr = PetscSplitOwnership(PETSC_COMM_WORLD,&proc_size,&N);CHKERRQ(ierr);
 
   ctx->mask_starts[0] = 0;
   m = proc_size;
-  for (i=1;i<ctx->nterms;++i) {
-    for (;m<=ctx->masks[i];m += proc_size) {
-      ctx->mask_starts[m / proc_size] = i;
+  if (s.left_type == PARITY) {
+    for (i=1;i<ctx->nterms;++i) {
+      for (;m <= PARITY_ItoS(ctx->masks[i],s.left_space,L);m += proc_size) {
+        ctx->mask_starts[m / proc_size] = i;
+      }
+    }
+  }
+  else {
+    for (i=1;i<ctx->nterms;++i) {
+      for (;m<=ctx->masks[i];m += proc_size) {
+        ctx->mask_starts[m / proc_size] = i;
+      }
     }
   }
   /* maybe a few of the last ones had none, have

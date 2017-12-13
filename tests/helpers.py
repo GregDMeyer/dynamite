@@ -4,7 +4,8 @@ from scipy.linalg import expm
 from dynamite import config
 from dynamite.tools import build_state,vectonumpy
 from dynamite.operators import Sigmax,Sigmay,Sigmaz,Load
-from petsc4py.PETSc import COMM_WORLD,NormType
+
+from petsc4py.PETSc import COMM_WORLD,NormType,Vec
 
 from numpy_operators import *
 
@@ -17,16 +18,18 @@ CW = COMM_WORLD.tompi4py()
 PROC_0 = CW.Get_rank() == 0
 
 def dnm_to_np(H):
-    dim = 2**H.L
+    dims = H.get_mat().getSize()
 
     if PROC_0:
-        ret = np.ndarray((dim,dim),dtype=np.complex128)
+        ret = np.ndarray(dims,dtype=np.complex128)
 
-    s1 = build_state(H.L)
-    s2 = build_state(H.L)
+    s1 = Vec().create()
+    s1.setSizes(dims[0])
+    s1.setFromOptions()
+    s2 = s1.duplicate()
 
     s1.set(0)
-    for i in range(dim):
+    for i in range(dims[1]):
         if i > 0:
             s1.setValue(i-1,0)
         s1.setValue(i,1)
@@ -199,10 +202,10 @@ numpy matrix: %s
 
     ### global shell
 
-    tmp = d.use_shell == config.global_shell
+    tmp = d.use_shell == config.shell
     if not tmp:
         msg += ('use_shell value %s not equal to global shell value %s\n'
-                % (str(d.use_shell),str(config.global_shell)))
+                % (str(d.use_shell),str(config.shell)))
 
     r = r and tmp
 

@@ -15,7 +15,7 @@ if __name__ == '__main__':
 
 from dynamite import config
 config.initialize(slepc_args)
-config.global_shell = True
+config.shell = True
 
 import dynamite.operators as do
 from dynamite.tools import build_state,vectonumpy
@@ -337,7 +337,7 @@ class Sums(ut.TestCase):
 class Compound(ut.TestCase):
 
     def setUp(self):
-        config.global_L = 8
+        config.L = 8
         self.op_lists = OrderedDict([
             ('XY',[(np_sigmax,np_sigmay),
                    (do.Sigmax,do.Sigmay)]),
@@ -346,12 +346,12 @@ class Compound(ut.TestCase):
         ])
 
     def tearDown(self):
-        config.global_L = None
+        config.L = None
 
     def test_Hamiltonians(self):
         for name in Hamiltonians.__all__:
             with self.subTest(name=name):
-                d,n = getattr(Hamiltonians,name)(config.global_L)
+                d,n = getattr(Hamiltonians,name)(config.L)
                 r,msg = check_dnm_np(d,n)
                 self.assertTrue(r,msg=msg)
 
@@ -360,9 +360,9 @@ class Compound(ut.TestCase):
             with self.subTest(ops=name):
                 d = do.Sum(s() for s in ol[1])
 
-                n = ol[0][0](0,config.global_L)
+                n = ol[0][0](0,config.L)
                 for o in ol[0][1:]:
-                    n += o(0,config.global_L)
+                    n += o(0,config.L)
 
                 r,msg = check_dnm_np(d,n)
                 self.assertTrue(r,msg=msg)
@@ -372,9 +372,9 @@ class Compound(ut.TestCase):
             with self.subTest(ops=name):
                 d = do.Product(s() for s in ol[1])
 
-                n = ol[0][0](0,config.global_L)
+                n = ol[0][0](0,config.L)
                 for o in ol[0][1:]:
-                    n = n.dot(o(0,config.global_L))
+                    n = n.dot(o(0,config.L))
 
                 r,msg = check_dnm_np(d,n)
                 self.assertTrue(r,msg=msg)
@@ -384,13 +384,13 @@ class Compound(ut.TestCase):
             with self.subTest(ops=name):
                 d = do.IndexSum(do.Sum(s() for s in ol[1]))
 
-                n = ol[0][0](0,config.global_L)
+                n = ol[0][0](0,config.L)
                 for o in ol[0][1:]:
-                    n += o(0,config.global_L)
+                    n += o(0,config.L)
 
-                for i in range(1,config.global_L):
+                for i in range(1,config.L):
                     for o in ol[0]:
-                        n += o(i,config.global_L)
+                        n += o(i,config.L)
 
                 r,msg = check_dnm_np(d,n)
                 self.assertTrue(r,msg=msg)
@@ -400,14 +400,14 @@ class Compound(ut.TestCase):
             with self.subTest(ops=name):
                 d = do.IndexSum(do.Product(s() for s in ol[1]))
 
-                n = ol[0][0](0,config.global_L)
+                n = ol[0][0](0,config.L)
                 for o in ol[0][1:]:
-                    n = n.dot(o(0,config.global_L))
+                    n = n.dot(o(0,config.L))
 
-                for i in range(1,config.global_L):
-                    n_tmp = ol[0][0](i,config.global_L)
+                for i in range(1,config.L):
+                    n_tmp = ol[0][0](i,config.L)
                     for o in ol[0][1:]:
-                        n_tmp = n_tmp.dot(o(i,config.global_L))
+                        n_tmp = n_tmp.dot(o(i,config.L))
                     n += n_tmp
 
                 r,msg = check_dnm_np(d,n)
@@ -418,14 +418,14 @@ class Compound(ut.TestCase):
             with self.subTest(ops=name):
                 d = do.IndexProduct(do.Sum(s() for s in ol[1]))
 
-                n = ol[0][0](0,config.global_L)
+                n = ol[0][0](0,config.L)
                 for o in ol[0][1:]:
-                    n += o(0,config.global_L)
+                    n += o(0,config.L)
 
-                for i in range(1,config.global_L):
-                    n_tmp = ol[0][0](i,config.global_L)
+                for i in range(1,config.L):
+                    n_tmp = ol[0][0](i,config.L)
                     for o in ol[0][1:]:
-                        n_tmp += o(i,config.global_L)
+                        n_tmp += o(i,config.L)
                     n = n.dot(n_tmp)
 
                 r,msg = check_dnm_np(d,n)
@@ -436,14 +436,14 @@ class Compound(ut.TestCase):
             with self.subTest(ops=name):
                 d = do.IndexProduct(do.Product(s() for s in ol[1]))
 
-                n = ol[0][0](0,config.global_L)
+                n = ol[0][0](0,config.L)
                 for o in ol[0][1:]:
-                    n = n.dot(o(0,config.global_L))
+                    n = n.dot(o(0,config.L))
 
-                for i in range(1,config.global_L):
-                    n_tmp = ol[0][0](i,config.global_L)
+                for i in range(1,config.L):
+                    n_tmp = ol[0][0](i,config.L)
                     for o in ol[0][1:]:
-                        n_tmp = n_tmp.dot(o(i,config.global_L))
+                        n_tmp = n_tmp.dot(o(i,config.L))
                     n = n.dot(n_tmp)
 
                 r,msg = check_dnm_np(d,n)
@@ -454,11 +454,11 @@ class Compound(ut.TestCase):
             with self.subTest(ops=name):
                 d = do.Sum(s(0)*s(1) for s in ol[1])
 
-                s = ol[0][0](0,config.global_L)
-                n = s.dot(ol[0][0](1,config.global_L))
+                s = ol[0][0](0,config.L)
+                n = s.dot(ol[0][0](1,config.L))
                 for o in ol[0][1:]:
-                    s = o(0,config.global_L)
-                    n += s.dot(o(1,config.global_L))
+                    s = o(0,config.L)
+                    n += s.dot(o(1,config.L))
 
                 r,msg = check_dnm_np(d,n)
                 self.assertTrue(r,msg=msg)
@@ -469,16 +469,16 @@ class Compound(ut.TestCase):
                 d = do.IndexSum(do.Sum(s(0)*s(1)
                                        for s in ol[1]))
 
-                s = ol[0][0](0,config.global_L)
-                n = s.dot(ol[0][0](1,config.global_L))
+                s = ol[0][0](0,config.L)
+                n = s.dot(ol[0][0](1,config.L))
                 for o in ol[0][1:]:
-                    s = o(0,config.global_L)
-                    n += s.dot(o(1,config.global_L))
+                    s = o(0,config.L)
+                    n += s.dot(o(1,config.L))
 
-                for i in range(1,config.global_L-1):
+                for i in range(1,config.L-1):
                     for o in ol[0]:
-                        s = o(i,config.global_L)
-                        n += s.dot(o(i+1,config.global_L))
+                        s = o(i,config.L)
+                        n += s.dot(o(i+1,config.L))
 
                 r,msg = check_dnm_np(d,n)
                 self.assertTrue(r,msg=msg)
@@ -486,11 +486,11 @@ class Compound(ut.TestCase):
 class StateBuilding(ut.TestCase):
 
     def setUp(self):
-        config.global_L = 4
-        self.L = config.global_L
+        config.L = 4
+        self.L = config.L
 
     def tearDown(self):
-        config.global_L = None
+        config.L = None
 
     def test_buildstate(self):
         for i in [0,
@@ -604,7 +604,7 @@ class Eigsolve(ut.TestCase):
                 # --download-mumps option to ./configure)
                 # TODO: check if package exists, if not don't run these tests
 
-                if not config.global_shell:
+                if not config.shell:
                     if name != 'XXYY':
                         with self.subTest(which='target0'):
                             self.check_eigs(d,n,target=0,nev=2)
@@ -814,9 +814,9 @@ class Benchmarking(ut.TestCase):
 
 class Config(ut.TestCase):
 
-    def test_global_L(self):
+    def test_L(self):
 
-        config.global_L = 10
+        config.L = 10
 
         test_ops = OrderedDict([
             ('sx', do.Sigmax),
@@ -837,7 +837,7 @@ class Config(ut.TestCase):
         v = build_state()
         self.assertEqual(v.size,2**10)
 
-        config.global_L = None
+        config.L = None
 
         for op,d in test_ops.items():
             with self.subTest(op=op):

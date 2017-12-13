@@ -13,11 +13,24 @@ cdef extern from "backend_impl.h":
     ctypedef int PetscInt
     ctypedef float PetscLogDouble
 
+    ctypedef enum subspace_type:
+        _FULL "FULL"
+        _PARITY "PARITY"
+
+    ctypedef struct Subspaces:
+        int left_type
+        int right_type
+        int left_space
+        int right_space
+
+    PetscInt get_dimension(PetscInt L,subspace_type type,int space)
+
     int BuildMat_Full(PetscInt L,
                       np.int_t nterms,
                       PetscInt* masks,
                       PetscInt* signs,
                       np.complex128_t* coeffs,
+                      Subspaces s,
                       PetscMat *A)
 
     int BuildMat_Shell(PetscInt L,
@@ -25,6 +38,7 @@ cdef extern from "backend_impl.h":
                        PetscInt* masks,
                        PetscInt* signs,
                        np.complex128_t* coeffs,
+                       Subspaces s,
                        PetscMat *A)
 
     int DestroyContext(PetscMat A)
@@ -35,7 +49,6 @@ cdef extern from "backend_impl.h":
                              bint fillall,
                              np.complex128_t* m)
     int MatShellGetContext(PetscMat,void* ctx)
-
 
     int PetscMemoryGetCurrentUsage(PetscLogDouble* mem)
     int PetscMallocGetCurrentUsage(PetscLogDouble* mem)
@@ -59,30 +72,46 @@ cdef extern from "shellcontext.h":
     ctypedef struct shell_context:
         PetscBool gpu
 
+class SubspaceType:
+    FULL = _FULL
+    PARITY = _PARITY
+
 @cython.boundscheck(False)
 @cython.wraparound(False)
 def build_mat(int L,
               np.ndarray[PetscInt,mode="c"] masks not None,
               np.ndarray[PetscInt,mode="c"] signs not None,
               np.ndarray[np.complex128_t,mode="c"] coeffs not None,
+              subspace_type left_type,
+              int left_space,
+              subspace_type right_type,
+              int right_space,
               bint shell=False,
               bint gpu=False):
 
     cdef int ierr,n
+    cdef Subspaces s
 
     M = Mat()
     n = masks.shape[0]
 
+    s.left_type = left_type
+    s.left_space = left_space
+    s.right_type = right_type
+    s.right_space = right_space
+
     if shell and gpu:
         IF USE_CUDA:
+            if not (left_type == _FULL and right_type == _FULL):
+                raise TypeError('Subspaces not currently supported for CUDA shell matrices.')
             ierr = BuildMat_CUDAShell(L,n,&masks[0],&signs[0],&coeffs[0],&M.mat)
         ELSE:
-            raise NotImplementedError("dynamite was not built with CUDA shell "
-                                      "functionality (requires nvcc during build).")
+            raise RuntimeError("dynamite was not built with CUDA shell "
+                               "functionality (requires nvcc during build).")
     elif shell:
-        ierr = BuildMat_Shell(L,n,&masks[0],&signs[0],&coeffs[0],&M.mat)
+        ierr = BuildMat_Shell(L,n,&masks[0],&signs[0],&coeffs[0],s,&M.mat)
     else:
-        ierr = BuildMat_Full(L,n,&masks[0],&signs[0],&coeffs[0],&M.mat)
+        ierr = BuildMat_Full(L,n,&masks[0],&signs[0],&coeffs[0],s,&M.mat)
 
     if ierr != 0:
         raise Error(ierr)
@@ -108,6 +137,9 @@ def destroy_shell_context(Mat A):
 
     if ierr != 0:
         raise Error(ierr)
+
+def get_subspace_dimension(PetscInt L,subspace_type type,int space):
+    return get_dimension(L,type,space)
 
 def have_gpu_shell():
     return bool(USE_CUDA)

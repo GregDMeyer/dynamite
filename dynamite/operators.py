@@ -19,11 +19,13 @@ from . import config
 config.initialize()
 
 import numpy as np
+from copy import deepcopy
 
 from petsc4py.PETSc import Vec, COMM_WORLD
 
-from .backend.backend import build_mat,destroy_shell_context,MSC_dtype
+from .backend.backend import build_mat,destroy_shell_context,MSC_dtype,SubspaceType
 from .computations import evolve,eigsolve
+from .subspace import check_subspace, Parity, Full
 from ._utils import qtp_identity_product,condense_terms,coeff_to_str,MSC_matrix_product
 
 class Operator:
@@ -42,7 +44,7 @@ class Operator:
     def __init__(self,L=None):
 
         if L is None:
-            L = config.global_L
+            L = config.L
 
         self._L = L
         self.max_ind = None
@@ -51,8 +53,9 @@ class Operator:
         self._mat = None
         self._MSC = None
         self._diag_entries = False
-        self._shell = config.global_shell
-
+        self._shell = config.shell
+        self._left_subspace = config.subspace
+        self._right_subspace = config.subspace
 
     ### computation functions
 
@@ -212,6 +215,41 @@ class Operator:
             self.destroy_mat()
         self._shell = value
 
+    @property
+    def left_subspace(self):
+        return self._left_subspace
+
+    @property
+    def right_subspace(self):
+        return self._right_subspace
+
+    @property
+    def subspace(self):
+        if self._left_subspace != self._right_subspace:
+            raise ValueError('Left subspace and right subspace not equal, '
+                             'use left_subspace and right_subspace to access each.')
+
+        return self._left_subspace
+
+    @left_subspace.setter
+    def left_subspace(self,value):
+        need_rebuild = check_subspace(value,self.left_subspace)
+        if need_rebuild:
+            self.destroy_mat()
+        self._left_subspace = value
+
+    @right_subspace.setter
+    def right_subspace(self,value):
+        need_rebuild = check_subspace(value,self.right_subspace)
+        if need_rebuild:
+            self.destroy_mat()
+        self._right_subspace = value
+
+    @subspace.setter
+    def subspace(self,value):
+        self.left_subspace = value
+        self.right_subspace = value
+
     ### copy
 
     def copy(self):
@@ -231,6 +269,8 @@ class Operator:
         o.needs_parens = self.needs_parens
         o.coeff = self.coeff
         o.use_shell = self.use_shell
+        o.left_subspace = deepcopy(self.left_subspace)
+        o.right_subspace = deepcopy(self.right_subspace)
         return o
 
     def _copy(self):
@@ -346,10 +386,19 @@ class Operator:
         else:
             self._diag_entries = True
 
+        to_enum = {
+            Parity : SubspaceType.PARITY,
+            Full : SubspaceType.FULL
+        }
+
         self._mat = build_mat(self.L,
                               np.ascontiguousarray(term_array['masks']),
                               np.ascontiguousarray(term_array['signs']),
                               np.ascontiguousarray(term_array['coeffs']),
+                              to_enum[type(self.left_subspace)],
+                              self.left_subspace.space,
+                              to_enum[type(self.right_subspace)],
+                              self.right_subspace.space,
                               bool(self.use_shell),
                               self.use_shell == 'gpu')
 
@@ -633,7 +682,7 @@ class _Expression(Operator):
         """
 
         if L is None:
-            L = config.global_L
+            L = config.L
 
         Operator.__init__(self,L=L)
 
@@ -715,7 +764,7 @@ class Sum(_Expression):
     def __init__(self,terms,copy=True,L=None):
 
         if L is None:
-            L = config.global_L
+            L = config.L
 
         _Expression.__init__(self,terms,copy,L=L)
         if len(self.terms) > 1:
@@ -783,7 +832,7 @@ class Product(_Expression):
     def __init__(self,terms,copy=True,L=None):
 
         if L is None:
-            L = config.global_L
+            L = config.L
 
         _Expression.__init__(self,terms,copy,L=L)
         for term in self.terms:
@@ -824,7 +873,7 @@ class _IndexType(Operator):
     def __init__(self,op,min_i=0,max_i=None,index_label='i',wrap=False,L=None):
 
         if L is None:
-            L = config.global_L
+            L = config.L
 
         self._min_i = min_i
         self._max_i = max_i
@@ -958,7 +1007,7 @@ class IndexSum(_IndexType):
     def __init__(self,op,min_i=0,max_i=None,index_label='i',wrap=False,L=None):
 
         if L is None:
-            L = config.global_L
+            L = config.L
 
         _IndexType.__init__(self,
                             op=op,
@@ -1022,7 +1071,7 @@ class IndexProduct(_IndexType):
     def __init__(self,op,min_i=0,max_i=None,index_label='i',wrap=False,L=None):
 
         if L is None:
-            L = config.global_L
+            L = config.L
 
         _IndexType.__init__(self,
                             op=op,
@@ -1060,7 +1109,7 @@ class _Fundamental(Operator):
     def __init__(self,index=0,L=None):
 
         if L is None:
-            L = config.global_L
+            L = config.L
 
         Operator.__init__(self,L=L)
         self.index = index
@@ -1112,7 +1161,7 @@ class Sigmax(_Fundamental):
     def __init__(self,index=0,L=None):
 
         if L is None:
-            L = config.global_L
+            L = config.L
 
         _Fundamental.__init__(self,index,L=L)
         self.tex = [[r'\sigma^x_{',self.index]]
@@ -1138,7 +1187,7 @@ class Sigmaz(_Fundamental):
     def __init__(self,index=0,L=None):
 
         if L is None:
-            L = config.global_L
+            L = config.L
 
         _Fundamental.__init__(self,index,L=L)
         self.tex = [[r'\sigma^z_{',self.index]]
@@ -1164,7 +1213,7 @@ class Sigmay(_Fundamental):
     def __init__(self,index=0,L=None):
 
         if L is None:
-            L = config.global_L
+            L = config.L
 
         _Fundamental.__init__(self,index,L=L)
         self.tex = [[r'\sigma^y_{',self.index]]
@@ -1191,7 +1240,7 @@ class Identity(_Fundamental):
     def __init__(self,index=0,L=None):
 
         if L is None:
-            L = config.global_L
+            L = config.L
 
         _Fundamental.__init__(self,index,L=L)
         self.tex = []
@@ -1219,7 +1268,7 @@ class Zero(_Fundamental):
     def __init__(self,index=0,L=None):
 
         if L is None:
-            L = config.global_L
+            L = config.L
 
         _Fundamental.__init__(self,index,L=L)
         self.tex = []
