@@ -156,8 +156,8 @@ static inline void _cadd(PetscScalar *x,PetscReal c)
 PetscErrorCode MatMult_Shell(Mat A,Vec x,Vec b)
 {
   PetscErrorCode ierr;
-  PetscInt state,i,Istart,Iend,start,block_start,sign,m,mt,s,*l;
-  PetscInt proc,proc_idx,proc_mask,proc_size,log2size,local_size;
+  PetscInt state,i,Istart,Iend,start,block_start,sign,m,s,*l;
+  PetscInt proc,proc_max,proc_idx,proc_mask,proc_size,log2size,local_size;
   PetscBool assembling,r,do_xmul;
   const PetscScalar *x_array, *x_begin, *xp;
   PetscReal c,tmp_c;
@@ -203,7 +203,7 @@ PetscErrorCode MatMult_Shell(Mat A,Vec x,Vec b)
       break;
   }
 
-  proc_mask = ((1 << log2size)-1) << local_size;
+  proc_mask = (-1) << local_size;
   proc_idx = mpi_rank << local_size;
   proc_size = Iend-Istart;
   x_begin = x_array - Istart;
@@ -211,7 +211,14 @@ PetscErrorCode MatMult_Shell(Mat A,Vec x,Vec b)
   /* we are not already sending values to another processor */
   assembling = PETSC_FALSE;
 
-  for (proc=0;proc < mpi_size;++proc) {
+  if (ctx->s.left_type == PARITY) {
+    proc_max = 2*mpi_size;
+  }
+  else {
+    proc_max = mpi_size;
+  }
+
+  for (proc=0;proc < proc_max;++proc) {
 
     /*
      * NOTE: these breaks and continues are dangerous if
@@ -227,6 +234,7 @@ PetscErrorCode MatMult_Shell(Mat A,Vec x,Vec b)
     if (ctx->mask_starts[proc] == ctx->nterms) break;
 
     start = proc_mask & (proc_idx ^ ctx->masks[ctx->mask_starts[proc]]);
+
     for (block_start=start;
          block_start<start+proc_size;
          block_start+=VECSET_CACHE_SIZE) {
@@ -236,8 +244,15 @@ PetscErrorCode MatMult_Shell(Mat A,Vec x,Vec b)
       ierr = PetscMemzero(values,sizeof(PetscScalar)*VECSET_CACHE_SIZE);CHKERRQ(ierr);
       ierr = PetscMemzero(summed_c,sizeof(PetscScalar)*VECSET_CACHE_SIZE);CHKERRQ(ierr);
 
-      for (cache_idx=0;cache_idx<cache_idx_max;++cache_idx) {
-        lidx[cache_idx] = block_start + cache_idx;
+      if (ctx->s.left_type == PARITY) {
+        for (cache_idx=0;cache_idx<cache_idx_max;++cache_idx) {
+          lidx[cache_idx] = PARITY_StoI(block_start + cache_idx,ctx->s.left_space,ctx->L);
+        }
+      }
+      else {
+        for (cache_idx=0;cache_idx<cache_idx_max;++cache_idx) {
+          lidx[cache_idx] = block_start + cache_idx;
+        }
       }
 
       for (i=ctx->mask_starts[proc];i<ctx->mask_starts[proc+1];++i) {
@@ -258,12 +273,12 @@ PetscErrorCode MatMult_Shell(Mat A,Vec x,Vec b)
          */
         if (cache_idx_max != VECSET_CACHE_SIZE || (block_start&LKP_MASK) != 0) {
           for (cache_idx=0;cache_idx<cache_idx_max;++cache_idx) {
-            sign = __builtin_popcount(lidx[cache_idx]&s)&1;
+            sign = __builtin_popcount((block_start+cache_idx)&s)&1;
             tmp_c = -(sign^(sign-1))*c;
             if (r) summed_c[cache_idx] += tmp_c;
             else summed_c[cache_idx] += I*tmp_c;
           }
-          ierr = PetscInfo(A,"Using small-matrix shell code...");CHKERRQ(ierr);
+          ierr = PetscInfo(A,"Using small-matrix shell code...\n");CHKERRQ(ierr);
         }
         /* otherwise we can really blaze. the loop limits are all #defined! */
         else {
@@ -331,22 +346,17 @@ PetscErrorCode MatMult_Shell(Mat A,Vec x,Vec b)
         /* need to finally multiply by x */
         if (do_xmul) {
 
-          /* TODO: need to be careful here if going from full space to a subspace */
-          if (ctx->s.left_type == PARITY) {
-            mt = m & PARITY_MASK(ctx->L);
-          }
-          else mt = m;
-
-          iterate_max = 1<<__builtin_ctz(mt);
+          iterate_max = 1<<__builtin_ctz(m);
           if (iterate_max < ITER_CUTOFF) {
             for (cache_idx=0;cache_idx<cache_idx_max;++cache_idx) {
-              state = (block_start+cache_idx) ^ mt;
+              state = (block_start+cache_idx) ^ m;
               values[cache_idx] += summed_c[cache_idx]*x_begin[state];
             }
           }
           else {
             for (cache_idx=0;cache_idx<cache_idx_max;++cache_idx) {
-              state = (block_start+cache_idx) ^ mt;
+
+              state = (block_start+cache_idx) ^ m;
 
               vp = values + cache_idx;
               xp = x_begin + state;
@@ -369,7 +379,6 @@ PetscErrorCode MatMult_Shell(Mat A,Vec x,Vec b)
         }
       }
 
-      /* set the last values that weren't set at the end there */
       if (assembling) {
         ierr = VecAssemblyEnd(b);CHKERRQ(ierr);
         assembling = PETSC_FALSE;
@@ -469,7 +478,7 @@ PetscErrorCode BuildContext(PetscInt L,
 {
   PetscErrorCode ierr;
   shell_context *ctx;
-  PetscInt i,j,mpi_size,proc_size,N,m,tmp;
+  PetscInt i,j,mpi_size,proc_size,proc_L,N,m,tmp,mask_start_max;
 
   ierr = PetscMalloc1(1,ctx_p);CHKERRQ(ierr);
   ctx = (*ctx_p);
@@ -508,33 +517,37 @@ PetscErrorCode BuildContext(PetscInt L,
   ierr = MPI_Comm_size(PETSC_COMM_WORLD,&mpi_size);
 
   /* count the number of masks going to each processor */
-  ierr = PetscMalloc1(mpi_size+1,&(ctx->mask_starts));CHKERRQ(ierr);
+  if (s.left_type == PARITY) {
+    /* this is kind of subtle and neat. basically we're considering the
+     * extra masks due to the extra parity bit as if there were twice
+     * as many processors.
+     */
+    mask_start_max = 2*mpi_size+1;
+  }
+  else {
+    mask_start_max = mpi_size+1;
+  }
+  ierr = PetscMalloc1(mask_start_max,&(ctx->mask_starts));CHKERRQ(ierr);
 
   proc_size = PETSC_DECIDE;
   N = get_dimension(L,s.left_type,s.left_space);
   ierr = PetscSplitOwnership(PETSC_COMM_WORLD,&proc_size,&N);CHKERRQ(ierr);
 
+  /* this assumes proc_size a power of 2! */
+  proc_L = __builtin_ctz(proc_size);
+
   ctx->mask_starts[0] = 0;
-  m = proc_size;
-  if (s.left_type == PARITY) {
-    for (i=1;i<ctx->nterms;++i) {
-      for (;m <= PARITY_StoI(ctx->masks[i],s.left_space,L);m += proc_size) {
-        ctx->mask_starts[m / proc_size] = i;
-      }
-    }
-  }
-  else {
-    for (i=1;i<ctx->nterms;++i) {
-      for (;m<=ctx->masks[i];m += proc_size) {
-        ctx->mask_starts[m / proc_size] = i;
-      }
+  m = 1;
+  for (i=1;i<ctx->nterms;++i) {
+    for (;(m<<proc_L) <= ctx->masks[i];++m) {
+      ctx->mask_starts[m] = i;
     }
   }
   /* maybe a few of the last ones had none, have
    * to iterate through those
    */
-  for (i=m/proc_size;i<mpi_size+1;++i) {
-    ctx->mask_starts[i] = ctx->nterms;
+  for (;m<mask_start_max;++m) {
+    ctx->mask_starts[m] = ctx->nterms;
   }
 
   return ierr;

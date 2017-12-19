@@ -2,6 +2,7 @@
 import unittest as ut
 import numpy as np
 from dynamite import config
+#config.initialize(['-start_in_debugger','noxterm'])
 from dynamite.operators import Sigmax,Sigmay,Sigmaz
 from dynamite.subspace import Parity
 from dynamite.tools import build_state,vectonumpy
