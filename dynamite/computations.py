@@ -1,16 +1,12 @@
 
-from . import config
-config.initialize()
-
+from ._imports import get_import
 from .backend import backend as bknd
-from ._utils import estimate_compute_time,get_tstep
+from .states import State
 
 import numpy as np
-from slepc4py import SLEPc
-from petsc4py import PETSc
 
-def evolve(state,H=None,t=None,result=None,tol=1E-15,algo='expokit',
-           check_trivial=False,ncv_max=40,mfn=None):
+def evolve(H,state,t,result=None,tol=1E-15,algo='krylov',
+           check_trivial=False,ncv=None,mfn=None):
     """
     Evolve a quantum state according to the Schrodinger equation
     under the Hamiltonian H. The units are natural, that is, the
@@ -22,18 +18,17 @@ def evolve(state,H=None,t=None,result=None,tol=1E-15,algo='expokit',
     Parameters
     ----------
 
-    state : petsc4py.PETSc.Vec
-        A PETSc vector containing the state to be evolved.
-        Can be created easily with :func:`dynamite.tools.build_state`.
-
     H : Operator
         The Hamiltonian
+
+    state : dynamite.states.State
+        A dynamite State object containing the state to be evolved.
 
     t : float
         The time for which to evolve. Can be negative to evolve
         backwards in time.
 
-    result : petsc4py.PETSc.Vec, optional
+    result : dynamite.states.State, optional
         Where to store the result state. If not given, a new vector
         is created in which to store the result. If evolving repeatedly
         many times, it is a good idea to pass a result vector to avoid
@@ -54,10 +49,12 @@ def evolve(state,H=None,t=None,result=None,tol=1E-15,algo='expokit',
         H*s == 0, evolution fails, but this just means that the evolution
         is the identity. A check for this takes a (short) time.
 
-    ncv_max : int, optional
-        The maximum subspace size to use. Increasing subspace size can
+    ncv : int, optional
+        The Krylov subspace size to use. Increasing subspace size can
         increase performance by reducing the number of iterations necessary,
-        but also linearly increases memory usage.
+        but also linearly increases memory usage and the number of matrix
+        multiplies performed. Optimizing this parameter can significantly
+        affect performance.
 
     mfn : slepc4py.SLEPc.MFN, optional
         Advanced users can pass their own matrix function object from
@@ -66,22 +63,28 @@ def evolve(state,H=None,t=None,result=None,tol=1E-15,algo='expokit',
 
     Returns
     -------
-    petsc4py.PETSc.Vec
-        The result vector
+    dynamite.states.State
+        The result state
     """
 
-    if result is None:
-        result = H.get_mat().createVecs(side='l')
+    SLEPc = get_import('slepc4py.SLEPc')
 
-    if H is not None and check_trivial:
+    if H.L != state.L:
+        raise ValueError('Hamiltonian and state have incompatible lengths (H:%d, state:%d)'%
+                         (H.L,state.L))
+
+    if result is None:
+        result = State(L=H.L,subspace=H.left_subspace)
+
+    if check_trivial:
         # check if the evolution is trivial. if H*state = 0,
         # then the evolution does nothing and state is unchanged.
         # In this case MFNSolve fails. to avoid that, we check if
         # we have that condition.
 
-        H.get_mat().mult(state,result)
-        if result.norm() == 0:
-            result = state.copy()
+        H.get_mat().mult(state.vec,result.vec)
+        if result.vec.norm() == 0:
+            state.vec.copy(result.vec)
             return result
 
     if mfn is None:
@@ -92,30 +95,20 @@ def evolve(state,H=None,t=None,result=None,tol=1E-15,algo='expokit',
         f = mfn.getFN()
         f.setType(SLEPc.FN.Type.EXP)
 
-        if algo == 'expokit':
-            # optimize the size of the subspace!
-            nrm = H.get_mat().norm(PETSc.NormType.INFINITY)
-            ncvs = np.arange(1,ncv_max)
-            ct = estimate_compute_time(np.abs(t),ncvs,nrm,tol)
-            ncv = np.argmin(ct)+1
+        if ncv is not None:
             mfn.setDimensions(ncv)
 
         mfn.setFromOptions()
 
-        if t is None or H is None:
-            raise ValueError('Must supply t and H if not supplying mfn to evolve')
-
     if tol is not None:
         mfn.setTolerances(tol)
 
-    if H is not None:
-        mfn.setOperator(H.get_mat())
+    mfn.setOperator(H.get_mat())
 
-    if t is not None:
-        f = mfn.getFN()
-        f.setScale(-1j*t)
+    f = mfn.getFN()
+    f.setScale(-1j*t)
 
-    mfn.solve(state,result)
+    mfn.solve(state.vec,result.vec)
 
     return result
 
@@ -170,10 +163,12 @@ def eigsolve(H,getvecs=False,nev=1,which=None,target=None):
 
     Returns
     -------
-    numpy.array or tuple(numpy.array, list(petsc4py.PETSc.Vec))
+    numpy.array or tuple(numpy.array, list(dynamite.states.State))
         Either a 1D numpy array of eigenvalues, or a pair containing that array
         and a list of the corresponding eigenvectors.
     """
+
+    SLEPc = get_import('slepc4py.SLEPc')
 
     if which is None:
         if target is not None:
@@ -186,7 +181,8 @@ def eigsolve(H,getvecs=False,nev=1,which=None,target=None):
 
     if target is not None:
         # shift-invert not supported for shell matrices
-        if H.use_shell:
+        # TODO: can use a different preconditioner so shift-invert works!
+        if H.shell:
             raise TypeError('Shift-invert ("target") not supported for shell matrices.')
 
         st = eps.getST()
@@ -194,7 +190,8 @@ def eigsolve(H,getvecs=False,nev=1,which=None,target=None):
 
         eps.setTarget(target)
 
-        # fix for "bug" discussed here: https://www.mail-archive.com/petsc-users@mcs.anl.gov/msg22867.html
+        # fix for "bug" discussed here:
+        # https://www.mail-archive.com/petsc-users@mcs.anl.gov/msg22867.html
         eps.setOperators(H.get_mat(diag_entries=True))
     else:
         eps.setOperators(H.get_mat())
@@ -225,10 +222,8 @@ def eigsolve(H,getvecs=False,nev=1,which=None,target=None):
     v = None
     for i in range(nconv):
         if getvecs:
-            v = PETSc.Vec().create()
-            v.setSizes(1<<H.L)
-            v.setFromOptions()
-        evals[i] = eps.getEigenpair(i,v)
+            v = State(H.L,H.subspace)
+        evals[i] = eps.getEigenpair(i,v.vec)
         if getvecs:
             evecs.append(v)
 
@@ -237,7 +232,7 @@ def eigsolve(H,getvecs=False,nev=1,which=None,target=None):
     else:
         return evals
 
-def reduced_density_matrix(v,cut_size,fillall=True):
+def reduced_density_matrix(state,cut_size,fillall=True):
     """
     Compute the reduced density matrix of a state vector by
     tracing out some set of spins. Currently only supports
@@ -251,8 +246,8 @@ def reduced_density_matrix(v,cut_size,fillall=True):
     Parameters
     ----------
 
-    v : petsc4py.PETSc.Vec
-        A PETSc vector containing the state.
+    state : dynamite.states.State
+        A dynamite State object.
 
     cut_size : int
         The number of spins to keep. So, for ``cut_size``:math:`=n`,
@@ -270,13 +265,12 @@ def reduced_density_matrix(v,cut_size,fillall=True):
         The density matrix
     """
 
-    L = v.getSize().bit_length() - 1
-    if cut_size != int(cut_size) or not 0 <= cut_size <= L:
+    if cut_size != int(cut_size) or not 0 <= cut_size <= state.L:
         raise ValueError('cut_size must be an integer between 0 and L, inclusive.')
 
-    return bknd.reduced_density_matrix(v,cut_size,fillall=fillall)
+    return bknd.reduced_density_matrix(state.vec,cut_size,fillall=fillall)
 
-def entanglement_entropy(v,cut_size):
+def entanglement_entropy(state,cut_size):
     """
     Compute the entanglement of a state across some cut on the
     spin chain. To be precise, this is the bipartite entropy of
@@ -290,8 +284,8 @@ def entanglement_entropy(v,cut_size):
     Parameters
     ----------
 
-    v : petsc4py.PETSc.Vec
-        A vector containing the state
+    state : dynamite.states.State
+        A dynamite State object.
 
     cut_size : int
         The number of spins on one side of the cut. To be precise,
@@ -305,8 +299,9 @@ def entanglement_entropy(v,cut_size):
         The entanglement entropy
     """
 
-    reduced = reduced_density_matrix(v,cut_size,fillall=False)
+    reduced = reduced_density_matrix(state,cut_size,fillall=False)
 
+    # currently everything computed on process 0
     if reduced is None:
         return -1
 

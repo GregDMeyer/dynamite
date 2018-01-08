@@ -1,18 +1,20 @@
 
 import numpy as np
+from copy import deepcopy
 
-# TODO: this should probably be included in a member function
-def check_subspace(new,old=None):
-    if not (isinstance(new,Subspace) or new is None):
-        raise ValueError('subspace can only be set to objects of Subspace type, or None')
+from . import validate
 
-    # only rebuild if we need to
-    if old is None:
-        return True
-    else:
-        return old.needs_rebuild(new)
+# TODO: this will be serial_backend eventually
+from .backend import backend
 
 # TODO: implement checks that subspace is valid?
+
+def class_to_enum(subspace_type):
+    to_enum = {
+        Parity : backend.SubspaceType.PARITY,
+        Full : backend.SubspaceType.FULL
+    }
+    return to_enum[subspace_type]
 
 class Subspace:
     # base class for all subspaces. Each one should define these
@@ -44,6 +46,28 @@ class Subspace:
     def space(self):
         raise NotImplementedError()
 
+    def get_size(self,L=None):
+        """
+        Get the dimension of the Hilbert space for a spin chain length `L`.
+
+        Parameters
+        ----------
+
+        L : int, optional
+            The spin chain length. Can be omitted if Subspace.L is set.
+        """
+
+        if L is None:
+            L = self.L
+
+        L = validate.L(L)
+
+        return self._get_size(L)
+
+    @classmethod
+    def _get_size(cls,L):
+        raise NotImplementedError()
+
     def idx_to_state(self,idx):
         """
         Maps a matrix or vector index to an integer representing the
@@ -58,16 +82,30 @@ class Subspace:
         """
         raise NotImplementedError()
 
-    def needs_rebuild(self,new):
+    def update_operator(self,which,operator):
         """
-        Whether an operator needs to be rebuilt when the subspace changes to `new`.
+        Updates an operator when the subspace changes. This is allowed to be
+        overridden by particular subspaces, so that clever things can be done to save
+        memory.
         """
+        if which == 'left':
+            if operator.left_subspace != self:
+                operator.destroy_mat()
+        elif which == 'right':
+            if operator.right_subspace != self:
+                operator.destroy_mat()
+        else:
+            raise ValueError('which must be "left" or "right"')
 
-        # in general we need to if it's different, this can be overridden by derived classes.
-        return self != new
+    def copy(self):
+        return deepcopy(self)
 
 
 class Parity(Subspace):
+
+    @classmethod
+    def _get_size(cls,L):
+        return 1<<(L-1)
 
     @Subspace.space.setter
     def space(self,value):
@@ -98,7 +136,8 @@ class Parity(Subspace):
             raise ValueError('Must set parity space (even or odd) before calling idx_to_state.')
 
         if self.L is None:
-            raise ValueError('Must set spin chain size for parity object (Parity.L) before calling idx_to_state.')
+            raise ValueError('Must set spin chain size for parity object (Parity.L) before calling '
+                             'idx_to_state.')
 
         p = self.parity(idx)
         prefix = p^self.space
@@ -109,7 +148,8 @@ class Parity(Subspace):
             raise ValueError('Must set parity space (even or odd) before calling state_to_idx.')
 
         if self.L is None:
-            raise ValueError('Must set spin chain size for parity object (Parity.L) before calling state_to_idx.')
+            raise ValueError('Must set spin chain size for parity object (Parity.L) before calling '
+                             'state_to_idx.')
 
         idxs = state & (~((-1)<<(self.L-1)))
         bad = self.parity(state) != self.space
@@ -117,8 +157,23 @@ class Parity(Subspace):
         return idxs
 
 class Full(Subspace):
+
+    @classmethod
+    def _get_size(cls,L):
+        return 1<<L
+
     @Subspace.space.setter
     def space(self,value):
         if not (value is None or value == 0):
             raise ValueError('Only valid choice for full space subspace specifier is "None" or 0.')
         self._space = 0
+
+    def state_to_idx(self,state):
+        if not 0 <= state < self.get_size():
+            raise ValueError('State %d out of range (%d,%d)' % (state,0,self.get_size()))
+        return state
+
+    def idx_to_state(self,idx):
+        if not 0 <= idx < self.get_size():
+            raise ValueError('State %d out of range (%d,%d)' % (idx,0,self.get_size()))
+        return idx

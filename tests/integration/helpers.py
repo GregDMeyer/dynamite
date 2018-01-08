@@ -2,17 +2,13 @@
 import numpy as np
 from scipy.linalg import expm
 from dynamite import config
-from dynamite.tools import build_state,vectonumpy
+from dynamite.tools import vectonumpy
+from dynamite.states import State
 from dynamite.operators import Sigmax,Sigmay,Sigmaz,Load
 
 from petsc4py.PETSc import COMM_WORLD,NormType,Vec
 
 from numpy_operators import *
-
-try:
-    import qutip as qtp
-except ImportError:
-    qtp = None
 
 CW = COMM_WORLD.tompi4py()
 PROC_0 = CW.Get_rank() == 0
@@ -86,14 +82,14 @@ def check_dnm_np(d,n):
     return compare_and_scatter(_matrix_checks,n,d,d_np,d_norm)
 
 def check_vecs(d,n,max_nrm=0):
-    d_np = vectonumpy(d)
+    d_np = d.to_numpy()
     return compare_and_scatter(_vector_checks,d_np,n,max_nrm)
 
 def check_evolve(d,n,state,t=0.1):
-    ds = build_state(L=d.L,state=state)
+    ds = State(L=d.L,state=state)
     dr = d.evolve(ds,t=t)
 
-    ns = vectonumpy(ds)
+    ns = ds.to_numpy()
 
     if PROC_0:
         nr = expm(-1j*t*n).dot(ns)
@@ -157,7 +153,6 @@ def _matrix_checks(n,d,dnm_np,dnm_norm):
       -- nnz
       -- norm
       -- global shell
-      -- qutip, if available
 
     note: this function will ONLY run on process 0
     So, don't do anything that needs to run in parallel!
@@ -202,27 +197,12 @@ numpy matrix: %s
 
     ### global shell
 
-    tmp = d.use_shell == config.shell
+    tmp = d.shell == config.shell
     if not tmp:
-        msg += ('use_shell value %s not equal to global shell value %s\n'
-                % (str(d.use_shell),str(config.shell)))
+        msg += ('operator.shell value %s not equal to global shell value %s\n'
+                % (str(d.shell),str(config.shell)))
 
     r = r and tmp
-
-    ### qutip
-
-    # not supported for matrices loaded from file
-    if qtp is not None and not isinstance(d,Load):
-        qtp_o = d.build_qutip().full()
-        tmp = np.allclose(qtp_o,dnm_np)
-        if not tmp:
-            msg += '''qutip matrix not equal to dynamite matrix!
-qutip matrix: %s
-dynamite matrix: %s
-''' % (str(qtp_o),str(dnm_np))
-            msg += str_differences(qtp_o,dnm_np)
-
-        r = r and tmp
 
     return r,msg
 

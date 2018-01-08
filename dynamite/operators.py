@@ -4,6 +4,7 @@ This module provides the building blocks for Hamiltonians, and
 defines their built-in behavior and operations.
 """
 
+# defines the order the classes appear in the documentation
 __all__ = ['Sigmax',
            'Sigmay',
            'Sigmaz',
@@ -15,18 +16,18 @@ __all__ = ['Sigmax',
            'IndexProduct',
            'Load']
 
-from . import config
-config.initialize()
-
 import numpy as np
 from copy import deepcopy
 
-from petsc4py.PETSc import Vec, COMM_WORLD
+from . import config, validate, info
+from .computations import evolve, eigsolve
+from .subspace import class_to_enum
+from .states import State
+from ._imports import get_import
+from ._utils import condense_terms,coeff_to_str,MSC_matrix_product
 
-from .backend.backend import build_mat,destroy_shell_context,MSC_dtype,SubspaceType
-from .computations import evolve,eigsolve
-from .subspace import check_subspace, Parity, Full
-from ._utils import qtp_identity_product,condense_terms,coeff_to_str,MSC_matrix_product
+# this will be serial_backend eventually
+from .backend import backend
 
 class Operator:
     """
@@ -46,10 +47,7 @@ class Operator:
         if L is None:
             L = config.L
 
-        self._L = L
-        self.max_ind = None
-        self.needs_parens = False
-        self.coeff = 1
+        self._L = None
         self._mat = None
         self._MSC = None
         self._diag_entries = False
@@ -57,29 +55,28 @@ class Operator:
         self._left_subspace = config.subspace
         self._right_subspace = config.subspace
 
-    ### computation functions
+        self.min_length = 0
+        self.needs_parens = False
+        self.coeff = 1
+        self.L = L
 
-    def evolve(self,state,t=None,**kwargs):
+    ### computations
+
+    def evolve(self,state,t,**kwargs):
         """
-        Evolve a state under the Hamiltonian, according to the Schrodinger equation.
-        The units are natural; the evolution is:
+        Evolve a state under the Hamiltonian. If the Hamiltonian's chain length has not
+        been set, attempts to set it based on the state's length.
 
-        .. math::
-            \Psi_t = e^{-i H t} \Psi_0
-
-        This class method is just a wrapper on :meth:`dynamite.computations.evolve`.
-
-        .. note:: The spin chain length ``L`` must be set before calling ``evolve``.
+        This method wraps :meth:`dynamite.computations.evolve` (see that documentation
+        for a full description of the method's functionality).
 
         Parameters
         ----------
-        state : petsc4py.PETSc.Vec
-            A PETSc vector containing the initial state.
-            Can be easily created with :meth:`dynamite.tools.build_state`.
+        state : dynamite.states.State
+            The initial state.
 
         t : float
-            The time for which to evolve the state (can be negative to evolve
-            backwards in time).
+            The time :math:`t` for which to evolve the state (can be negative or complex).
 
         **kwargs :
             Any further keyword arguments are passed to the underlying call to
@@ -88,10 +85,14 @@ class Operator:
 
         Returns
         -------
-        petsc4py.PETSc.Vec
+        dynamite.states.State
             The result vector :math:`\Psi_f`.
         """
-        return evolve(state,self,t,**kwargs)
+
+        if self.L is None:
+            self.L = state.L
+
+        return evolve(self,state,t,**kwargs)
 
     def eigsolve(self,**kwargs):
         """
@@ -106,7 +107,7 @@ class Operator:
 
         Returns
         -------
-        numpy.array or tuple(numpy.array, list(petsc4py.PETSc.Vec))
+        numpy.array or tuple(numpy.array, list(dynamite.states.State))
             Either a 1D numpy array of eigenvalues, or a pair containing that array
             and a list of the corresponding eigenvectors.
         """
@@ -118,7 +119,6 @@ class Operator:
     def L(self):
         """
         Property defining the length of the spin chain.
-        The matrix dimension will then be :math:`d = 2^L`.
         If the length hasn't been set yet, ``L`` is ``None``.
         """
         return self._L
@@ -127,38 +127,22 @@ class Operator:
     def L(self,value):
 
         if value is not None:
-            try:
-                valid = int(value) == value
-            except ValueError:
-                valid = False
+            value = validate.L(value)
 
-            if not (valid and value > 0):
-                raise ValueError('L must be a positive integer.')
-
-            if self.max_ind is not None and value <= self.max_ind:
+            if value < self.min_length:
                 raise ValueError('Length %d too short--non-identity'
-                                 'operator on index %d' % (value,self.max_ind))
+                                 'operator on index %d' % (value,self.min_length-1))
 
-        if self._mat is not None:
-            self.destroy_mat()
-            self.release_MSC()
+        self.destroy_mat()
+        self._MSC = None
+
         self._L = value
+
+        self.left_subspace.L = value
+        self.right_subspace.L = value
 
         # propagate L down the tree of operators
         self._prop_L(value)
-
-    def set_length(self,length):
-        """
-        Set the length of the spin chain. An alternate interface to :attr:`Operator.L`.
-
-        Equivalent to ``Operator.L = length``.
-
-        Parameters
-        ----------
-        length : int
-            The length of the spin chain.
-        """
-        self.L = length
 
     def _prop_L(self,L):
         raise NotImplementedError()
@@ -166,13 +150,13 @@ class Operator:
     @property
     def dim(self):
         """
-        Read-only attribute returning the dimension :math:`d = 2^L` of the matrix,
+        Read-only attribute returning the dimension of the matrix,
         or ``None`` if ``L`` is ``None``.
         """
         if self.L is None:
             return None
         else:
-            return 1<<self.L
+            return self.left_subspace.get_size(), self.right_subspace.get_size()
 
     @property
     def nnz(self):
@@ -195,10 +179,10 @@ class Operator:
         The density of the sparse matrix---that is, the number of non-zero
         elements per row divided by the length of a row.
         """
-        return self.nnz/self.dim
+        return self.nnz/self.dim[0]
 
     @property
-    def use_shell(self):
+    def shell(self):
         """
         Switch whether to use shell matrices or not. For a description of shell
         matrices and their benefits, see the documentation.
@@ -209,46 +193,67 @@ class Operator:
         """
         return self._shell
 
-    @use_shell.setter
-    def use_shell(self,value):
+    @shell.setter
+    def shell(self,value):
         if value != self._shell:
             self.destroy_mat()
         self._shell = value
 
     @property
+    def use_shell(self):
+        raise TypeError('Operator.use_shell is deprecated, use Operator.shell instead.')
+
+    @use_shell.setter
+    def use_shell(self,value):
+        raise TypeError('Operator.use_shell is deprecated, use Operator.shell instead.')
+
+    @property
     def left_subspace(self):
+        """
+        The subspace of "bra" states--in other words, states that
+        could be multiplied on the left against the matrix.
+        """
         return self._left_subspace
 
     @property
     def right_subspace(self):
+        """
+        The subspace of "ket" states--those that can be multiplied
+        on the right against the matrix.
+        """
         return self._right_subspace
 
     @property
     def subspace(self):
+        """
+        When the left and right subspaces are the same, this property
+        gets or sets both at the same time. If they are different, it
+        raises an error.
+        """
         if self._left_subspace != self._right_subspace:
-            raise ValueError('Left subspace and right subspace not equal, '
+            raise ValueError('Left subspace and right subspace not the same, '
                              'use left_subspace and right_subspace to access each.')
 
         return self._left_subspace
 
     @left_subspace.setter
-    def left_subspace(self,value):
-        need_rebuild = check_subspace(value,self.left_subspace)
-        if need_rebuild:
-            self.destroy_mat()
-        self._left_subspace = value
+    def left_subspace(self,s):
+        validate.subspace(s)
+        s.L = self.L
+        s.update_operator('left',self)
+        self._left_subspace = s
 
     @right_subspace.setter
-    def right_subspace(self,value):
-        need_rebuild = check_subspace(value,self.right_subspace)
-        if need_rebuild:
-            self.destroy_mat()
-        self._right_subspace = value
+    def right_subspace(self,s):
+        validate.subspace(s)
+        s.L = self.L
+        s.update_operator('right',self)
+        self._right_subspace = s
 
     @subspace.setter
-    def subspace(self,value):
-        self.left_subspace = value
-        self.right_subspace = value
+    def subspace(self,s):
+        self.left_subspace = s
+        self.right_subspace = s
 
     ### copy
 
@@ -263,18 +268,15 @@ class Operator:
         Operator
             A copy of the operator
         """
-        o = self._copy()
-        o.L = self.L
-        o.max_ind = self.max_ind
-        o.needs_parens = self.needs_parens
-        o.coeff = self.coeff
-        o.use_shell = self.use_shell
-        o.left_subspace = deepcopy(self.left_subspace)
-        o.right_subspace = deepcopy(self.right_subspace)
-        return o
 
-    def _copy(self):
-        raise NotImplementedError()
+        # the only thing we really don't want to copy is the PETSc matrix in the
+        # backend. so we just temporarily make that not part of the operator!
+
+        tmp_mat = self._mat
+        self._mat = None
+        c = deepcopy(self)
+        self._mat = tmp_mat
+        return c
 
     ### save to disk
 
@@ -283,36 +285,44 @@ class Operator:
         Save the MSC representation of the operator to disk.
         Can be loaded again through :class:`Load`.
 
+        .. note::
+            If one calls this method in parallel, one MUST call :meth:`dynamite.config.initialize`
+            first, or all processes will try to simultaneously write to the same file!
+
         Parameters
         ----------
         fout : str
             The path to the file to save the operator in.
         """
 
+        if config.initialized:
+            PETSc = get_import('petsc4py.PETSc')
+            do_save = PETSc.COMM_WORLD.rank == 0
+        else:
+            # this should be the case when not running under MPI
+            do_save = True
+
         # only process 0 should save
-        if COMM_WORLD.rank == 0:
+        if do_save:
 
             # The file format is:
             # L,nterms,masks,signs,coefficients
             # where each is just a binary blob, one after the other.
 
-            # do this first so that we haven't already created the file if
-            # it fails for some reason
+            # values are saved in big-endian format, to be compatible with PETSc defaults
+
+            if self.L is None:
+                raise ValueError('L must be set before saving to disk.')
+
             msc = self.get_MSC()
 
             with open(fout,mode='wb') as f:
-
-                # write the chain length to the file. This is the only parameter
-                # that we save other than the MSC representation.
-                L = self.L
-                if L is None:
-                    raise ValueError('L must be set before saving to disk.')
 
                 # cast it to the type that C will be looking for
                 int_t = msc.dtype[0].newbyteorder('>')
                 complex_t = msc.dtype[2].newbyteorder('>')
 
-                L = np.array(L,dtype=int_t)
+                L = np.array(self.L,dtype=int_t)
                 f.write(L.tobytes())
 
                 # write out the length of the MSC representation
@@ -323,7 +333,8 @@ class Operator:
                 f.write(msc['signs'].astype(int_t,casting='equiv',copy=False).tobytes())
                 f.write(msc['coeffs'].astype(complex_t,casting='equiv',copy=False).tobytes())
 
-        COMM_WORLD.barrier()
+        if config.initialized:
+            PETSc.COMM_WORLD.barrier()
 
     ### interface with PETSc
 
@@ -357,8 +368,11 @@ class Operator:
         if self._mat is None:
             return
 
+        # TODO: see if there is a way that I can add destroying the shell
+        # context to the __del__ method for the matrix
         if self._shell:
-            destroy_shell_context(self._mat)
+            backend = get_import('backend')
+            backend.destroy_shell_context(self._mat)
 
         self._mat.destroy()
         self._mat = None
@@ -371,36 +385,39 @@ class Operator:
         by the end user, since it is called automatically whenever the underlying matrix
         needs to be built or rebuilt.
         """
+
         if self.L is None:
-            raise ValueError('Must set number of spins (Operator.L) before building PETSc matrix.')
+            raise ValueError('Set L before building matrix.')
+
+        if self.L > self.min_length:
+            info.write(1,'Trivial identity operators at end of chain--length L could be smaller.')
+
+        # TODO: will be mpi_backend eventually
+        backend = get_import('backend')
 
         self.destroy_mat()
 
         term_array = self.get_MSC()
 
         if diag_entries and not np.any(term_array['masks'] == 0):
-            term_array = np.hstack([np.array([(0,0,0)],dtype=MSC_dtype),term_array])
+            term_array = np.hstack([np.array([(0,0,0)],dtype=term_array.dtype),term_array])
 
         if not np.any(term_array['masks'] == 0):
             self._diag_entries = False
         else:
             self._diag_entries = True
 
-        to_enum = {
-            Parity : SubspaceType.PARITY,
-            Full : SubspaceType.FULL
-        }
-
-        self._mat = build_mat(self.L,
-                              np.ascontiguousarray(term_array['masks']),
-                              np.ascontiguousarray(term_array['signs']),
-                              np.ascontiguousarray(term_array['coeffs']),
-                              to_enum[type(self.left_subspace)],
-                              self.left_subspace.space,
-                              to_enum[type(self.right_subspace)],
-                              self.right_subspace.space,
-                              bool(self.use_shell),
-                              self.use_shell == 'gpu')
+        # TODO: clean up these arguments into a dictionary or similar
+        self._mat = backend.build_mat(self.L,
+                                      np.ascontiguousarray(term_array['masks']),
+                                      np.ascontiguousarray(term_array['signs']),
+                                      np.ascontiguousarray(term_array['coeffs']),
+                                      class_to_enum(type(self.left_subspace)),
+                                      self.left_subspace.space,
+                                      class_to_enum(type(self.right_subspace)),
+                                      self.right_subspace.space,
+                                      bool(self.shell),
+                                      self.shell == 'gpu')
 
     ### LaTeX representation of operators
 
@@ -435,8 +452,10 @@ class Operator:
         # don't print if we aren't process 0
         # this causes there to still be some awkward white space,
         # but at least it doesn't print the tex a zillion times
-        if COMM_WORLD.getRank() != 0:
-            return ''
+        if config.initialized:
+            PETSc = get_import('petsc4py.PETSc')
+            if PETSc.COMM_WORLD.getRank() != 0:
+                return ''
 
         return '$' + self.build_tex(signs='-') + '$'
 
@@ -446,42 +465,6 @@ class Operator:
 
     def _replace_index(self,ind,rep):
         # Replace an index by some value in the TeX representation
-        raise NotImplementedError()
-
-    ### qutip representation of operators
-
-    def build_qutip(self,shift_index=0,wrap=False):
-        """
-        Build a representation of the operator as a qutip.Qobj. This functionality
-        is mostly useful for testing and checking correctness, though also perhaps
-        to access some qutip functionality directly from dynamite.
-
-        .. note::
-            QuTiP's representation of the matrix will not be split among processes--if
-            you call this on a large spin chain, it will build a copy on each process,
-            possibly causing your program to run out of memory and crash.
-
-        Parameters
-        ----------
-        shift_index : int
-            Shift the whole operator along the spin chain by ``shift_index`` spins.
-
-        wrap : bool
-            Whether to wrap around if requesting a ``shift_index`` greater than the length
-            of the spin chain (i.e., take ``shift_index`` to ``shift_index % L``).
-
-        Returns
-        -------
-        qutip.Qobj
-            The operator in qutip representation
-        """
-        import qutip as qtp
-
-        if self.L is None:
-            raise ValueError('Must set L before building qutip representation.')
-        return self.coeff * self._build_qutip(shift_index,wrap=wrap)
-
-    def _build_qutip(self,shift_index,wrap):
         raise NotImplementedError()
 
     ### mask, sign, coefficient representation of operators
@@ -508,23 +491,44 @@ class Operator:
         numpy.ndarray
             A numpy array containing the representation.
         """
+
+        if self._MSC is None:
+            self._MSC = self._get_MSC()
+
         if shift_index is None:
-            # the value of wrap doesn't matter if no shift index
-            if self._MSC is None:
-                self._MSC = self._get_MSC()
             return self._MSC
         else:
-            return self._get_MSC(shift_index,wrap=wrap)
+            # check that the shift_index is valid
+            if not wrap and self.L is not None and self.min_length + shift_index > self.L:
+                raise ValueError('Shift of %d would put operators past end of spin chain.'%
+                                 shift_index)
 
-    def _get_MSC(self,shift_index,wrap):
+            msc = self._MSC.copy()
+
+            msc['masks'] <<= shift_index
+            msc['signs'] <<= shift_index
+
+            if wrap:
+                mask = (-1) << self.L
+
+                for v in [msc['masks'],msc['signs']]:
+
+                    # find the bits that need to wrap around
+                    overflow = v & mask
+
+                    # wrap them to index 0
+                    overflow >>= self.L
+
+                    # recombine them with the ones that didn't get wrapped
+                    v |= overflow
+
+                    # shave off the extras that go past L
+                    v &= ~mask
+
+            return msc
+
+    def _get_MSC(self):
         raise NotImplementedError()
-
-    def release_MSC(self):
-        """
-        Remove the operator's reference to the MSC representation, so that it
-        can be garbage collected if there are no other references to it.
-        """
-        self._MSC = None
 
     ### unary and binary operations
 
@@ -544,8 +548,8 @@ class Operator:
     def __mul__(self,x):
         if isinstance(x,Operator):
             return self._op_mul(x)
-        elif isinstance(x,Vec):
-            return self.get_mat() * x
+        elif isinstance(x,State):
+            return self.get_mat() * x.vec
         else:
             try:
                 # check that it is a number, in the
@@ -559,7 +563,7 @@ class Operator:
                                 % (str(type(self)),str(type(x))))
 
     def __rmul__(self,x):
-        if isinstance(x,Vec):
+        if isinstance(x,State):
             return TypeError('Left vector-matrix multiplication not currently '
                              'supported.')
         else:
@@ -608,8 +612,7 @@ class Load(Operator):
     """
     Class for operator loaded from memory.
     Only the MSC representation of the operator
-    is saved; LaTeX, QuTiP, etc. are all currently
-    disabled for this type.
+    is saved.
 
     Files should be created with the :meth:`Operator.save`
     method.
@@ -620,60 +623,66 @@ class Load(Operator):
         The file from which to load the operator.
     """
     def __init__(self,fin):
-
+        self._prop_L = lambda self,value=None: None
         Operator.__init__(self)
 
         if isinstance(fin,str):
-            f = open(fin,mode='rb')
+            with open(fin,mode='rb') as f:
+                self._load(f)
+            self.filename = fin
         else:
-            f = fin
+            self._load(fin)
+            self.filename = None
 
+        self._prop_L = self._postinit_prop_L
+
+    def _load(self,f):
         # figure out the datatype for int
-        int_t = MSC_dtype[0].newbyteorder('>')
-        complex_t = MSC_dtype[2].newbyteorder('>')
+        # TODO: should save data type along with msc representation
+        int_t = backend.MSC_dtype[0].newbyteorder('>')
+        complex_t = backend.MSC_dtype[2].newbyteorder('>')
         int_size = int_t.itemsize
 
-        self._L = int(np.fromstring(f.read(int_size),dtype=int_t))
+        self.L = int(np.fromstring(f.read(int_size),dtype=int_t))
         msc_size = int(np.fromstring(f.read(int_size),dtype=int_t))
 
-        self._MSC = np.ndarray(msc_size,dtype=MSC_dtype)
+        self._MSC = np.ndarray(msc_size,dtype=backend.MSC_dtype)
 
         self._MSC['masks'] = np.fromstring(f.read(int_size*msc_size),dtype=int_t)
         self._MSC['signs'] = np.fromstring(f.read(int_size*msc_size),dtype=int_t)
         self._MSC['coeffs'] = np.fromstring(f.read(complex_t.itemsize*msc_size),dtype=complex_t)
 
-        if isinstance(fin,str):
-            f.close()
+    def _postinit_prop_L(self,value):
+        raise TypeError('Cannot set L for operator loaded from file. Value from file: L=%d'%self.L)
 
-    @Operator.L.setter
-    def L(self,value):
-        raise TypeError('Cannot set L for operator loaded from file. Value from file: L='+str(self.L))
+    def _build_tex(self,signs='-',request_parens=False):
+        t = coeff_to_str(self.coeff,signs=signs)
+        if t:
+            t += '*'
 
-    def _copy(self):
-        raise TypeError('Copy currently not implemented for operator loaded from file.')
+        if self.filename is None:
+            t += r'[\text{operator from file}]'
+        else:
+            t += r'[\text{operator from file "%s"}]' % self.filename
 
-    def _build_tex(self,signs=None,request_parens=None):
-        raise TypeError('LaTeX not supported for operator loaded from file.')
+        return t
 
-    def _build_qutip(self,shift_index,wrap):
-        raise TypeError('QuTiP not support for operator loaded from file.')
+    def _get_MSC(self):
+        if self.coeff == 1:
+            return self._MSC
+        else:
+            msc = self._MSC.copy()
+            msc['coeffs'] *= self.coeff
+            return msc
 
-    def _get_MSC(self,shift_index=0,wrap=False):
-        if shift_index != 0 or wrap:
-            raise TypeError('MSC shifts not supported for operator loaded from file.')
-        return self._MSC
-
-    def release_MSC(self):
-        raise TypeError('Cannot delete MSC representation for operator loaded from file.')
-
+    # TODO: there is no good reason to restrict this behavior. just a couple things to
+    # implement
     def _op_add(self,o):
-        raise TypeError('Cannot use operators loaded from file in expressions.')
+        raise TypeError('Cannot currently use operators loaded from file in expressions.')
 
     def _op_mul(self,o):
-        raise TypeError('Cannot use operators loaded from file in expressions.')
+        raise TypeError('Cannot currently use operators loaded from file in expressions.')
 
-    def _num_mul(self,x):
-        self._MSC['coeffs'] *= x
 
 class _Expression(Operator):
     def __init__(self,terms,copy=True,L=None):
@@ -681,10 +690,8 @@ class _Expression(Operator):
         Base class for Sum and Product classes.
         """
 
-        if L is None:
-            L = config.L
-
         Operator.__init__(self,L=L)
+        L = self.L
 
         if copy:
             self.terms = [t.copy() for t in terms]
@@ -704,18 +711,15 @@ class _Expression(Operator):
                     terms_L = t.L
 
         if len(self.terms) > 1:
-            self.max_ind = max(o.max_ind for o in self.terms)
+            self.min_length = max(o.min_length for o in self.terms)
         elif len(self.terms) == 1:
-            self.max_ind = self.terms[0].max_ind
+            self.min_length = self.terms[0].min_length
 
         # pick up length from terms if it isn't set any other way
-        if L is None:
+        if self.L is None:
             L = terms_L
 
         self.L = L
-
-    def _copy(self):
-        return type(self)(terms=self.terms)
 
     def _get_index_set(self):
         indices = set()
@@ -731,6 +735,11 @@ class _Expression(Operator):
         raise NotImplementedError()
 
     def _prop_L(self,L):
+
+        # when we are not fully initialized
+        if not hasattr(self,'terms'):
+            return
+
         for term in self.terms:
             term.L = L
 
@@ -763,10 +772,8 @@ class Sum(_Expression):
 
     def __init__(self,terms,copy=True,L=None):
 
-        if L is None:
-            L = config.L
-
         _Expression.__init__(self,terms,copy,L=L)
+
         if len(self.terms) > 1:
             self.needs_parens = True
 
@@ -787,14 +794,6 @@ class Sum(_Expression):
         if add_parens:
             t += r'\right)'
         return t
-
-    def _build_qutip(self,shift_index,wrap):
-        ret = Zero(L=self.L).build_qutip()
-
-        for term in self.terms:
-            ret += term.build_qutip(shift_index,wrap=wrap)
-
-        return ret
 
     def _op_add(self,o):
         if isinstance(o,Sum):
@@ -831,10 +830,8 @@ class Product(_Expression):
 
     def __init__(self,terms,copy=True,L=None):
 
-        if L is None:
-            L = config.L
-
         _Expression.__init__(self,terms,copy,L=L)
+
         for term in self.terms:
             self.coeff = self.coeff * term.coeff
             term.coeff = 1
@@ -851,14 +848,6 @@ class Product(_Expression):
             t += term.build_tex(request_parens=True)
         return t
 
-    def _build_qutip(self,shift_index,wrap):
-        ret = Identity(L=self.L).build_qutip()
-
-        for term in self.terms:
-            ret *= term.build_qutip(shift_index,wrap)
-
-        return ret
-
     def _op_mul(self,o):
         if isinstance(o,Product):
             return Product(terms = [self.coeff*t for t in self.terms] + \
@@ -872,20 +861,18 @@ class _IndexType(Operator):
 
     def __init__(self,op,min_i=0,max_i=None,index_label='i',wrap=False,L=None):
 
-        if L is None:
-            L = config.L
+        Operator.__init__(self,L=L)
+        L = self.L
 
         self._min_i = min_i
         self._max_i = max_i
         self.hard_max = max_i is not None
         self.wrap = wrap
 
-        Operator.__init__(self,L=L)
-
         if self._max_i is not None and self._max_i < self._min_i:
             raise ValueError('max_i must be >= min_i.')
 
-        self.max_ind = op.max_ind
+        self.min_length = op.min_length
         if self.L is not None:
             if self._max_i is not None and self._max_i >= self.L:
                 raise ValueError('max_i must be < L.')
@@ -920,13 +907,8 @@ class _IndexType(Operator):
                     rep = '%L'  # TODO: change L to an integer when it's set
                 self.op._replace_index(ind,rep)
 
-    def _copy(self):
-        o = type(self)(op=self.op,
-                       min_i=self._min_i,
-                       max_i=self._max_i,
-                       index_label=self.index_label,
-                       wrap=self.wrap)
-        return o
+        # finally we should set L again to make sure it's set everywhere
+        self.L = self.L
 
     def _get_sigma_tex(self):
         raise NotImplementedError()
@@ -943,7 +925,7 @@ class _IndexType(Operator):
             if self.wrap:
                 t += '^{L-1}'
             else:
-                t += '^{L'+('-'+str(self.max_ind+1))+'}'
+                t += '^{L'+('-'+str(self.min_length))+'}'
         t += self.op.build_tex(request_parens=True)
         if request_parens:
             t += r'\right]'
@@ -956,11 +938,16 @@ class _IndexType(Operator):
         return self.op._replace_index(ind,rep)
 
     def _prop_L(self,L):
+
+        # not fully initialized yet
+        if not hasattr(self,'op'):
+            return
+
         if self.hard_max and L is not None:
             if self._max_i > L-1:
                 raise ValueError('Cannot set L smaller than '
                                  'max_i+1 of index sum or product.')
-            elif not self.wrap and self._max_i + self.max_ind > L-1:
+            elif not self.wrap and self._max_i + self.min_length > L:
                 raise ValueError('Index sum or product operator would extend '
                                  'past end of spin chain (L too small).')
 
@@ -970,11 +957,11 @@ class _IndexType(Operator):
                 if self.wrap:
                     self._max_i = L-1
                 else:
-                    self._max_i = L - self.max_ind - 1
+                    self._max_i = L - self.min_length
             else:
                 self._max_i = None
 
-    def _get_MSC(self,shift_index=0,wrap=False):
+    def _get_MSC(self):
         raise NotImplementedError()
 
 class IndexSum(_IndexType):
@@ -1006,9 +993,6 @@ class IndexSum(_IndexType):
 
     def __init__(self,op,min_i=0,max_i=None,index_label='i',wrap=False,L=None):
 
-        if L is None:
-            L = config.L
-
         _IndexType.__init__(self,
                             op=op,
                             min_i=min_i,
@@ -1020,24 +1004,15 @@ class IndexSum(_IndexType):
     def _get_sigma_tex(self):
         return r'\sum'
 
-    def _get_MSC(self,shift_index=0,wrap=False):
+    def _get_MSC(self):
         if self._max_i is None:
             raise Exception('Must set L or max_i before building MSC representation of IndexSum.')
-        wrap = wrap or self.wrap
-        all_terms = np.hstack([self.op.get_MSC(shift_index=shift_index+i,wrap=wrap)
+
+        all_terms = np.hstack([self.op.get_MSC(shift_index=i,wrap=self.wrap)
                                for i in range(self._min_i,self._max_i+1)])
         all_terms['coeffs'] *= self.coeff
         return condense_terms(all_terms)
 
-    def _build_qutip(self,shift_index,wrap):
-        ret = Zero(L=self.L).build_qutip()
-
-        wrap = wrap or self.wrap
-
-        for i in range(self._min_i,self._max_i+1):
-            ret += self.op.build_qutip(shift_index=i,wrap=wrap)
-
-        return ret
 
 class IndexProduct(_IndexType):
 
@@ -1070,9 +1045,6 @@ class IndexProduct(_IndexType):
 
     def __init__(self,op,min_i=0,max_i=None,index_label='i',wrap=False,L=None):
 
-        if L is None:
-            L = config.L
-
         _IndexType.__init__(self,
                             op=op,
                             min_i=min_i,
@@ -1084,41 +1056,27 @@ class IndexProduct(_IndexType):
     def _get_sigma_tex(self):
         return r'\prod'
 
-    def _get_MSC(self,shift_index=0,wrap=False):
+    def _get_MSC(self):
         if self._max_i is None:
-            raise Exception('Must set L or max_i before building MSC representation of IndexProduct.')
-        wrap = wrap or self.wrap
-        terms = (self.op.get_MSC(shift_index=shift_index+i,wrap=wrap) for i in range(self._min_i,self._max_i+1))
+            raise Exception('Must set L or max_i before building MSC representation of '
+                            'IndexProduct.')
+        terms = (self.op.get_MSC(shift_index=i,wrap=self.wrap)
+                 for i in range(self._min_i,self._max_i+1))
         all_terms = MSC_matrix_product(terms)
         all_terms['coeffs'] *= self.coeff
         return condense_terms(all_terms)
 
-    def _build_qutip(self,shift_index,wrap):
-        ret = Identity(L=self.L).build_qutip()
-
-        wrap = wrap or self.wrap
-
-        for i in range(self._min_i,self._max_i+1):
-            ret *= self.op.build_qutip(shift_index=i,wrap=wrap)
-
-        return ret
 
 # the bottom level. a single operator (e.g. sigmax)
 class _Fundamental(Operator):
 
     def __init__(self,index=0,L=None):
 
-        if L is None:
-            L = config.L
-
         Operator.__init__(self,L=L)
         self.index = index
-        self.max_ind = index
+        self.min_length = index + 1
         self.tex = []
         self.tex_end = ''
-
-    def _copy(self):
-        return type(self)(index=self.index)
 
     def _calc_ind(self,shift_index,wrap):
         ind = self.index+shift_index
@@ -1169,15 +1127,8 @@ class Sigmax(_Fundamental):
 
     def _get_MSC(self,shift_index=0,wrap=False):
         ind = self._calc_ind(shift_index,wrap)
-        return np.array([(1<<ind,0,self.coeff)],dtype=MSC_dtype)
+        return np.array([(1<<ind,0,self.coeff)],dtype=backend.MSC_dtype)
 
-    def _build_qutip(self,shift_index,wrap):
-        import qutip as qtp
-        ind = self._calc_ind(shift_index,wrap)
-        if ind >= self.L:
-            raise IndexError('requested too large an index')
-
-        return qtp_identity_product(qtp.sigmax(),ind,self.L)
 
 class Sigmaz(_Fundamental):
     """
@@ -1195,15 +1146,8 @@ class Sigmaz(_Fundamental):
 
     def _get_MSC(self,shift_index=0,wrap=False):
         ind = self._calc_ind(shift_index,wrap)
-        return np.array([(0,1<<ind,self.coeff)],dtype=MSC_dtype)
+        return np.array([(0,1<<ind,self.coeff)],dtype=backend.MSC_dtype)
 
-    def _build_qutip(self,shift_index,wrap):
-        import qutip as qtp
-        ind = self._calc_ind(shift_index,wrap)
-        if ind >= self.L:
-            raise IndexError('requested too large an index')
-
-        return qtp_identity_product(qtp.sigmaz(),ind,self.L)
 
 class Sigmay(_Fundamental):
     """
@@ -1221,15 +1165,8 @@ class Sigmay(_Fundamental):
 
     def _get_MSC(self,shift_index=0,wrap=False):
         ind = self._calc_ind(shift_index,wrap)
-        return np.array([(1<<ind,1<<ind,1j*self.coeff)],dtype=MSC_dtype)
+        return np.array([(1<<ind,1<<ind,1j*self.coeff)],dtype=backend.MSC_dtype)
 
-    def _build_qutip(self,shift_index,wrap):
-        import qutip as qtp
-        ind = self._calc_ind(shift_index,wrap)
-        if ind >= self.L:
-            raise IndexError('requested too large an index')
-
-        return qtp_identity_product(qtp.sigmay(),ind,self.L)
 
 class Identity(_Fundamental):
     """
@@ -1245,18 +1182,11 @@ class Identity(_Fundamental):
         _Fundamental.__init__(self,index,L=L)
         self.tex = []
         self.tex_end = r'I'
-        self.max_ind = 0
+        self.min_length = 0
 
     def _get_MSC(self,shift_index=0,wrap=False):
-        return np.array([(0,0,self.coeff)],dtype=MSC_dtype)
+        return np.array([(0,0,self.coeff)],dtype=backend.MSC_dtype)
 
-    def _build_qutip(self,shift_index,wrap):
-        import qutip as qtp
-        ind = self._calc_ind(shift_index,wrap)
-        if ind >= self.L:
-            raise IndexError('requested too large an index')
-
-        return qtp_identity_product(qtp.identity(2),0,self.L)
 
 # also should hide this tex when appropriate
 class Zero(_Fundamental):
@@ -1273,18 +1203,7 @@ class Zero(_Fundamental):
         _Fundamental.__init__(self,index,L=L)
         self.tex = []
         self.tex_end = r'0'
-        self.max_ind = 0
+        self.min_length = 0
 
     def _get_MSC(self,shift_index=0,wrap=False):
-        return np.array([],dtype=MSC_dtype)
-
-    def _build_qutip(self,shift_index,wrap):
-        import qutip as qtp
-        ind = self._calc_ind(shift_index,wrap)
-        if ind >= self.L:
-            raise IndexError('requested too large an index')
-
-        q = z = qtp.Qobj([[0,0],[0,0]])
-        for _ in range(1,self.L):
-            q = qtp.tensor(q,z)
-        return q
+        return np.array([],dtype=backend.MSC_dtype)

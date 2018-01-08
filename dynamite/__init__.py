@@ -1,6 +1,6 @@
 
-import slepc4py
-from .subspace import check_subspace,Full
+from . import validate
+from .subspace import Full
 
 # handle global configuration
 
@@ -10,8 +10,10 @@ class _Config:
     """
 
     initialized = False
+    mock_backend = False
     _L = None
     _shell = False
+    _info_level = 0
     _subspace = Full()
 
     def initialize(self,slepc_args=None):
@@ -30,6 +32,11 @@ class _Config:
         slepc_args : list of str
             The arguments to SLEPc initialization.
         """
+
+        # this is the only place where we don't use _imports.py to get the
+        # slepc4py/petsc4py modules!
+        import slepc4py
+
         if slepc_args is None:
             slepc_args = []
 
@@ -51,11 +58,13 @@ class _Config:
 
     @property
     def global_shell(self):
-        raise TypeError('config.global_shell has been changed to config.shell, please use that instead.')
+        raise TypeError('config.global_shell has been changed to config.shell, '
+                        'please use that instead.')
 
     @global_shell.setter
     def global_shell(self,value):
-        raise TypeError('config.global_shell has been changed to config.shell, please use that instead.')
+        raise TypeError('config.global_shell has been changed to config.shell, '
+                        'please use that instead.')
 
     @property
     def L(self):
@@ -121,7 +130,22 @@ class _Config:
 
     @subspace.setter
     def subspace(self,value):
-        check_subspace(value)
-        self._subspace = value
+        self._subspace = validate.subspace(value)
+
+    @property
+    def info_level(self):
+        """
+        How verbose to output debug information. Default is 0. Currently, options are:
+         0 : no information output about execution
+         1 : all debug information printed
+        """
+        return self._info_level
+
+    @info_level.setter
+    def info_level(self,value):
+        # need to do this import here, or it will be cyclic
+        from info import validate_level
+        validate_level(value)
+        self._info_level = value
 
 config = _Config()

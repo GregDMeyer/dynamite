@@ -15,10 +15,11 @@ if __name__ == '__main__':
 
 from dynamite import config
 config.initialize(slepc_args)
-config.shell = True
+config.shell = False
 
 import dynamite.operators as do
-from dynamite.tools import build_state,vectonumpy
+from dynamite.tools import vectonumpy
+from dynamite.states import State
 from dynamite._utils import coeff_to_str
 from dynamite.extras import commutator, Majorana
 import numpy as np
@@ -67,7 +68,6 @@ class SingleOperators(ut.TestCase):
             with self.subTest(L=L):
                 s = do.Sigmax(1)
                 s.L = L
-                s.set_length(L)
 
         bad_Ls = [0,'hi',1]
         for L in bad_Ls:
@@ -81,7 +81,7 @@ class SingleOperators(ut.TestCase):
         self.assertEqual(s.dim,None)
 
         s.L = self.L
-        self.assertEqual(s.dim,2**self.L)
+        self.assertEqual(s.dim,(2**self.L,2**self.L))
 
     def test_MSC_size(self):
         # simply an example in which I know the answer
@@ -94,12 +94,12 @@ class SingleOperators(ut.TestCase):
 
         s.build_mat()
 
-        s.use_shell = False
-        s.use_shell = True
+        s.shell = False
+        s.shell = True
         self.assertIs(s._mat,None)
 
         s.build_mat()
-        s.use_shell = True
+        s.shell = True
         self.assertIsNot(s._mat,None)
 
     def test_build(self):
@@ -498,7 +498,7 @@ class StateBuilding(ut.TestCase):
                   int(0.339054706405*(2**self.L)),
                   int(0.933703666179*(2**self.L))]:
             with self.subTest(state=i):
-                d = build_state(state=i)
+                d = State(state=i)
                 n = np.zeros(2**self.L,dtype=np.complex128)
                 n[i] = 1
 
@@ -508,9 +508,9 @@ class StateBuilding(ut.TestCase):
     def test_str_buildstate(self):
         for i in ['UUUU','UDUD','UDDD']:
             with self.subTest(state=i):
-                d = build_state(state=i)
+                d = State(state=i)
                 n = np.zeros(2**self.L,dtype=np.complex128)
-                ind = int(i.replace('U','1').replace('D','0'),2)
+                ind = int(i.replace('U','1').replace('D','0')[::-1],2)
                 n[ind] = 1
 
                 r,msg = check_vecs(d,n)
@@ -521,19 +521,19 @@ class StateBuilding(ut.TestCase):
         # without exceptions and that their norm is reasonable.
         # it would take too long to actually test that they
         # are correctly distributed etc during the automated tests.
-        s = build_state(L=self.L,state='random')
-        r,msg = check_close(s.norm(),1)
+        s = State(L=self.L,state='random')
+        r,msg = check_close(s.vec.norm(),1)
         self.assertTrue(r,msg=msg)
 
-        s = build_state(L=self.L,state='random',seed=0)
+        s = State(L=self.L,state='random',seed=0)
         x = np.random.random()
-        t = build_state(L=self.L,state='random',seed=0)
+        t = State(L=self.L,state='random',seed=0)
         y = np.random.random()
 
-        r,msg = check_close(s.norm(),1)
+        r,msg = check_close(s.vec.norm(),1)
         self.assertTrue(r,msg=msg)
 
-        r,msg = check_close(s.dot(t),1)
+        r,msg = check_close(s.vec.dot(t.vec),1)
         self.assertTrue(r,msg=msg)
 
         # make sure we aren't screwing with numpy's random
@@ -544,12 +544,12 @@ class StateBuilding(ut.TestCase):
         for i in ['U','UDDUDUD','DUDE',10000,-1]:
             with self.subTest(state=i):
                 with self.assertRaises(ValueError):
-                    build_state(state=i)
+                    State(state=i)
 
         for i in [1j,4.2]:
             with self.subTest(state=i):
                 with self.assertRaises(TypeError):
-                    build_state(state=i)
+                    State(state=i)
 
 class Evolve(ut.TestCase):
 
@@ -648,11 +648,11 @@ class Eigsolve(ut.TestCase):
                 # a) an eigenvector and
                 # b) has the right eigenvalue
                 if ev != 0:
-                    err = d.get_mat()*evec / ev - evec
+                    err = d*evec / ev - evec.vec
                 else:
-                    err = d.get_mat()*evec
+                    err = d*evec
                 errnorm = err.norm(NormType.INFINITY)
-                vecnorm = evec.norm(NormType.INFINITY)
+                vecnorm = evec.vec.norm(NormType.INFINITY)
                 self.assertLess(errnorm,1E-6*vecnorm)
 
 from dynamite.computations import reduced_density_matrix
@@ -674,11 +674,11 @@ class Entropy(ut.TestCase):
         self.L = 4
         self.cuts = [0,1,2,4]
         self.states = OrderedDict([
-            ('product0',build_state(L=self.L)),
+            ('product0',State(L=self.L,state=0)),
             ('product1',
-             build_state(L=self.L,
-                         state=int(0.8675309*(2**self.L)))),
-            ('random',build_state(L=self.L,state='random'))
+             State(L=self.L,
+                   state=int(0.8675309*(2**self.L)))),
+            ('random',State(L=self.L,state='random'))
         ])
 
         H = do.IndexSum(do.Sum(s(0)*s(1)
@@ -694,7 +694,7 @@ class Entropy(ut.TestCase):
                     ddm = reduced_density_matrix(state,cut)
                     dy_EE = entanglement_entropy(state,cut)
 
-                    qtp_state = qtp.Qobj(vectonumpy(state),
+                    qtp_state = qtp.Qobj(state.to_numpy(),
                                          dims=[[2]*self.L,
                                                [1]*self.L])
 
@@ -834,8 +834,8 @@ class Config(ut.TestCase):
             with self.subTest(op=op):
                 self.assertEqual(d().L,10)
 
-        v = build_state()
-        self.assertEqual(v.size,2**10)
+        v = State()
+        self.assertEqual(v.vec.size,2**10)
 
         config.L = None
 
@@ -844,7 +844,7 @@ class Config(ut.TestCase):
                 self.assertIs(d().L,None)
 
         with self.assertRaises(ValueError):
-            build_state()
+            State()
 
 if __name__ == '__main__':
 

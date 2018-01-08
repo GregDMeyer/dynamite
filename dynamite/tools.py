@@ -11,104 +11,10 @@ from os import urandom
 from .backend import backend
 
 __all__ = [
-    'build_state',
     'vectonumpy',
     'track_memory',
     'get_max_memory_usage',
     'get_cur_memory_usage']
-
-def build_state(L = None,state = 0,seed = None):
-    '''
-    Build a PETSc vector representing a state.
-
-    .. note::
-        State indices go from right-to-left. For example,
-        the state "UUUUD" has the spin at index 0 down
-        and all the rest of the spins up.
-
-    Parameters
-    ----------
-    L : int
-        The length of the spin chain. Can be omitted if a global
-        L has been set with :meth:`dynamite.Config.L`.
-
-    state : int or str, optional
-        The desired state. Can either be an integer whose
-        binary representation represents the spin configuration
-        (0=↓, 1=↑) of a product state, or a string of the form
-        ``"DUDDU...UDU"`` (D=↓, U=↑). If it is a string, the string's
-        length must equal ``L``. One can also pass ``state='random'``
-        to generate a random, normalized state (not a product state,
-        random values for all components).
-
-    seed : int, optional
-        The seed for the random number generator, when generating
-        a random state. Has no effect without the option ``state='random'``.
-        Note that on multiple processes, the seed is incremented by the process
-        number, to prevent different parts of the vector from having the
-        same random values.
-
-    Returns
-    -------
-    petsc4py.PETSc.Vec
-        The product state
-    '''
-
-    if L is None:
-        if config.L is None:
-            raise ValueError('Must set state size L explicitly '
-                             'or through config.L')
-        L = config.L
-
-    v = PETSc.Vec().create()
-    v.setSizes(1<<L)
-    v.setFromOptions()
-
-    if state == 'random':
-        istart,iend = v.getOwnershipRange()
-
-        R = np.random.RandomState()
-
-        if seed is None:
-            try:
-                seed = int.from_bytes(urandom(4),'big',signed=False)
-            except NotImplementedError:
-                raise RuntimeError('Could not access urandom for random number '
-                                   'initialization. Please manually set a seed.')
-
-        R.seed(seed + PETSc.COMM_WORLD.rank)
-
-        local_size = iend-istart
-        v[istart:iend] = R.standard_normal(local_size) + \
-                            1j*R.standard_normal(local_size)
-
-    else:
-        if isinstance(state,str):
-            state_str = state
-            state = 0
-            if len(state_str) != L:
-                raise ValueError('state string must have length L')
-            if not all(c in ['U','D'] for c in state_str):
-                raise ValueError('only character U and D allowed in state')
-            for i,c in enumerate(state_str[::-1]):
-                if c == 'U':
-                    state += 1<<i
-
-        elif not isinstance(state,int):
-            raise TypeError('State must be an int or str.')
-
-        if not 0 <= state < 2**L:
-            raise ValueError('Requested state out of bounds (0,2**L).')
-
-        v[state] = 1
-
-    v.assemblyBegin()
-    v.assemblyEnd()
-
-    if state == 'random':
-        v.normalize()
-
-    return v
 
 def vectonumpy(v,toall=False):
     '''
