@@ -33,6 +33,13 @@ class _Config:
             The arguments to SLEPc initialization.
         """
 
+        if self.initialized:
+            if slepc_args:
+                raise RuntimeError('initialize has already been called. Perhaps '
+                                   'you already imported a dynamite submodule?')
+            else:
+                return
+
         # this is the only place where we don't use _imports.py to get the
         # slepc4py/petsc4py modules!
         import slepc4py
@@ -40,13 +47,15 @@ class _Config:
         if slepc_args is None:
             slepc_args = []
 
-        if not self.initialized:
-            slepc4py.init(slepc_args)
-            self.initialized = True
-        else:
-            if slepc_args:
-                raise RuntimeError('initialize has already been called. Perhaps '
-                                   'you already imported a dynamite submodule?')
+        slepc4py.init(slepc_args)
+        self.initialized = True
+
+        # check that the number of processes is a factor of 2 (currently required)
+        from petsc4py import PETSc
+        mpi_size = PETSc.COMM_WORLD.size
+
+        if not mpi_size & (mpi_size-1):
+            raise RuntimeError('Number of MPI processes must be a factor of 2!')
 
     @property
     def global_L(self):
