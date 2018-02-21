@@ -12,6 +12,8 @@ from dynamite import config
 config.initialize(dnm_args)
 config.global_shell = True
 
+import random
+
 import dynamite.operators as do
 from dynamite.tools import build_state,vectonumpy
 from dynamite._utils import coeff_to_str
@@ -649,6 +651,7 @@ class Eigsolve(ut.TestCase):
 
 from dynamite.computations import reduced_density_matrix
 from dynamite.computations import entanglement_entropy
+from dynamite.computations import Renyi_entropy
 from petsc4py.PETSc import Vec
 
 # this test uses qutip to test the entanglement entropy computation
@@ -710,6 +713,38 @@ class Entropy(ut.TestCase):
 
                     r,msg = check_close(qtp_EE,dy_EE)
                     self.assertTrue(r,msg=msg)
+
+class Renyi_Entropy(ut.TestCase):
+    def setUp(self):
+
+        self.L = 8
+        self.cuts = [0,1,2,4,5,6,7]
+        self.states = OrderedDict([
+            ('product0',build_state(L=self.L)),
+            ('product1',
+             build_state(L=self.L,
+                         state=int(random.random()*(2**self.L)))),
+            ('random',build_state(L=self.L,state='random'))
+        ])
+
+
+    def test_Renyi(self):
+
+        for cut in self.cuts:
+            for name,state in self.states.items():
+                for n in range(2,4):
+                    with self.subTest(cut=cut,state=name):
+                        dy_Ry = Renyi_entropy(state, cut, n)
+
+                        ddm = reduced_density_matrix(state,cut)
+                        pis = np.linalg.eigvals(ddm)
+                        Renyi = 1.0/(1-n) * np.sum(pis**n)
+
+                        r,msg = check_close(Renyi,dy_Ry)
+                        self.assertTrue(r,msg=msg)
+                    
+        
+        
 
 class Save(ut.TestCase):
     def test_SaveAndLoad(self):
