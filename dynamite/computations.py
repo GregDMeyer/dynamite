@@ -338,11 +338,11 @@ def Renyi_entropy(v,cut_size, n):
         The entanglement entropy
     """
 
-    reduced = reduced_density_matrix(v,cut_size,fillall=False)
+    reduced = reduced_density_matrix(v,cut_size,fillall=True)
 
     if reduced is None or n <= 1:
         return -1
 
-    EE = (1.0/(1-n)) * np.trace( np.matrix_power(reduced, n) )
+    EE = (1.0/(1-n)) * np.trace( np.linalg.matrix_power(reduced, n) )
 
     return EE
