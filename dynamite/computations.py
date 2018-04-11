@@ -91,6 +91,18 @@ def evolve(H, state, t, result=None, **kwargs):
 
     mfn.solve(state.vec,result.vec)
 
+    conv = mfn.getConvergedReason()
+    if conv <= 0:
+        if conv == -1:
+            raise RuntimeError('solver reached maximum number of iterations without '
+                               'converging. perhaps try increasing the max iterations with '
+                               'the options to config.initialize ["-mfn_max_it","<maxits>"].')
+        elif conv == -2:
+            raise RuntimeError('solver failed to converge with MFN_DIVERGED_BREAKDOWN.')
+
+        else:
+            raise RuntimeError('solver failed to converge.')
+
     return result
 
 def eigsolve(H, getvecs=False, nev=1, which='smallest', target=None, tol=None, subspace=None):
