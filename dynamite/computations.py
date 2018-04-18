@@ -307,3 +307,78 @@ def entanglement_entropy(v,cut_size):
     EE = -np.sum(w * np.log(w,where=w>0))
 
     return EE
+
+def renyi_entropy(v, cut_size, n):
+    r"""
+    Compute the n-th Renyi entropy of a state across some cut on the
+    spin chain. It is defined as
+
+    .. math::
+        S_\text{Renyi} = \frac{1}{1-n} \ln\left( \text{Tr}\left[\rho^n\right] \right)
+
+    where :math:`n` is the order of the Renyi entropy requested,
+    and :math:`\rho` is the reduced density matrix obtained from tracing
+    out spins.
+
+    Currently, this quantity is computed entirely on process 0.
+    As a result, the function returns ``-1`` on all other processes.
+
+    Parameters
+    ----------
+
+    v : petsc4py.PETSc.Vec
+        A vector containing the state
+
+    cut_size : int
+        The number of spins on one side of the cut. To be precise,
+        the cut will be made between the spins at index ``cut_size-1``
+        and ``cut_size``.
+
+    n : int
+        The order of the Renyi entropy desired. Must be a positive integer > 1.
+
+    Returns
+    -------
+
+    float
+        The n-th Renyi entropy
+    """
+
+    reduced = reduced_density_matrix(v, cut_size, fillall=True)
+
+    # processor rank != 0
+    if reduced is None:
+        return -1
+
+    return dm_renyi_entropy(reduced, n)
+
+def dm_renyi_entropy(rho, n):
+    """
+    Compute the n-th Renyi entropy of a density matrix (see above for definition).
+
+    Currently, this quantity is computed entirely on process 0.
+    As a result, the function returns ``-1`` on all other processes.
+
+    Parameters
+    ----------
+
+    rho : np.array
+       The density matrix
+
+    n : int
+        The order of the Renyi entropy desired. Must be a positive integer > 1.
+
+    Returns
+    -------
+
+    float
+        The n-th Renyi entropy
+    """
+    # TODO: Implement for non-integer n using matrix diagonalization
+
+    if n <= 1:
+        raise ValueError('order of Renyi entropy must be >= 2.')
+
+    ent = (1.0/(1-n)) * np.log( np.trace( np.linalg.matrix_power(rho, n) ) ).real
+
+    return ent
