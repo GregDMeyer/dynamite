@@ -738,7 +738,7 @@ class Renyi_Entropy(ut.TestCase):
 
                         ddm = reduced_density_matrix(state,cut)
                         pis = np.linalg.eigvals(ddm)
-                        Renyi = 1.0/(1-n) * np.sum(pis**n)
+                        Renyi = 1.0/(1-n) * np.log( np.sum(pis**n) )
 
                         r,msg = check_close(Renyi,dy_Ry)
                         self.assertTrue(r,msg=msg)

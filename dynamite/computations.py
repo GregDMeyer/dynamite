@@ -355,6 +355,6 @@ def Renyi_entropy(v,cut_size, n):
     if reduced is None or n <= 1:
         return -1
 
-    EE = (1.0/(1-n)) * np.trace( np.linalg.matrix_power(reduced, n) )
+    EE = (1.0/(1-n)) * np.log( np.trace( np.linalg.matrix_power(reduced, n) ) )
 
     return EE
