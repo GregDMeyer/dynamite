@@ -714,38 +714,34 @@ class Entropy(ut.TestCase):
                     r,msg = check_close(qtp_EE,dy_EE)
                     self.assertTrue(r,msg=msg)
 
+                    
 class Renyi_Entropy(ut.TestCase):
-    def setUp(self):
-
-        self.L = 8
-        self.cuts = [0,1,2,4,5,6,7]
-        self.states = OrderedDict([
-            ('product0',build_state(L=self.L)),
-            ('product1',
-             build_state(L=self.L,
-                         state=int(random.random()*(2**self.L)))),
-            ('random',build_state(L=self.L,state='random'))
-        ])
-
 
     def test_Renyi(self):
 
-        for cut in self.cuts:
-            for name,state in self.states.items():
-                for n in range(2,4):
-                    with self.subTest(cut=cut,state=name):
-                        dy_Ry = Renyi_entropy(state, cut, n)
-
-                        ddm = reduced_density_matrix(state,cut)
-                        pis = np.linalg.eigvals(ddm)
-                        Renyi = 1.0/(1-n) * np.log( np.sum(pis**n) )
-
-                        r,msg = check_close(Renyi,dy_Ry)
-                        self.assertTrue(r,msg=msg)
-                    
+        np.random.seed(42)
         
-        
+        diag = np.random.rand(100)
+        diag /= np.sum(diag)
 
+        dm = np.diag( diag)
+        
+        for n in range(2,10):
+
+            Ren_sol = (1.0/(1-n)) * np.log(np.sum(diag**n))
+
+            # Pick a random unitary
+            H = np.random.randn( (100,100))
+            H = H + np.conj(H.T)
+            U = np.linalg.expm(-1j * H)
+
+            dm_transformed = U @ ( dm @ np.conj(U.T))
+            Ren = dm_renyi_entropy(dm_transformed, n)
+
+            r,msg = check_close( Ren, Ren_sol)
+            self.assertTrue(r,msg=msg)
+
+            
 class Save(ut.TestCase):
     def test_SaveAndLoad(self):
         H,n = Hamiltonians.longrange(7)

@@ -309,18 +309,17 @@ def entanglement_entropy(v,cut_size):
     return EE
 
 
-def Renyi_entropy(v,cut_size, n):
+def renyi_entropy(v,cut_size, n):
     """
     Compute the nth Reniy entropy of a state across some cut on the
     spin chain.
 
     Returns:
-        1/(1-n) ln( \sum_i Tr[rho^n] )
+        :math:`\frac{1}{1-n} \ln\left( \sum_i \text{Tr}\left[rho^n\right] \right)`
     where:
         - n  : the order of the Renyi entropy requested
         - rho: is the reduced density matrix derived from the cut-size
 
-    TODO: which side does cut-size cut from
     TODO: Implement for non-integer n using matrix diagonalization
 
     Currently, this quantity is computed entirely on process 0.
@@ -347,7 +346,7 @@ def Renyi_entropy(v,cut_size, n):
     -------
 
     float
-        The entanglement entropy
+        The n-th Renyi entropy
     """
 
     reduced = reduced_density_matrix(v,cut_size,fillall=True)
@@ -355,6 +354,46 @@ def Renyi_entropy(v,cut_size, n):
     if reduced is None or n <= 1:
         return -1
 
+    return dm_renyi_entropy(reduced, n)
+
+
+
+def dm_renyi_entropy(reduced, n):
+
+    """
+    Compute the nth Reniy entropy of density matrix
+
+    Returns:
+        :math:`\frac{1}{1-n} \ln\left( \sum_i \text{Tr}\left[rho^n\right] \right)`
+    where:
+        - n  : the order of the Renyi entropy requested
+        - rho: is the reduced density matrix
+
+    TODO: Implement for non-integer n using matrix diagonalization
+
+    Currently, this quantity is computed entirely on process 0.
+    As a result, the function returns ``-1`` on all other processes.
+    Ideally, at some point a parallelized dense matrix solver will
+    be used in this computation.
+
+    Parameters
+    ----------
+
+    reduced: np.array
+       The reduced density matrix of the system
+
+    n : int
+        The order of the Renyi entropy desired.
+        Needs to be a positive integer > 1. Otherwise -1 is returned
+
+    Returns
+    -------
+
+    float
+        The n-th Renyi entropy
+    """
+
+    
     EE = (1.0/(1-n)) * np.log( np.trace( np.linalg.matrix_power(reduced, n) ) )
 
     return EE
