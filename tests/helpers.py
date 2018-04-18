@@ -115,10 +115,19 @@ def _allclose(a,b):
     return r,msg
 
 def _close(a,b,tol):
+    
     msg = ''
+
+    # check that they are within tolerance
     r = abs(a-b) < tol
     if not r:
-        msg += '%f and %f not within tolerance %f' % (a,b,tol)
+        msg += '%f and %f not within tolerance %f\n' % (a,b,tol)
+
+    # check that they are either both complex or both real
+    r = r and not ((a.imag == 0) != (b.imag == 0))
+    if not r:
+        msg += 'comparison of real to complex\n'
+        
     return r,msg
 
 def _vector_checks(d,n,max_nrm):

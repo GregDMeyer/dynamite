@@ -12,11 +12,14 @@ from dynamite import config
 config.initialize(dnm_args)
 config.global_shell = True
 
+import random
+
 import dynamite.operators as do
 from dynamite.tools import build_state,vectonumpy
 from dynamite._utils import coeff_to_str
 from dynamite.extras import commutator, Majorana
 import numpy as np
+import scipy
 from petsc4py.PETSc import Sys,NormType,COMM_WORLD
 Print = Sys.Print
 
@@ -710,6 +713,55 @@ class Entropy(ut.TestCase):
 
                     r,msg = check_close(qtp_EE,dy_EE)
                     self.assertTrue(r,msg=msg)
+
+from dynamite.computations import dm_renyi_entropy
+
+class Renyi(ut.TestCase):
+
+    '''
+    For this test, we start with a diagonal density matrix, compute the Renyi entropy
+    (which is easy because it's diagonal), then rotate it, and make sure dynamite still
+    gets the right answer.
+    '''
+
+    def test_random(self):
+        np.random.seed(42)
+        diag = np.random.rand(100)
+        diag /= np.sum(diag)
+        self.check_renyi(diag)
+
+    def test_pure(self):
+        diag = np.zeros(100)
+        diag[0] = 1
+        self.check_renyi(diag)
+
+    def test_decaying(self):
+        diag = np.arange(1, 100)
+        diag = 1/diag
+        diag /= np.sum(diag)
+        self.check_renyi(diag)
+
+    def check_renyi(self, diag):
+
+        dm = np.diag(diag)
+
+        for n in range(2,10):
+
+            ren_sol = (1.0/(1-n)) * np.log(np.sum(diag**n))
+
+            # Pick a random unitary, to rotate our density matrix by
+            H = np.random.randn(diag.size, diag.size) + 1j * np.random.randn(diag.size, diag.size)
+            H = H + np.conj(H.T)
+            U = scipy.linalg.expm(-1j * H)
+
+            # it would be nice to use the @ operator, but we use
+            # np.array.dot() to be compatible with python 3.[<5]
+            dm_transformed = U.dot(dm.dot(np.conj(U.T)))
+            ren = dm_renyi_entropy(dm_transformed, n)
+
+            r,msg = check_close(ren, ren_sol)
+            self.assertTrue(r,msg=msg)
+
 
 class Save(ut.TestCase):
     def test_SaveAndLoad(self):
