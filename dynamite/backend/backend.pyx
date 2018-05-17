@@ -76,6 +76,9 @@ class SubspaceType:
     FULL = _FULL
     PARITY = _PARITY
 
+def get_build_version():
+    return DNM_VERSION
+
 @cython.boundscheck(False)
 @cython.wraparound(False)
 def build_mat(int L,

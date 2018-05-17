@@ -2,3 +2,5 @@ __pycache__
 htmlcov
 .coverage
 notes
+build
+dynamite.egg-info

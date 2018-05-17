@@ -1,8 +1,8 @@
 
 import os
-from os.path import join,dirname
+from os.path import join, dirname, realpath
 from sys import version
-from subprocess import check_output, CalledProcessError
+from subprocess import check_output
 from setuptools import setup, Extension
 from setuptools.command.build_ext import build_ext
 from shutil import which
@@ -18,10 +18,14 @@ if version[0] != '3':
 
 HAVE_NVCC = which('nvcc') is not None
 
-# also write a .pxi that tells the backend
-# to include the CUDA shell functionality
-with open(join(dirname(__file__), 'dynamite', 'backend', 'config.pxi'), 'w') as fd:
-    fd.write('DEF USE_CUDA = %d\n' % int(HAVE_NVCC))
+# write a .pxi that defines constants for the backend
+with open(join(dirname(__file__), 'dynamite', 'backend', 'config.pxi'), 'w') as f:
+    f.write('DEF USE_CUDA = %d\n' % int(HAVE_NVCC))
+
+    dnm_version = check_output(['git', 'describe', '--always'],
+                               cwd = dirname(realpath(__file__)),
+                               universal_newlines = True).strip()
+    f.write('DEF DNM_VERSION = "%s"\n' % dnm_version)
 
 def configure():
 

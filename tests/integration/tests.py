@@ -793,6 +793,21 @@ class Extras(ut.TestCase):
     def test_commutator(self):
         self.assertEqual(commutator(do.Sigmax(),do.Sigmay()),2j*do.Sigmaz())
 
+from dynamite.tools import get_version, get_version_str
+class Versioning(ut.TestCase):
+    # make sure this returns something sane
+    def test_gv(self):
+        info = get_version()
+        for k in ['PETSc', 'SLEPc', 'dynamite']:
+            self.assertTrue(k in info)
+
+        self.assertTrue(info['dynamite'] != '')
+
+    def test_gv_str(self):
+        r = get_version_str()
+        self.assertTrue(isinstance(r, str))
+        self.assertLess(0, len(r))
+
 from dynamite.tools import track_memory,get_max_memory_usage,get_cur_memory_usage
 class Benchmarking(ut.TestCase):
 

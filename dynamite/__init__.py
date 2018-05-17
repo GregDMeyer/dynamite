@@ -52,9 +52,9 @@ class _Config:
 
         # check that the number of processes is a factor of 2 (currently required)
         from petsc4py import PETSc
-        mpi_size = PETSc.COMM_WORLD.size
+        mpi_size = int(PETSc.COMM_WORLD.size)  # this cast is needed for MagicMock
 
-        if not mpi_size & (mpi_size-1):
+        if mpi_size > 1 and not mpi_size & (mpi_size-1):
             raise RuntimeError('Number of MPI processes must be a factor of 2!')
 
     @property
@@ -145,8 +145,8 @@ class _Config:
     def info_level(self):
         """
         How verbose to output debug information. Default is 0. Currently, options are:
-         0 : no information output about execution
-         1 : all debug information printed
+        0 - no information output about execution
+        1 - all debug information printed
         """
         return self._info_level
 

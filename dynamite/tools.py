@@ -3,18 +3,58 @@ from . import config
 config.initialize()
 
 import numpy as np
-from slepc4py import SLEPc
 from petsc4py import PETSc
-
-from os import urandom
+from slepc4py import SLEPc
 
 from .backend import backend
 
 __all__ = [
+    'get_version',
+    'get_version_str',
     'vectonumpy',
     'track_memory',
     'get_max_memory_usage',
     'get_cur_memory_usage']
+
+def get_version():
+    '''
+    Gets the version information for dynamite, and the PETSc and SLEPc libraries it's built on.
+
+    Returns
+    -------
+
+    dict
+        A dictionary with the keys 'PETSc', 'SLEPc', and 'dynamite', each of which contains version
+        information for the respective library.
+    '''
+
+    rtn = {}
+    rtn['PETSc'] = PETSc.Sys.getVersionInfo()
+    rtn['SLEPc'] = SLEPc.Sys.getVersionInfo()
+    rtn['dynamite'] = backend.get_build_version()
+    return rtn
+
+def get_version_str():
+    '''
+    Get a string with the version information for PETSc, SLEPc, and dynamite.
+
+    Returns
+    -------
+
+    str
+        The version string
+    '''
+
+    info = get_version()
+
+    rtn = 'dynamite commit {dnm_v} built with PETSc {PETSc_v} and SLEPc {SLEPc_v}'
+    rtn = rtn.format(
+        dnm_v = info['dynamite'],
+        PETSc_v = '.'.join([str(info['PETSc'][k]) for k in ['major', 'minor', 'subminor']]),
+        SLEPc_v = '.'.join([str(info['SLEPc'][k]) for k in ['major', 'minor', 'subminor']]),
+    )
+
+    return rtn
 
 def vectonumpy(v,toall=False):
     '''
