@@ -31,7 +31,9 @@ def get_version():
     rtn = {}
     rtn['PETSc'] = PETSc.Sys.getVersionInfo()
     rtn['SLEPc'] = SLEPc.Sys.getVersionInfo()
-    rtn['dynamite'] = backend.get_build_version()
+    rtn['dynamite'] = {}
+    rtn['dynamite']['commit'] = backend.get_build_version()
+    rtn['dynamite']['branch'] = backend.get_build_branch()
     return rtn
 
 def get_version_str():
@@ -47,9 +49,11 @@ def get_version_str():
 
     info = get_version()
 
-    rtn = 'dynamite commit {dnm_v} built with PETSc {PETSc_v} and SLEPc {SLEPc_v}'
+    rtn = 'dynamite commit {dnm_v} on branch "{dnm_branch}" ' +\
+          'built with PETSc {PETSc_v} and SLEPc {SLEPc_v}'
     rtn = rtn.format(
-        dnm_v = info['dynamite'],
+        dnm_v = info['dynamite']['commit'],
+        dnm_branch = info['dynamite']['branch'],
         PETSc_v = '.'.join([str(info['PETSc'][k]) for k in ['major', 'minor', 'subminor']]),
         SLEPc_v = '.'.join([str(info['SLEPc'][k]) for k in ['major', 'minor', 'subminor']]),
     )

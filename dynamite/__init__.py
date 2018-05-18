@@ -57,6 +57,30 @@ class _Config:
         if mpi_size > 1 and not mpi_size & (mpi_size-1):
             raise RuntimeError('Number of MPI processes must be a factor of 2!')
 
+        # check for a new version of dynamite
+        from .backend import backend
+        from urllib import request, error
+        import json
+
+        branch = backend.get_build_branch()
+        url = 'https://api.github.com/repos/GregDMeyer/dynamite/git/refs/heads/{branch}'
+        url = url.format(branch = branch)
+
+        try:
+            with request.urlopen(url, timeout=1) as url_req:
+                data = json.load(url_req)
+                commit = data['object']['sha']
+
+            build_commit = backend.get_build_version()
+            if not commit.startswith(build_commit):
+                print('Changes have been pushed to GitHub since dynamite was installed. '
+                      'Please update!')
+
+        # in general, catching all exceptions is a bad idea. but here, no matter
+        # what happens we just want to give up on the check
+        except (error.URLError, error.HTTPError):
+            pass
+
     @property
     def global_L(self):
         raise TypeError('config.global_L has been changed to config.L, please use that instead.')

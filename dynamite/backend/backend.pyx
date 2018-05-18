@@ -79,6 +79,9 @@ class SubspaceType:
 def get_build_version():
     return DNM_VERSION
 
+def get_build_branch():
+    return DNM_BRANCH
+
 @cython.boundscheck(False)
 @cython.wraparound(False)
 def build_mat(int L,

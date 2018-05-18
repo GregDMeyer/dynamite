@@ -27,6 +27,11 @@ with open(join(dirname(__file__), 'dynamite', 'backend', 'config.pxi'), 'w') as 
                                universal_newlines = True).strip()
     f.write('DEF DNM_VERSION = "%s"\n' % dnm_version)
 
+    dnm_version = check_output(['git', 'rev-parse', '--abbrev-ref', 'HEAD'],
+                               cwd = dirname(realpath(__file__)),
+                               universal_newlines = True).strip()
+    f.write('DEF DNM_BRANCH = "%s"\n' % dnm_version)
+
 def configure():
 
     if any(e not in os.environ for e in ['PETSC_DIR','PETSC_ARCH','SLEPC_DIR']):
