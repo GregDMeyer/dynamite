@@ -21,7 +21,7 @@ PetscErrorCode BuildMat_CUDAShell(PetscInt L,PetscInt nterms,PetscInt* masks,Pet
   ierr = MatCreateShell(PETSC_COMM_WORLD,n,n,N,N,ctx,A);CHKERRQ(ierr);
   ierr = MatShellSetOperation(*A,MATOP_MULT,(void(*)(void))MatMult_CUDAShell);
   ierr = MatShellSetOperation(*A,MATOP_NORM,(void(*)(void))MatNorm_CUDAShell);
-  ierr = MatShellSetOperation(*A,MATOP_GET_VECS,(void(*)(void))MatCreateVecs_CUDAShell);
+  ierr = MatShellSetOperation(*A,MATOP_CREATE_VECS,(void(*)(void))MatCreateVecs_CUDAShell);
 
   return ierr;
 }
