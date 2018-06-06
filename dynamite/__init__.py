@@ -68,7 +68,11 @@ class _Config:
 
         try:
             with request.urlopen(url, timeout=1) as url_req:
-                data = json.load(url_req)
+                try:
+                    data = json.load(url_req)
+                except TypeError: # python < 3.6
+                    data = json.loads(url_req.readall().decode('utf-8'))
+
                 commit = data['object']['sha']
 
             build_commit = backend.get_build_version()
@@ -78,7 +82,7 @@ class _Config:
 
         # in general, catching all exceptions is a bad idea. but here, no matter
         # what happens we just want to give up on the check
-        except (error.URLError, error.HTTPError):
+        except:
             pass
 
     @property
