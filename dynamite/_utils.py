@@ -114,3 +114,13 @@ def estimate_compute_time(t,ncv,nrm,tol=1E-7):
     tstep = get_tstep(ncv,nrm,tol)
     iters = np.ceil(t/tstep)
     return ncv*iters
+
+def popcount(x):
+    '''
+    Compute the number of 1 bits set in x.
+    '''
+    count = 0
+    while x:
+        count += 1
+        x &= x-1
+    return count

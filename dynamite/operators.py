@@ -24,6 +24,7 @@ from .computations import evolve, eigsolve
 from .subspace import class_to_enum
 from .states import State
 from ._imports import get_import
+from . import _utils
 from ._utils import condense_terms,coeff_to_str,MSC_matrix_product
 
 # this will be serial_backend eventually
@@ -529,6 +530,77 @@ class Operator:
 
     def _get_MSC(self):
         raise NotImplementedError()
+
+    ### interface to numpy
+
+    @classmethod
+    def _MSC_to_numpy(cls, MSC, dims, idx_to_state = None, state_to_idx = None):
+        '''
+        Build a NumPy array from an MSC array. This method isolates to_numpy
+        from the rest of the class for testing. It also defines the MSC
+        representation.
+
+        Parameters
+        ----------
+
+        MSC : np.ndarray(dtype = MSC_dtype)
+            An MSC array.
+
+        dims : (int, int)
+            The dimensions (M, N) of the matrix.
+
+        idx_to_state : function(int), optional
+            If working in a subspace, a function to map indices to states for
+            the *left* subspace.
+
+        state_to_idx : function(int), optional
+            If working in a subspace, a function to map states to indices for
+            the *right* subspace.
+
+        Returns
+        -------
+
+        np.ndarray(dtype = np.complex128)
+            A 2-D NumPy array which stores the matrix.
+        '''
+
+        ary = np.zeros(dims, dtype = np.complex128)
+
+        # if these aren't supplied, they are the identity
+        if idx_to_state is None:
+            idx_to_state = lambda x: x
+
+        if state_to_idx is None:
+            state_to_idx = lambda x: x
+
+        for idx in range(dims[0]):
+            bra = idx_to_state(idx)
+            for m,s,c in MSC:
+                ket = m ^ bra
+                ridx = state_to_idx(ket)
+                if ridx is not None: # otherwise we went out of the subspace
+                    sign = 1 - 2*(_utils.popcount(s & ket) % 2)
+                    ary[idx, ridx] += sign * c
+
+        return ary
+
+    def to_numpy(self):
+        '''
+        Get a dense NumPy array representing the operator.
+
+        Returns
+        -------
+
+        np.ndarray(dtype = np.complex128)
+            The array.
+        '''
+
+        ary = self._MSC_to_numpy(self.get_MSC(),
+                                 (self.left_subspace.dim, self.right_subspace.dim),
+                                 self.left_subspace.idx_to_state,
+                                 self.right_subspace.state_to_idx)
+
+        return ary
 
     ### unary and binary operations
 
