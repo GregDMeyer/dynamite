@@ -1,0 +1,6 @@
+numpy
+scipy
+cython
+petsc4py
+slepc4py
+mpi4py
