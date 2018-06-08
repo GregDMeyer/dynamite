@@ -92,15 +92,36 @@ def extensions():
 class MakeBuildExt(build_ext):
     def run(self):
         # build the backend_impl.o object file
-        make = check_output(['make','backend_impl.o'],cwd='dynamite/backend')
+        make = check_output(['make','backend_impl.o'], cwd='dynamite/backend')
         print(make.decode())
 
         # if we have nvcc, build the CUDA backend
         if HAVE_NVCC:
-            make = check_output(['make','cuda_shell.o'],cwd='dynamite/backend')
+            make = check_output(['make','cuda_shell.o'], cwd='dynamite/backend')
             print(make.decode())
 
-        build_ext.run(self)
+        # get the correct compiler from SLEPc
+        # there is probably a more elegant way to do this
+        makefile = 'include ${SLEPC_DIR}/lib/slepc/conf/slepc_common\n' + \
+                   'print_compiler:\n\t$(CC)'
+        CC = check_output(['make', '-n', '-f', '-', 'print_compiler'],
+                          input = makefile, encoding = 'utf-8')
+
+        if 'CC' in os.environ:
+            _old_CC = os.environ['CC']
+        else:
+            _old_CC = None
+
+        os.environ['CC'] = CC
+
+        try:
+            build_ext.run(self)
+        finally:
+            # set CC back to its old value
+            if _old_CC is not None:
+                os.environ['CC'] = _old_CC
+            else:
+                os.environ.pop('CC')
 
 setup(
     name = "dynamite",
