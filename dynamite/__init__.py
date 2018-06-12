@@ -54,12 +54,12 @@ class _Config:
         from petsc4py import PETSc
         mpi_size = int(PETSc.COMM_WORLD.size)  # this cast is needed for MagicMock
 
-        if mpi_size > 1 and not mpi_size & (mpi_size-1):
+        if mpi_size & (mpi_size-1) != 0:
             raise RuntimeError('Number of MPI processes must be a factor of 2!')
 
         # check for a new version of dynamite
         from .backend import backend
-        from urllib import request, error
+        from urllib import request
         import json
 
         branch = backend.get_build_branch()
