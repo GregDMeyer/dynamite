@@ -32,7 +32,8 @@ class ToNumpy(ut.TestCase):
         Helper function to check that dynamite and numpy arrays are equal, and
         print the differences if not.
         '''
-        self.assertTrue(np.all(dnm == npy), msg = '\n\n'.join(['\ndnm:\n'+str(dnm), '\nnpy:\n'+str(npy)]))
+        self.assertTrue(np.all(dnm == npy),
+                        msg = '\n\n'.join(['\ndnm:\n'+str(dnm), '\nnpy:\n'+str(npy)]))
 
     def test_identity(self):
         dnm = Operator._MSC_to_numpy([(0, 0, 1)], (5,5))
@@ -143,6 +144,76 @@ class ToNumpy(ut.TestCase):
             ]
         )
         self.check_same(dnm, npy)
+
+class Serialization(ut.TestCase):
+    '''
+    Test the Operator._serialize and Operator._deserialize methods.
+    '''
+
+    def setUp(self):
+        dtype32 = np.dtype([('masks', np.int32),
+                            ('signs', np.int32),
+                            ('coeffs', np.complex128)])
+        dtype64 = np.dtype([('masks', np.int64),
+                            ('signs', np.int64),
+                            ('coeffs', np.complex128)])
+
+        self.test_cases = [
+            {
+                'L' : 20,
+                'MSC' : np.array([(1, 5, -0.2j), (0, 1, 2)],
+                                 dtype = dtype32.newbyteorder('B')),
+                'serial' : b'20\n2\n32\n' + \
+                           b'\x00\x00\x00\x01\x00\x00\x00\x00' + \
+                           b'\x00\x00\x00\x05\x00\x00\x00\x01' + \
+                           b'\x80\x00\x00\x00\x00\x00\x00\x00\xbf\xc9\x99\x99\x99\x99\x99\x9a' + \
+                           b'@\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00',
+            },
+            {
+                'L' : 20,
+                'MSC' : np.array([(1, 5, -0.2j), (0, 1, 2)],
+                                 dtype = dtype32.newbyteorder('L')),
+                'serial' : b'20\n2\n32\n' + \
+                           b'\x00\x00\x00\x01\x00\x00\x00\x00' + \
+                           b'\x00\x00\x00\x05\x00\x00\x00\x01' + \
+                           b'\x80\x00\x00\x00\x00\x00\x00\x00\xbf\xc9\x99\x99\x99\x99\x99\x9a' + \
+                           b'@\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00',
+            },
+            {
+                'L' : 20,
+                'MSC' : np.array([(1, 5, -0.2j), (0, 1, 2)],
+                                 dtype = dtype64.newbyteorder('B')),
+                'serial' : b'20\n2\n64\n' + \
+                           b'\x00\x00\x00\x00\x00\x00\x00\x01\x00\x00\x00\x00\x00\x00\x00\x00' + \
+                           b'\x00\x00\x00\x00\x00\x00\x00\x05\x00\x00\x00\x00\x00\x00\x00\x01' + \
+                           b'\x80\x00\x00\x00\x00\x00\x00\x00\xbf\xc9\x99\x99\x99\x99\x99\x9a' + \
+                           b'@\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00',
+            },
+            {
+                'L' : 20,
+                'MSC' : np.array([(1, 5, -0.2j), (0, 1, 2)],
+                                 dtype = dtype64.newbyteorder('L')),
+                'serial' : b'20\n2\n64\n' + \
+                           b'\x00\x00\x00\x00\x00\x00\x00\x01\x00\x00\x00\x00\x00\x00\x00\x00' + \
+                           b'\x00\x00\x00\x00\x00\x00\x00\x05\x00\x00\x00\x00\x00\x00\x00\x01' + \
+                           b'\x80\x00\x00\x00\x00\x00\x00\x00\xbf\xc9\x99\x99\x99\x99\x99\x9a' + \
+                           b'@\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00',
+            }
+        ]
+
+    def test_serialize(self):
+        for n, case in enumerate(self.test_cases):
+            with self.subTest(n = n):
+                ser = Operator._serialize(case['L'], case['MSC'])
+                self.assertEqual(ser, case['serial'])
+
+    def test_deserialize(self):
+        for n, case in enumerate(self.test_cases):
+            with self.subTest(n = n):
+                L, MSC = Operator._deserialize(case['serial'])
+                self.assertEqual(L, case['L'])
+                self.assertTrue(np.all(MSC == case['MSC']),
+                                msg = '\n'+'\n\n'.join([str(MSC), str(case['MSC'])]))
 
 if __name__ == '__main__':
     ut.main()

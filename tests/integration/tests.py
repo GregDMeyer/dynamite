@@ -3,7 +3,6 @@ import unittest as ut
 
 from itertools import product
 from collections import OrderedDict
-from tempfile import TemporaryFile
 from os import remove
 
 slepc_args = []
@@ -18,7 +17,6 @@ config.initialize(slepc_args)
 config.shell = False
 
 import dynamite.operators as do
-from dynamite.tools import vectonumpy
 from dynamite.states import State
 from dynamite._utils import coeff_to_str
 from dynamite.extras import commutator, Majorana
@@ -731,24 +729,13 @@ class Save(ut.TestCase):
             H.save(f)
 
         with self.subTest(m='load_str'):
-            Hf = do.Load(f)
+            Hf = do.load_from_file(f)
             self.assertEqual(H,Hf)
 
             # also make sure that the generated PETSc matrix
             # works
             r,msg = check_dnm_np(Hf,n)
             self.assertTrue(r,msg=msg)
-
-        with self.subTest(m='load_file'):
-
-            with open(f,'rb') as fd:
-                Hf = do.Load(fd)
-                self.assertEqual(H,Hf)
-
-                # also make sure that the generated PETSc matrix
-                # works
-                r,msg = check_dnm_np(Hf,n)
-                self.assertTrue(r,msg=msg)
 
         COMM_WORLD.barrier()
         if COMM_WORLD.rank == 0:

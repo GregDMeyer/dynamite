@@ -63,7 +63,7 @@ class Operator:
 
     ### computations
 
-    def evolve(self,state,t,**kwargs):
+    def evolve(self, state, t, **kwargs):
         """
         Evolve a state under the Hamiltonian. If the Hamiltonian's chain length has not
         been set, attempts to set it based on the state's length.
@@ -93,9 +93,9 @@ class Operator:
         if self.L is None:
             self.L = state.L
 
-        return evolve(self,state,t,**kwargs)
+        return evolve(self, state, t, **kwargs)
 
-    def eigsolve(self,**kwargs):
+    def eigsolve(self, **kwargs):
         """
         Find eigenvalues (and eigenvectors if requested) of the Hamiltonian. This class
         method is a wrapper on :meth:`dynamite.computations.eigsolve`. Any keyword
@@ -112,7 +112,7 @@ class Operator:
             Either a 1D numpy array of eigenvalues, or a pair containing that array
             and a list of the corresponding eigenvectors.
         """
-        return eigsolve(self,**kwargs)
+        return eigsolve(self, **kwargs)
 
     ### properties
 
@@ -125,14 +125,14 @@ class Operator:
         return self._L
 
     @L.setter
-    def L(self,value):
+    def L(self, value):
 
         if value is not None:
             value = validate.L(value)
 
             if value < self.min_length:
                 raise ValueError('Length %d too short--non-identity'
-                                 'operator on index %d' % (value,self.min_length-1))
+                                 'operator on index %d' % (value, self.min_length-1))
 
         self.destroy_mat()
         self._MSC = None
@@ -145,7 +145,7 @@ class Operator:
         # propagate L down the tree of operators
         self._prop_L(value)
 
-    def _prop_L(self,L):
+    def _prop_L(self, L):
         raise NotImplementedError()
 
     @property
@@ -201,14 +201,6 @@ class Operator:
         self._shell = value
 
     @property
-    def use_shell(self):
-        raise TypeError('Operator.use_shell is deprecated, use Operator.shell instead.')
-
-    @use_shell.setter
-    def use_shell(self,value):
-        raise TypeError('Operator.use_shell is deprecated, use Operator.shell instead.')
-
-    @property
     def left_subspace(self):
         """
         The subspace of "bra" states--in other words, states that
@@ -238,21 +230,21 @@ class Operator:
         return self._left_subspace
 
     @left_subspace.setter
-    def left_subspace(self,s):
+    def left_subspace(self, s):
         validate.subspace(s)
         s.L = self.L
-        s.update_operator('left',self)
+        s.update_operator('left', self)
         self._left_subspace = s
 
     @right_subspace.setter
-    def right_subspace(self,s):
+    def right_subspace(self, s):
         validate.subspace(s)
         s.L = self.L
-        s.update_operator('right',self)
+        s.update_operator('right', self)
         self._right_subspace = s
 
     @subspace.setter
-    def subspace(self,s):
+    def subspace(self, s):
         self.left_subspace = s
         self.right_subspace = s
 
@@ -273,6 +265,8 @@ class Operator:
         # the only thing we really don't want to copy is the PETSc matrix in the
         # backend. so we just temporarily make that not part of the operator!
 
+        # TODO: this makes me uncomfortable. figure out a better way.
+
         tmp_mat = self._mat
         self._mat = None
         c = deepcopy(self)
@@ -281,7 +275,129 @@ class Operator:
 
     ### save to disk
 
-    def save(self,fout):
+    @classmethod
+    def _serialize(cls, L, MSC):
+        '''
+        Take an MSC representation and spin chain length and serialize it into a
+        byte string.
+
+        The format is
+        `L nterms int_size masks signs coefficients`
+        where `L`, `nterms`, and `int_size` are utf-8 text, including newlines, and the others
+        are each just a binary blob, one after the other. `int_size` is an integer representing
+        the size of the int data type used (32 or 64 bits).
+
+        Binary values are saved in big-endian format, to be compatible with PETSc defaults.
+
+        This function isolates serialization from the rest of the Operator class
+        for testing.
+
+        Parameters
+        ----------
+        L : int
+            The spin chain length
+
+        MSC : np.array
+            The MSC representation
+
+        Returns
+        -------
+        bytes
+            A byte string containing the serialized operator.
+        '''
+
+        rtn = b''
+
+        rtn += (str(L)+'\n').encode('utf-8')
+        rtn += (str(MSC.size)+'\n').encode('utf-8')
+        rtn += (str(MSC.dtype['masks'].itemsize*8)+'\n').encode('utf-8')
+
+        int_t = MSC.dtype[0].newbyteorder('B')
+        cplx_t = np.dtype(np.complex128).newbyteorder('B')
+        rtn += MSC['masks'].astype(int_t, casting='equiv', copy=False).tobytes()
+        rtn += MSC['signs'].astype(int_t, casting='equiv', copy=False).tobytes()
+        rtn += MSC['coeffs'].astype(cplx_t, casting='equiv', copy=False).tobytes()
+
+        return rtn
+
+    @classmethod
+    def _deserialize(cls, data):
+        '''
+        Reverse the _serialize operation.
+
+        This function isolates deserialization from the rest of the Operator class
+        for testing.
+
+        Parameters
+        ----------
+        data : bytes
+            The byte string containing the serialized data.
+
+        Returns
+        -------
+        tuple(int, np.ndarray)
+            A tuple of the form (L, MSC)
+        '''
+
+        stop = data.find(b'\n')
+        L = int(data[:stop])
+
+        start = stop + 1
+        stop = data.find(b'\n', start)
+        MSC_size = int(data[start:stop])
+
+        start = stop + 1
+        stop = data.find(b'\n', start)
+        int_size = int(data[start:stop])
+        if int_size == 32:
+            int_t = np.int32
+        elif int_size == 64:
+            int_t = np.int64
+        else:
+            raise ValueError('Invalid int_size. Perhaps file is corrupt.')
+
+        dt = np.dtype([
+            ('masks', int_t),
+            ('signs', int_t),
+            ('coeffs', np.complex128)
+        ])
+        MSC = np.ndarray(MSC_size, dtype = dt)
+
+        # TODO: can I do this without making a copy in the calls to np.frombuffer?
+        mv = memoryview(data)
+        start = stop + 1
+        int_MSC_bytes = MSC_size * int_size // 8
+
+        MSC['masks'] = np.frombuffer(mv[start:start+int_MSC_bytes],
+                                     dtype = np.dtype(int_t).newbyteorder('B'))
+        start += int_MSC_bytes
+        MSC['signs'] = np.frombuffer(mv[start:start+int_MSC_bytes],
+                                     dtype = np.dtype(int_t).newbyteorder('B'))
+        start += int_MSC_bytes
+        MSC['coeffs'] = np.frombuffer(mv[start:],
+                                      dtype = np.dtype(np.complex128).newbyteorder('B'))
+
+        return L, MSC
+
+    def serialize(self):
+        '''
+        Serialize the operator's MSC representation into a string of bytes.
+        The byte string ONLY contains the MSC representation and the spin chain
+        length. It does not save any other information, such as subspaces etc.
+
+        Returns
+        -------
+        bytes
+            The byte string containing the serialized object.
+
+        '''
+        if self.L is None:
+            raise ValueError('L must be set before serializing.')
+
+        MSC = self.get_MSC()
+        return self._serialize(self.L, MSC)
+
+    def save(self, filename):
         """
         Save the MSC representation of the operator to disk.
         Can be loaded again through :class:`Load`.
@@ -292,7 +408,7 @@ class Operator:
 
         Parameters
         ----------
-        fout : str
+        filename : str
             The path to the file to save the operator in.
         """
 
@@ -305,34 +421,8 @@ class Operator:
 
         # only process 0 should save
         if do_save:
-
-            # The file format is:
-            # L,nterms,masks,signs,coefficients
-            # where each is just a binary blob, one after the other.
-
-            # values are saved in big-endian format, to be compatible with PETSc defaults
-
-            if self.L is None:
-                raise ValueError('L must be set before saving to disk.')
-
-            msc = self.get_MSC()
-
-            with open(fout,mode='wb') as f:
-
-                # cast it to the type that C will be looking for
-                int_t = msc.dtype[0].newbyteorder('>')
-                complex_t = msc.dtype[2].newbyteorder('>')
-
-                L = np.array(self.L,dtype=int_t)
-                f.write(L.tobytes())
-
-                # write out the length of the MSC representation
-                size = np.array(msc.size,dtype=int_t)
-                f.write(size.tobytes())
-
-                f.write(msc['masks'].astype(int_t,casting='equiv',copy=False).tobytes())
-                f.write(msc['signs'].astype(int_t,casting='equiv',copy=False).tobytes())
-                f.write(msc['coeffs'].astype(complex_t,casting='equiv',copy=False).tobytes())
+            with open(filename, mode='wb') as f:
+                f.write(self.serialize())
 
         if config.initialized:
             PETSc.COMM_WORLD.barrier()
@@ -680,63 +770,58 @@ class Operator:
         # deletion.
         self.destroy_mat()
 
-class Load(Operator):
-    """
-    Class for operator loaded from memory.
-    Only the MSC representation of the operator
-    is saved.
-
-    Files should be created with the :meth:`Operator.save`
-    method.
+def load_from_file(filename):
+    '''
+    Load the operator in file ``filename`` and return the corresponding object.
 
     Parameters
     ----------
-    fin : str or file object
-        The file from which to load the operator.
+    filename : str
+        The path of the file to load.
+
+    Returns
+    -------
+    dynamite.operators.Load
+        The operator as a dynamite object.
+    '''
+    with open(filename, 'rb') as f:
+        bytestring = f.read()
+        op = Load(bytestring)
+    return op
+
+class Load(Operator):
     """
-    def __init__(self,fin):
+    Class for operator loaded from a byte string.
+    Only the MSC representation of the operator
+    is saved.
+
+    Byte strings should be created with the :meth:`Operator.serialize`
+    method. This class can also be used to load from file through the
+    :meth:`dynamite.operators.load_from_file` method.
+
+    Parameters
+    ----------
+    data : bytes
+        The byte string containing the serialized object.
+    """
+
+    _prop_L = None
+
+    def __init__(self, data):
         self._prop_L = lambda self,value=None: None
         Operator.__init__(self)
-
-        if isinstance(fin,str):
-            with open(fin,mode='rb') as f:
-                self._load(f)
-            self.filename = fin
-        else:
-            self._load(fin)
-            self.filename = None
-
+        L, MSC = self._deserialize(data)
+        self._L = L
+        self._MSC = MSC
         self._prop_L = self._postinit_prop_L
 
-    def _load(self,f):
-        # figure out the datatype for int
-        # TODO: should save data type along with msc representation
-        int_t = backend.MSC_dtype[0].newbyteorder('>')
-        complex_t = backend.MSC_dtype[2].newbyteorder('>')
-        int_size = int_t.itemsize
-
-        self.L = int(np.fromstring(f.read(int_size),dtype=int_t))
-        msc_size = int(np.fromstring(f.read(int_size),dtype=int_t))
-
-        self._MSC = np.ndarray(msc_size,dtype=backend.MSC_dtype)
-
-        self._MSC['masks'] = np.fromstring(f.read(int_size*msc_size),dtype=int_t)
-        self._MSC['signs'] = np.fromstring(f.read(int_size*msc_size),dtype=int_t)
-        self._MSC['coeffs'] = np.fromstring(f.read(complex_t.itemsize*msc_size),dtype=complex_t)
-
-    def _postinit_prop_L(self,value):
-        raise TypeError('Cannot set L for operator loaded from file. Value from file: L=%d'%self.L)
+    def _postinit_prop_L(self, value):
+        raise TypeError('Cannot set L for operator loaded from file.'
+                        'Value from file: L=%d' % self.L)
 
     def _build_tex(self,signs='-',request_parens=False):
         t = coeff_to_str(self.coeff,signs=signs)
-        if t:
-            t += '*'
-
-        if self.filename is None:
-            t += r'[\text{operator from file}]'
-        else:
-            t += r'[\text{operator from file "%s"}]' % self.filename
-
+        t += r'[\text{loaded operator}]'
         return t
 
     def _get_MSC(self):

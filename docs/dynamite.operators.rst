@@ -52,6 +52,8 @@ Saved Operators
 
 .. autoclass:: dynamite.operators.Load
 
+.. autofunction:: dynamite.operators.load_from_file
+
 Member Functions
 ----------------
 
