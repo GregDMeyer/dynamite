@@ -1,70 +1,75 @@
-
 """
 This module provides the building blocks for Hamiltonians, and
 defines their built-in behavior and operations.
 """
 
-# defines the order the classes appear in the documentation
-__all__ = ['Sigmax',
-           'Sigmay',
-           'Sigmaz',
-           'Identity',
-           'Zero',
-           'Sum',
-           'Product',
-           'IndexSum',
-           'IndexProduct',
-           'Load']
-
 import numpy as np
-from copy import deepcopy
 
-from . import config, validate, info
+from . import config, validate, info, msc
 from .computations import evolve, eigsolve
 from .subspace import class_to_enum
 from .states import State
 from ._imports import get_import
-from . import _utils
-from ._utils import condense_terms,coeff_to_str,MSC_matrix_product
-
-# this will be serial_backend eventually
-from .backend import backend
 
 class Operator:
     """
-    Operator is the base class for all other operator classes.
-    This class should not be constructed explicitly by the user,
-    however here are defined some important member functions all
-    operators will have (see below).
+    A class representing a quantum operator.
 
-    Parameters
-    ----------
-    L : int, optional
-        The length of the spin chain. Can be set later with ``op.L = L``.
+    This class generally won't be directly instantiated by the user, but is returned by the
+    other functions in this module.
     """
 
-    def __init__(self,L=None):
-
-        if L is None:
-            L = config.L
+    def __init__(self):
 
         self._L = None
+        self._max_spin_idx = None
         self._mat = None
         self._MSC = None
-        self._diag_entries = False
+        self._is_reduced = False
+        self._has_diag_entries = False
         self._shell = config.shell
         self._left_subspace = config.subspace
         self._right_subspace = config.subspace
 
-        self.min_length = 0
-        self.needs_parens = False
-        self.coeff = 1
-        self.L = L
+        self._tex = r'\[\text{operator}\]'
+        self._string = '[operator]'
+        self._brackets = ''
+
+    def copy(self):
+        """
+        Return a copy of the operator.
+        Copy will not have its PETSc matrix already built,
+        even if the operator being copied does.
+
+        Returns
+        -------
+        Operator
+            A copy of the operator
+        """
+        rtn = Operator()
+        rtn.MSC = self.MSC
+        rtn.is_reduced = self.is_reduced
+        rtn.shell = self.shell
+        rtn.left_subspace = self.left_subspace.copy()
+        rtn.right_subspace = self.right_subspace.copy()
+
+        rtn.tex = self.tex
+        rtn.string = self.string
+        rtn.brackets = self.brackets
+
+        return rtn
+
+    def __del__(self):
+        # petsc4py will destroy the matrix object by itself,
+        # but for shell matrices the context will not be automatically
+        # freed! therefore we need to explicitly call this on object
+        # deletion.
+        self.destroy_mat()
 
     ### computations
 
     def evolve(self, state, t, **kwargs):
-        """
+        r"""
         Evolve a state under the Hamiltonian. If the Hamiltonian's chain length has not
         been set, attempts to set it based on the state's length.
 
@@ -117,70 +122,79 @@ class Operator:
     ### properties
 
     @property
+    def max_spin_idx(self):
+        '''
+        Read-only property giving the largest spin index on which this operator
+        has support.
+        '''
+        # save this so we don't recompute it every time.
+        # cleared when MSC changes
+
+        if self._max_spin_idx is None:
+            self._max_spin_idx = msc.max_spin_idx(self.MSC)
+
+        return self._max_spin_idx
+
+    @property
     def L(self):
         """
-        Property defining the length of the spin chain.
-        If the length hasn't been set yet, ``L`` is ``None``.
+        Property representing the length of the spin chain.
+        If L hasn't been set, defaults to the size of support of the operator (from site 0).
         """
         return self._L
 
     @L.setter
     def L(self, value):
+        L = validate.L(value)
+        if L < self.max_spin_idx + 1:
+            raise ValueError('Cannot set L smaller than one plus the largest spin index'
+                             'on which the operator has support (max_spin_idx = %d)' %
+                             (self.max_spin_idx))
+        self._L = L
 
-        if value is not None:
-            value = validate.L(value)
-
-            if value < self.min_length:
-                raise ValueError('Length %d too short--non-identity'
-                                 'operator on index %d' % (value, self.min_length-1))
-
-        self.destroy_mat()
-        self._MSC = None
-
-        self._L = value
-
-        self.left_subspace.L = value
-        self.right_subspace.L = value
-
-        # propagate L down the tree of operators
-        self._prop_L(value)
-
-    def _prop_L(self, L):
-        raise NotImplementedError()
+    def get_length(self):
+        '''
+        Returns the length of the spin chain for this operator. It is defined by the
+        property :meth:`Operator.L` if it has been set by the user. Otherwise, the
+        number of sites on which the operator has support is returned by default.
+        '''
+        if self.L is None:
+            return self.max_spin_idx + 1
+        else:
+            return self.L
 
     @property
     def dim(self):
         """
-        Read-only attribute returning the dimension of the matrix,
-        or ``None`` if ``L`` is ``None``.
+        Read-only attribute returning the dimensions of the matrix.
         """
-        if self.L is None:
-            return None
-        else:
-            return self.left_subspace.get_size(), self.right_subspace.get_size()
+        return self.left_subspace.get_size(), self.right_subspace.get_size()
 
     @property
     def nnz(self):
         """
         The number of nonzero elements per row of the sparse matrix.
         """
-        t = self.get_MSC()
-        return len(np.unique(t['masks']))
+        return msc.nnz(self.MSC)
 
     @property
     def MSC_size(self):
         """
         The number of elements in the MSC representation of the matrix.
         """
-        return len(self.get_MSC())
+        return len(self.MSC)
 
     @property
     def density(self):
         """
         The density of the sparse matrix---that is, the number of non-zero
         elements per row divided by the length of a row.
+
+        .. note::
+            This quantity is not always well defined when using a subspace, since
+            it can vary by row. In that case, the returned quantity will be an upper bound.
         """
-        return self.nnz/self.dim[0]
+        return self.nnz/self.dim[1]
 
     @property
     def shell(self):
@@ -196,6 +210,7 @@ class Operator:
 
     @shell.setter
     def shell(self,value):
+        value = validate.shell(value)
         if value != self._shell:
             self.destroy_mat()
         self._shell = value
@@ -206,6 +221,9 @@ class Operator:
         The subspace of "bra" states--in other words, states that
         could be multiplied on the left against the matrix.
         """
+        # always make sure that the subspace associated with this operator
+        # has the correct dimensions
+        self._left_subspace.L = self.get_length()
         return self._left_subspace
 
     @property
@@ -214,6 +232,7 @@ class Operator:
         The subspace of "ket" states--those that can be multiplied
         on the right against the matrix.
         """
+        self._right_subspace.L = self.get_length()
         return self._right_subspace
 
     @property
@@ -223,24 +242,24 @@ class Operator:
         gets or sets both at the same time. If they are different, it
         raises an error.
         """
-        if self._left_subspace != self._right_subspace:
+        if self.left_subspace != self.right_subspace:
             raise ValueError('Left subspace and right subspace not the same, '
                              'use left_subspace and right_subspace to access each.')
 
-        return self._left_subspace
+        return self.left_subspace
 
     @left_subspace.setter
     def left_subspace(self, s):
         validate.subspace(s)
-        s.L = self.L
-        s.update_operator('left', self)
+        if s != self.left_subspace:
+            self.destroy_mat()
         self._left_subspace = s
 
     @right_subspace.setter
     def right_subspace(self, s):
         validate.subspace(s)
-        s.L = self.L
-        s.update_operator('right', self)
+        if s != self.right_subspace:
+            self.destroy_mat()
         self._right_subspace = s
 
     @subspace.setter
@@ -248,136 +267,118 @@ class Operator:
         self.left_subspace = s
         self.right_subspace = s
 
-    ### copy
+    ### text representations
 
-    def copy(self):
-        """
-        Return a copy of the operator.
-        Copy will not have its PETSc matrix already built,
-        even if the operator being copied does.
+    # TODO: perhaps encapsulate the string/tex methods into their own class
+
+    @property
+    def string(self):
+        '''
+        A text string that will be used to represent the object in printed expressions.
+        '''
+        return self._string
+
+    @string.setter
+    def string(self, value):
+        self._string = value
+
+    @property
+    def tex(self):
+        '''
+        A LaTeX expression corresponding to the object. Can be set to any valid TeX.
+        '''
+        return self._tex
+
+    @tex.setter
+    def tex(self, value):
+        self._tex = value
+
+    @property
+    def brackets(self):
+        '''
+        Which kind of brackets to surround the expression with. Options are
+        ``'()'``, ``'[]'``, or ``''``, where the empty string means no brackets.
+        '''
+        return self._brackets
+
+    @brackets.setter
+    def brackets(self, value):
+        value = validate.brackets(value)
+        self._brackets = value
+
+    @classmethod
+    def _with_brackets(cls, string, brackets, tex=False):
+        '''
+        Put the given brackets around the string. If tex = True, the brackets
+        have \left and \right appended to them.
+
+        Parameters
+        ----------
+        string : str
+            The string to put brackets around
+
+        brackets : str
+            The set of brackets. Should be either ``'[]'``, ``'()'``, or ``''``
+            for no brackets.
+
+        tex : bool, optional
+            Whether to prepend ``\left`` and ``\right`` to the brackets.
 
         Returns
         -------
-        Operator
-            A copy of the operator
-        """
+        str
+            The result
+        '''
+        if not brackets:
+            return string
+        if tex:
+            brackets = [x+y for x,y in zip([r'\left',r'\right'], brackets)]
+        return string.join(brackets)
 
-        # the only thing we really don't want to copy is the PETSc matrix in the
-        # backend. so we just temporarily make that not part of the operator!
+    def with_brackets(self, which):
+        '''
+        Return a string or tex representation of the object, surrounded by brackets
+        if necessary. Useful for building larger expressions.
 
-        # TODO: this makes me uncomfortable. figure out a better way.
+        Parameters
+        ----------
 
-        tmp_mat = self._mat
-        self._mat = None
-        c = deepcopy(self)
-        self._mat = tmp_mat
-        return c
+        which : str
+            Whether to return a normal string or tex. Options are ``'string'`` or ``'tex'``.
+        '''
+        if which == 'tex':
+            strng = self.tex
+        elif which == 'string':
+            strng = self.string
+        else:
+            raise ValueError("which must be either 'string' or 'tex'.")
+
+        return self._with_brackets(strng, self._brackets, which == 'tex')
+
+    def __str__(self):
+        return self.string
+
+    # TODO: __repr__
+
+    def table(self):
+        '''
+        Return a string containing an ASCII table of the coefficients and terms
+        that make up this operator.
+
+        The table is generated directly from the MSC representation, so it is
+        expanded and simplified to the same form no matter how the operator was
+        built.
+
+        Call :meth:`Operator.reduce_MSC` first for a more compact table.
+
+        [This function is not yet implemented]
+        '''
+        raise NotImplementedError
+
+    def _repr_latex_(self):
+        return '$' + self.tex + '$'
 
     ### save to disk
-
-    @classmethod
-    def _serialize(cls, L, MSC):
-        '''
-        Take an MSC representation and spin chain length and serialize it into a
-        byte string.
-
-        The format is
-        `L nterms int_size masks signs coefficients`
-        where `L`, `nterms`, and `int_size` are utf-8 text, including newlines, and the others
-        are each just a binary blob, one after the other. `int_size` is an integer representing
-        the size of the int data type used (32 or 64 bits).
-
-        Binary values are saved in big-endian format, to be compatible with PETSc defaults.
-
-        This function isolates serialization from the rest of the Operator class
-        for testing.
-
-        Parameters
-        ----------
-        L : int
-            The spin chain length
-
-        MSC : np.array
-            The MSC representation
-
-        Returns
-        -------
-        bytes
-            A byte string containing the serialized operator.
-        '''
-
-        rtn = b''
-
-        rtn += (str(L)+'\n').encode('utf-8')
-        rtn += (str(MSC.size)+'\n').encode('utf-8')
-        rtn += (str(MSC.dtype['masks'].itemsize*8)+'\n').encode('utf-8')
-
-        int_t = MSC.dtype[0].newbyteorder('B')
-        cplx_t = np.dtype(np.complex128).newbyteorder('B')
-        rtn += MSC['masks'].astype(int_t, casting='equiv', copy=False).tobytes()
-        rtn += MSC['signs'].astype(int_t, casting='equiv', copy=False).tobytes()
-        rtn += MSC['coeffs'].astype(cplx_t, casting='equiv', copy=False).tobytes()
-
-        return rtn
-
-    @classmethod
-    def _deserialize(cls, data):
-        '''
-        Reverse the _serialize operation.
-
-        This function isolates deserialization from the rest of the Operator class
-        for testing.
-
-        Parameters
-        ----------
-        data : bytes
-            The byte string containing the serialized data.
-
-        Returns
-        -------
-        tuple(int, np.ndarray)
-            A tuple of the form (L, MSC)
-        '''
-
-        stop = data.find(b'\n')
-        L = int(data[:stop])
-
-        start = stop + 1
-        stop = data.find(b'\n', start)
-        MSC_size = int(data[start:stop])
-
-        start = stop + 1
-        stop = data.find(b'\n', start)
-        int_size = int(data[start:stop])
-        if int_size == 32:
-            int_t = np.int32
-        elif int_size == 64:
-            int_t = np.int64
-        else:
-            raise ValueError('Invalid int_size. Perhaps file is corrupt.')
-
-        dt = np.dtype([
-            ('masks', int_t),
-            ('signs', int_t),
-            ('coeffs', np.complex128)
-        ])
-        MSC = np.ndarray(MSC_size, dtype = dt)
-
-        # TODO: can I do this without making a copy in the calls to np.frombuffer?
-        mv = memoryview(data)
-        start = stop + 1
-        int_MSC_bytes = MSC_size * int_size // 8
-
-        MSC['masks'] = np.frombuffer(mv[start:start+int_MSC_bytes],
-                                     dtype = np.dtype(int_t).newbyteorder('B'))
-        start += int_MSC_bytes
-        MSC['signs'] = np.frombuffer(mv[start:start+int_MSC_bytes],
-                                     dtype = np.dtype(int_t).newbyteorder('B'))
-        start += int_MSC_bytes
-        MSC['coeffs'] = np.frombuffer(mv[start:],
-                                      dtype = np.dtype(np.complex128).newbyteorder('B'))
-
-        return L, MSC
 
     def serialize(self):
         '''
@@ -391,11 +392,7 @@ class Operator:
             The byte string containing the serialized object.
 
         '''
-        if self.L is None:
-            raise ValueError('L must be set before serializing.')
-
-        MSC = self.get_MSC()
-        return self._serialize(self.L, MSC)
+        return msc.serialize(self.MSC)
 
     def save(self, filename):
         """
@@ -429,7 +426,7 @@ class Operator:
 
     ### interface with PETSc
 
-    def get_mat(self,diag_entries=False):
+    def get_mat(self, diag_entries=False):
         """
         Get the PETSc matrix corresponding to this operator, building it if necessary.
 
@@ -445,15 +442,52 @@ class Operator:
         petsc4py.PETSc.Mat
             The PETSc matrix corresponding to the operator.
         """
-        if self._mat is None or (diag_entries and not self._diag_entries):
+        if self._mat is None or (diag_entries and not self._has_diag_entries):
             self.build_mat(diag_entries=diag_entries)
         return self._mat
 
+    def build_mat(self, diag_entries=False):
+        """
+        Build the PETSc matrix, destroying any matrix that has already been built, and
+        store it internally. This function does not return the matrix--see
+        :meth:`Operator.get_mat` for that functionality. This function is rarely needed
+        by the end user, since it is called automatically whenever the underlying matrix
+        needs to be built or rebuilt.
+        """
+
+        if self.get_length() > self.max_spin_idx:
+            info.write(1, 'Trivial identity operators at end of chain--length L could be smaller.')
+
+        backend = get_import('backend')
+
+        self.destroy_mat()
+
+        self.reduce_MSC()
+
+        term_array = self.MSC
+
+        self._has_diag_entries = term_array[0]['masks'] == 0
+        if diag_entries and not self._has_diag_entries:
+            term_array = np.hstack([np.array([(0,0,0)], dtype=term_array.dtype), term_array])
+            self._has_diag_entries = True
+
+        # TODO: clean up these arguments into a dictionary or similar
+        self._mat = backend.build_mat(self.get_length,
+                                      np.ascontiguousarray(term_array['masks']),
+                                      np.ascontiguousarray(term_array['signs']),
+                                      np.ascontiguousarray(term_array['coeffs']),
+                                      class_to_enum(type(self.left_subspace)),
+                                      self.left_subspace.space,
+                                      class_to_enum(type(self.right_subspace)),
+                                      self.right_subspace.space,
+                                      bool(self.shell),
+                                      self.shell == 'gpu')
+
     def destroy_mat(self):
         """
-        Destroy the PETSc matrix associated with the Hamiltonian, and free the
-        associated memory. If the PETSc matrix does not exist (has not been built
-        or has already been destroyed), the function has no effect.
+        Destroy the PETSc matrix, freeing the corresponding memory. If the PETSc
+        matrix does not exist (has not been built or has already been destroyed),
+        the function has no effect.
         """
 
         if self._mat is None:
@@ -468,211 +502,65 @@ class Operator:
         self._mat.destroy()
         self._mat = None
 
-    def build_mat(self,diag_entries=False):
-        """
-        Build the PETSc matrix, destroying any matrix that has already been built, and
-        store it internally. This function does not return the matrix--see
-        :meth:`Operator.get_mat` for that functionality. This function is rarely needed
-        by the end user, since it is called automatically whenever the underlying matrix
-        needs to be built or rebuilt.
-        """
-
-        if self.L is None:
-            raise ValueError('Set L before building matrix.')
-
-        if self.L > self.min_length:
-            info.write(1,'Trivial identity operators at end of chain--length L could be smaller.')
-
-        # TODO: will be mpi_backend eventually
-        backend = get_import('backend')
-
-        self.destroy_mat()
-
-        term_array = self.get_MSC()
-
-        if diag_entries and not np.any(term_array['masks'] == 0):
-            term_array = np.hstack([np.array([(0,0,0)],dtype=term_array.dtype),term_array])
-
-        if not np.any(term_array['masks'] == 0):
-            self._diag_entries = False
-        else:
-            self._diag_entries = True
-
-        # TODO: clean up these arguments into a dictionary or similar
-        self._mat = backend.build_mat(self.L,
-                                      np.ascontiguousarray(term_array['masks']),
-                                      np.ascontiguousarray(term_array['signs']),
-                                      np.ascontiguousarray(term_array['coeffs']),
-                                      class_to_enum(type(self.left_subspace)),
-                                      self.left_subspace.space,
-                                      class_to_enum(type(self.right_subspace)),
-                                      self.right_subspace.space,
-                                      bool(self.shell),
-                                      self.shell == 'gpu')
-
-    ### LaTeX representation of operators
-
-    def build_tex(self,signs='-',request_parens=False):
-        """
-        Output LaTeX of a symbolic representation of the Hamiltonian.
-        The arguments are probably only useful if integrating the output
-        into some larger LaTeX expression, but they are used internally
-        and could be useful for somebody so I expose them in the API.
-
-        Parameters
-        ----------
-        signs : str
-            The possible signs to include at the front of the TeX. Possible
-            values are ``'+-'``, ``'-'``, and ``''``. If the coefficient on
-            the expression is positive, a + sign will only be included if +
-            is included in the ``signs`` argument. Same with -, if the
-            coefficient is negative.
-
-        request_parens : bool
-            If set to ``True``, the returned expression will include surrounding
-            parentheses if they are needed (e.g. not if the result is a single
-            symbol that never would need parentheses around it).
-        """
-        return self._build_tex(signs,request_parens)
-
-    def _build_tex(self,signs='-',request_parens=False):
-        raise NotImplementedError()
-
-    def _repr_latex_(self):
-
-        # don't print if we aren't process 0
-        # this causes there to still be some awkward white space,
-        # but at least it doesn't print the tex a zillion times
-        if config.initialized:
-            PETSc = get_import('petsc4py.PETSc')
-            if PETSc.COMM_WORLD.getRank() != 0:
-                return ''
-
-        return '$' + self.build_tex(signs='-') + '$'
-
-    def _get_index_set(self):
-        # Get the set of indices in the TeX representation of the object
-        raise NotImplementedError()
-
-    def _replace_index(self,ind,rep):
-        # Replace an index by some value in the TeX representation
-        raise NotImplementedError()
-
     ### mask, sign, coefficient representation of operators
 
-    def get_MSC(self,shift_index=None,wrap=False):
-        """
-        Get the representation of the operator in the (mask, sign, coefficient)
-        format used internally by :mod:`dynamite`. The representation is saved
-        internally, so that if it takes a while to build it can be accessed quickly
-        next time. It is deleted when the PETSc matrix is built, however, to free
-        up some memory.
+    @property
+    def MSC(self):
+        '''
+        The (mask, sign, coefficient) representation of the operator. This
+        representation is used internally by dynamite.
+        '''
+        return self._MSC
+
+    @MSC.setter
+    def MSC(self, value):
+        value = validate.MSC(value)
+        self._max_spin_idx = None
+        self.is_reduced = False
+        self._MSC = value
+
+    def reduce_MSC(self):
+        '''
+        Combine and sort terms in the MSC representation, compressing it and
+        preparing it for use in the backend.
+        '''
+        self.MSC = msc.combine_and_sort(self.MSC)
+        self.is_reduced = True
+
+    @property
+    def is_reduced(self):
+        '''
+        Whether :meth:`Operators.reduce_MSC` has been called. Can also be set manually to avoid
+        calling that function, if you are sure that the terms are sorted already.
+        '''
+        return self._is_reduced
+
+    @is_reduced.setter
+    def is_reduced(self, value):
+        self._is_reduced = value
+
+    def get_shifted_MSC(self, shift, wrap_idx = None):
+        '''
+        Get the MSC representation of the operator, with all terms translated along
+        the spin chain (away from zero) by ``shift`` spins.
 
         Parameters
         ----------
-        shift_index : int
-            Shift the whole operator along the spin chain by ``shift_index`` spins.
+        shift : int
+            Shift the whole operator along the spin chain by ``shift`` spins.
 
         wrap : bool
-            Whether to wrap around if requesting a ``shift_index`` greater than the length
-            of the spin chain (i.e., take ``shift_index`` to ``shift_index % L``).
+            The site at which to begin wrapping around to the beginning of the spin chain.
+            e.g. takes a site index ``i`` to ``i % wrap_idx``. If ``None``, do not wrap.
 
         Returns
         -------
         numpy.ndarray
             A numpy array containing the representation.
-        """
-
-        if self._MSC is None:
-            self._MSC = self._get_MSC()
-
-        if shift_index is None:
-            return self._MSC
-        else:
-            # check that the shift_index is valid
-            if not wrap and self.L is not None and self.min_length + shift_index > self.L:
-                raise ValueError('Shift of %d would put operators past end of spin chain.'%
-                                 shift_index)
-
-            msc = self._MSC.copy()
-
-            msc['masks'] <<= shift_index
-            msc['signs'] <<= shift_index
-
-            if wrap:
-                mask = (-1) << self.L
-
-                for v in [msc['masks'],msc['signs']]:
-
-                    # find the bits that need to wrap around
-                    overflow = v & mask
-
-                    # wrap them to index 0
-                    overflow >>= self.L
-
-                    # recombine them with the ones that didn't get wrapped
-                    v |= overflow
-
-                    # shave off the extras that go past L
-                    v &= ~mask
-
-            return msc
-
-    def _get_MSC(self):
-        raise NotImplementedError()
+        '''
+        return msc.shift(self.MSC, shift, wrap_idx)
 
     ### interface to numpy
-
-    @classmethod
-    def _MSC_to_numpy(cls, MSC, dims, idx_to_state = None, state_to_idx = None):
-        '''
-        Build a NumPy array from an MSC array. This method isolates to_numpy
-        from the rest of the class for testing. It also defines the MSC
-        representation.
-
-        Parameters
-        ----------
-
-        MSC : np.ndarray(dtype = MSC_dtype)
-            An MSC array.
-
-        dims : (int, int)
-            The dimensions (M, N) of the matrix.
-
-        idx_to_state : function(int), optional
-            If working in a subspace, a function to map indices to states for
-            the *left* subspace.
-
-        state_to_idx : function(int), optional
-            If working in a subspace, a function to map states to indices for
-            the *right* subspace.
-
-        Returns
-        -------
-
-        np.ndarray(dtype = np.complex128)
-            A 2-D NumPy array which stores the matrix.
-        '''
-
-        ary = np.zeros(dims, dtype = np.complex128)
-
-        # if these aren't supplied, they are the identity
-        if idx_to_state is None:
-            idx_to_state = lambda x: x
-
-        if state_to_idx is None:
-            state_to_idx = lambda x: x
-
-        for idx in range(dims[0]):
-            bra = idx_to_state(idx)
-            for m,s,c in MSC:
-                ket = m ^ bra
-                ridx = state_to_idx(ket)
-                if ridx is not None: # otherwise we went out of the subspace
-                    sign = 1 - 2*(_utils.popcount(s & ket) % 2)
-                    ary[idx, ridx] += sign * c
-
-        return ary
 
     def to_numpy(self):
         '''
@@ -685,90 +573,77 @@ class Operator:
             The array.
         '''
 
-        ary = self._MSC_to_numpy(self.get_MSC(),
-                                 (self.left_subspace.dim, self.right_subspace.dim),
-                                 self.left_subspace.idx_to_state,
-                                 self.right_subspace.state_to_idx)
+        ary = msc.MSC_to_numpy(self.MSC,
+                               (self.left_subspace.dim, self.right_subspace.dim),
+                               self.left_subspace.idx_to_state,
+                               self.right_subspace.state_to_idx)
 
         return ary
 
     ### unary and binary operations
 
-    def __add__(self,x):
-        if isinstance(x,Operator):
-            return self._op_add(x)
-        else:
-            raise TypeError('Addition not supported for types %s and %s'
-                            % (str(type(self)),str(type(x))))
+    def __add__(self, x):
+        if not isinstance(x, Operator):
+            x = x*identity()
+        return self._op_add(x)
 
-    def __sub__(self,x):
+    def __radd__(self,x):
+        if not isinstance(x, Operator):
+            x = x*identity()
+        return x + self
+
+    def __sub__(self, x):
         return self + -x
 
     def __neg__(self):
         return -1*self
 
-    def __mul__(self,x):
-        if isinstance(x,Operator):
+    def __mul__(self, x):
+        if isinstance(x, Operator):
             return self._op_mul(x)
-        elif isinstance(x,State):
+        elif isinstance(x, State):
+            # TODO: check that the subspaces match?
             return self.get_mat() * x.vec
         else:
-            try:
-                # check that it is a number, in the
-                # most generic way I can think of
-                if x == np.array([1]) * x:
-                    return self._num_mul(x)
-                else:
-                    raise ValueError()
-            except (TypeError,ValueError):
-                raise TypeError('Multiplication not supported for types %s and %s'
-                                % (str(type(self)),str(type(x))))
+            return self._num_mul(x)
 
-    def __rmul__(self,x):
-        if isinstance(x,State):
+    def __rmul__(self, x):
+        if isinstance(x, State):
             return TypeError('Left vector-matrix multiplication not currently '
                              'supported.')
         else:
-            return self.__mul__(x)
+            return self._num_mul(x)
 
-    def __eq__(self,x):
-        if isinstance(x,Operator):
-            return np.array_equal(self.get_MSC(),x.get_MSC())
+    def __eq__(self, x):
+        if isinstance(x, Operator):
+            return np.array_equal(self.MSC, x.MSC)
         else:
             raise TypeError('Equality not supported for types %s and %s'
-                            % (str(type(self)),str(type(x))))
+                            % (str(type(self)), str(type(x))))
 
-    def _op_add(self,o):
+    def _op_add(self, o):
+        rtn = self.copy()
+        rtn.MSC = msc.MSC_sum([self.MSC, o.MSC])
+        rtn.tex = self.tex + ' + ' + o.tex
+        rtn.string = self.string + ' + ' + o.string
+        rtn.brackets = '()'
+        return rtn
 
-        if isinstance(o,Sum):
-            return Sum(terms = [self] + [o.coeff*t for t in o.terms])
-        elif isinstance(o,Operator):
-            return Sum(terms = [self,o])
-        else:
-            raise TypeError('Cannot sum expression with type '+type(o))
+    def _op_mul(self, o):
+        rtn = self.copy()
+        rtn.MSC = msc.MSC_product([self.MSC, o.MSC])
+        rtn.string = self.with_brackets('string') + '*' + o.with_brackets('string')
+        rtn.tex = self.with_brackets('tex') + '*' + o.with_brackets('tex')
+        rtn.brackets = ''
+        return rtn
 
-    def _op_mul(self,o):
-
-        if isinstance(o,Product):
-            return Product(terms = [self] + [o.coeff*t for t in o.terms])
-        elif isinstance(o,Operator):
-            return Product(terms = [self,o])
-        else:
-            raise TypeError('Cannot sum expression with type '+type(o))
-
-    def _num_mul(self,x):
-        o = self.copy()
-        o.coeff *= x
-        return o
-
-    ### cleanup
-
-    def __del__(self):
-        # petsc4py will destroy the matrix object by itself,
-        # but for shell matrices the context will not be automatically
-        # freed! therefore we need to explicitly call this on object
-        # deletion.
-        self.destroy_mat()
+    def _num_mul(self, x):
+        rtn = self.copy()
+        rtn.MSC['coeffs'] *= x
+        rtn.string = '{:.3f}*'.format(x) + self.with_brackets('string')
+        rtn.tex = '{:.3f}*'.format(x) + self.with_brackets('tex')
+        rtn.brackets = ''
+        return rtn
 
 def load_from_file(filename):
     '''
@@ -786,122 +661,33 @@ def load_from_file(filename):
     '''
     with open(filename, 'rb') as f:
         bytestring = f.read()
-        op = Load(bytestring)
+        op = from_bytes(bytestring)
     return op
 
-class Load(Operator):
+def from_bytes(data):
     """
-    Class for operator loaded from a byte string.
-    Only the MSC representation of the operator
-    is saved.
-
-    Byte strings should be created with the :meth:`Operator.serialize`
-    method. This class can also be used to load from file through the
-    :meth:`dynamite.operators.load_from_file` method.
+    Load operator from a byte string generated with the :meth:`Operator.serialize`
+    method.
 
     Parameters
     ----------
     data : bytes
         The byte string containing the serialized object.
+
+    Returns
+    -------
+    Operator
+        The operator.
     """
+    o = Operator()
+    MSC = msc.deserialize(data)
+    o.MSC = MSC
+    o.string = '[operator from bytes]'
+    o.tex = r'\left[\text{operator from bytes}\right]'
+    return o
 
-    _prop_L = None
-
-    def __init__(self, data):
-        self._prop_L = lambda self,value=None: None
-        Operator.__init__(self)
-        L, MSC = self._deserialize(data)
-        self._L = L
-        self._MSC = MSC
-        self._prop_L = self._postinit_prop_L
-
-    def _postinit_prop_L(self, value):
-        raise TypeError('Cannot set L for operator loaded from file.'
-                        'Value from file: L=%d' % self.L)
-
-    def _build_tex(self,signs='-',request_parens=False):
-        t = coeff_to_str(self.coeff,signs=signs)
-        t += r'[\text{loaded operator}]'
-        return t
-
-    def _get_MSC(self):
-        if self.coeff == 1:
-            return self._MSC
-        else:
-            msc = self._MSC.copy()
-            msc['coeffs'] *= self.coeff
-            return msc
-
-    # TODO: there is no good reason to restrict this behavior. just a couple things to
-    # implement
-    def _op_add(self,o):
-        raise TypeError('Cannot currently use operators loaded from file in expressions.')
-
-    def _op_mul(self,o):
-        raise TypeError('Cannot currently use operators loaded from file in expressions.')
-
-
-class _Expression(Operator):
-    def __init__(self,terms,copy=True,L=None):
-        """
-        Base class for Sum and Product classes.
-        """
-
-        Operator.__init__(self,L=L)
-        L = self.L
-
-        if copy:
-            self.terms = [t.copy() for t in terms]
-        else:
-            self.terms = list(terms)
-
-        if len(self.terms) == 0:
-            raise ValueError('Term list is empty.')
-
-        terms_L = None
-        for t in self.terms:
-            if t.L is not None:
-                if terms_L is not None:
-                    if t.L != terms_L:
-                        raise ValueError('All terms must have same length L.')
-                else:
-                    terms_L = t.L
-
-        if len(self.terms) > 1:
-            self.min_length = max(o.min_length for o in self.terms)
-        elif len(self.terms) == 1:
-            self.min_length = self.terms[0].min_length
-
-        # pick up length from terms if it isn't set any other way
-        if self.L is None:
-            L = terms_L
-
-        self.L = L
-
-    def _get_index_set(self):
-        indices = set()
-        for term in self.terms:
-            indices = indices | term._get_index_set()
-        return indices
-
-    def _replace_index(self,ind,rep):
-        for term in self.terms:
-            term._replace_index(ind,rep)
-
-    def _build_tex(self,signs='-',request_parens=False):
-        raise NotImplementedError()
-
-    def _prop_L(self,L):
-
-        # when we are not fully initialized
-        if not hasattr(self,'terms'):
-            return
-
-        for term in self.terms:
-            term.L = L
-
-class Sum(_Expression):
-    """
+def op_sum(terms, nshow = 3):
+    r"""
     A sum of several operators. This object can be used in a couple ways.
     All of the following return the exact same object,
     :math:`\sigma^x_0 + \sigma^y_0`\:
@@ -909,458 +695,232 @@ class Sum(_Expression):
     .. code:: python
 
         Sigmax() + Sigmay()
-        Sum([Sigmax(),Sigmay()])
-        Sum(s() for s in [Sigmax,Sigmay])
+        op_sum([Sigmax(),Sigmay()])
+        op_sum(s() for s in [Sigmax,Sigmay])
 
     Parameters
     ----------
     terms : list
         A list of operators to sum
 
-    copy : bool, optional
-        Whether to use copies of the operators
-        in ``terms`` list, or just use them as-is. Not making
-        copies could lead to odd behavior if those operators are
-        later modified.
-
-    L : int, optional
-        The length of the spin chain
+    nshow : int, optional
+        The number of terms to show in the string representations before adding
+        an ellipsis.
     """
 
-    def __init__(self,terms,copy=True,L=None):
+    o = Operator()
+    MSC_terms = []
+    strings = []
+    texs = []
 
-        _Expression.__init__(self,terms,copy,L=L)
+    done = False
+    for n,t in enumerate(terms):
+        MSC_terms.append(t.MSC)
+        strings.append(t.string)
+        texs.append(t.tex)
+        if n >= nshow:
+            break
+    else:
+        done = True
 
-        if len(self.terms) > 1:
-            self.needs_parens = True
+    if not done:
+        strings[-1] = '...'
+        texs[-1] = r'\cdots'
+        MSC_terms.append(msc.MSC_sum(terms))
 
-    def _get_MSC(self,shift_index=0,wrap=False):
+    o.MSC = msc.MSC_sum(MSC_terms)
+    o.string = ' + '.join(strings)
+    o.tex = ' + '.join(texs)
+    o.brackets = '()'
+    return o
 
-        all_terms = np.hstack([t.get_MSC(shift_index=shift_index,wrap=wrap) for t in self.terms])
-        all_terms['coeffs'] *= self.coeff
-        return condense_terms(all_terms)
-
-    def _build_tex(self,signs='-',request_parens=False):
-        t = coeff_to_str(self.coeff,signs)
-        add_parens = False
-        if (t and self.needs_parens) or (request_parens and self.needs_parens):
-            add_parens = True
-            t += r'\left('
-        for n,term in enumerate(self.terms):
-            t += term.build_tex(signs=('+-' if n else signs))
-        if add_parens:
-            t += r'\right)'
-        return t
-
-    def _op_add(self,o):
-        if isinstance(o,Sum):
-            return Sum(terms = [self.coeff*t for t in self.terms] + \
-                               [o.coeff*t for t in o.terms])
-        elif isinstance(o,Operator):
-            return Sum(terms = [self.coeff*t for t in self.terms] + [o])
-        else:
-            raise TypeError('Cannot sum expression with type '+type(o))
-
-class Product(_Expression):
+def op_product(terms):
     """
     A product of several operators. Called in same way as :class:`Sum`.
     For example:
 
     .. code:: python
 
-        Sigmax() * Sigmay() == Product([Sigmax(),Sigmay()])
+        >>> Sigmax() * Sigmay() == Product([Sigmax(),Sigmay()])
+        True
 
     Parameters
     ----------
     terms : list
         A list of operators to multiply
-
-    copy : bool, optional
-        Whether to use copies of the operators
-        in ``terms`` list, or just use them as-is. Not making
-        copies could lead to odd behavior if those operators are
-        later modified.
-
-    L : int, optional
-        The length of the spin chain
     """
 
-    def __init__(self,terms,copy=True,L=None):
+    # from a practical standpoint, there doesn't seem to ever be a use case
+    # for taking the product of a huge number of terms. So we assume the number
+    # of terms is O(1) in this implementation.
 
-        _Expression.__init__(self,terms,copy,L=L)
+    MSC_terms = []
+    strings = []
+    texs = []
+    for t in terms:
+        MSC_terms.append(t.MSC)
+        strings.append(t.with_brackets(which='string'))
+        texs.append(t.with_brackets(which='tex'))
 
-        for term in self.terms:
-            self.coeff = self.coeff * term.coeff
-            term.coeff = 1
+    if MSC_terms:
+        o = Operator()
+        o.MSC = msc.MSC_product(MSC_terms)
+        o.string = '*'.join(strings)
+        o.tex = '*'.join(texs)
+        o.brackets = ''
+    else:
+        o = identity()
 
-    def _get_MSC(self,shift_index=0,wrap=False):
+    return o
 
-        all_terms = MSC_matrix_product(t.get_MSC(shift_index=shift_index,wrap=wrap) for t in self.terms)
-        all_terms['coeffs'] *= self.coeff
-        return condense_terms(all_terms)
-
-    def _build_tex(self,signs='-',request_parens=False):
-        t = coeff_to_str(self.coeff,signs)
-        for term in self.terms:
-            t += term.build_tex(request_parens=True)
-        return t
-
-    def _op_mul(self,o):
-        if isinstance(o,Product):
-            return Product(terms = [self.coeff*t for t in self.terms] + \
-                                   [o.coeff*t for t in o.terms])
-        elif isinstance(o,Operator):
-            return Product(terms = [self.coeff*t for t in self.terms] + [o])
-        else:
-            raise TypeError('Cannot sum expression with type '+type(o))
-
-class _IndexType(Operator):
-
-    def __init__(self,op,min_i=0,max_i=None,index_label='i',wrap=False,L=None):
-
-        Operator.__init__(self,L=L)
-        L = self.L
-
-        self._min_i = min_i
-        self._max_i = max_i
-        self.hard_max = max_i is not None
-        self.wrap = wrap
-
-        if self._max_i is not None and self._max_i < self._min_i:
-            raise ValueError('max_i must be >= min_i.')
-
-        self.min_length = op.min_length
-        if self.L is not None:
-            if self._max_i is not None and self._max_i >= self.L:
-                raise ValueError('max_i must be < L.')
-
-        if self._min_i < 0:
-            raise ValueError('min_i must be >= 0.')
-
-        self.op = op.copy()
-
-        if self.op.L is not None and self.L is None:
-            self._L = self.op.L
-        self.L = self._L # propagate L
-
-        if not isinstance(index_label,str):
-            raise TypeError('Index label should be a string.')
-        self.index_label = index_label
-
-        indices = self.op._get_index_set()
-        if any(not isinstance(x,int) for x in indices):
-            raise TypeError('Can only sum/product over objects with integer indices')
-        if min(indices) != 0:
-            raise IndexError('Minimum index of summand must be 0.')
-
-        for ind in indices:
-            if isinstance(ind,int):
-                rep = index_label
-                if ind:
-                    rep = rep+'+'+str(ind)
-                if self.wrap:
-                    if ind:
-                        rep = '(' + rep + ')'
-                    rep = '%L'  # TODO: change L to an integer when it's set
-                self.op._replace_index(ind,rep)
-
-        # finally we should set L again to make sure it's set everywhere
-        self.L = self.L
-
-    def _get_sigma_tex(self):
-        raise NotImplementedError()
-
-    def _build_tex(self,signs='-',request_parens=False):
-        t = ''
-        if request_parens:
-            t += r'\left['
-        t += coeff_to_str(self.coeff,signs)
-        t += self._get_sigma_tex()+r'_{'+self.index_label+'='+str(self._min_i)+'}'
-        if self._max_i is not None:
-            t += '^{'+str(self._max_i)+'}'
-        else:
-            if self.wrap:
-                t += '^{L-1}'
-            else:
-                t += '^{L'+('-'+str(self.min_length))+'}'
-        t += self.op.build_tex(request_parens=True)
-        if request_parens:
-            t += r'\right]'
-        return t
-
-    def _get_index_set(self):
-        return self.op._get_index_set()
-
-    def _replace_index(self,ind,rep):
-        return self.op._replace_index(ind,rep)
-
-    def _prop_L(self,L):
-
-        # not fully initialized yet
-        if not hasattr(self,'op'):
-            return
-
-        if self.hard_max and L is not None:
-            if self._max_i > L-1:
-                raise ValueError('Cannot set L smaller than '
-                                 'max_i+1 of index sum or product.')
-            elif not self.wrap and self._max_i + self.min_length > L:
-                raise ValueError('Index sum or product operator would extend '
-                                 'past end of spin chain (L too small).')
-
-        self.op.L = L
-        if not self.hard_max:
-            if L is not None:
-                if self.wrap:
-                    self._max_i = L-1
-                else:
-                    self._max_i = L - self.min_length
-            else:
-                self._max_i = None
-
-    def _get_MSC(self):
-        raise NotImplementedError()
-
-class IndexSum(_IndexType):
+def index_sum(op, size = None, start = 0, boundary = 'open'):
     """
-    The sum of the operator ``op`` translated to sites ``min_i`` through ``max_i``, inclusive.
+    Duplicate the operator onto adjacent sites in the spin chain, and sum the resulting
+    operators.
+    In most cases, ``op`` should have support on site 0 (and possibly others).
 
     For illustrative examples, see the Examples pages.
 
     Parameters
     ----------
     op : Operator
-        The operator to translate along the spin chain
+        The operator to translate along the spin chain.
 
-    min_i : int, optional
-        The shift index at which to start the sum
+    size : int, optional
+        The size of the support of the resulting operator. For open boundary conditions,
+        the number of terms in the sum may be smaller than this. If not provided, defaults
+        to the value of :meth:`Operator.L`.
 
-    max_i : int or None, optional
-        The shift index at which to end the sum (inclusive). If None, sum goes to end of spin chain.
+    start : int, optional
+        The site for the first operator in the sum.
 
-    index_label : str, optional
-        The label to use as the index on the sum in the LaTeX representation.
-
-    wrap : bool, optional
-        Whether to wrap around, that is, to use periodic boundary conditions.
-
-    L : int, optional
-        The length of the spin chain.
+    boundary : str, optional
+        Whether to use 'open' or 'closed' boundary conditions. When ``op`` has support
+        on more than one site, this determines whether the last few terms of the sum should
+        wrap around to the beginning of the spin chain.
     """
 
-    def __init__(self,op,min_i=0,max_i=None,index_label='i',wrap=False,L=None):
+    if size is None:
+        if op.L is None:
+            raise ValueError('Must specify index_sum size with either the "size" argument '
+                             'or by setting Operator.L (possibly through config.L).')
+        else:
+            size = op.L
 
-        _IndexType.__init__(self,
-                            op=op,
-                            min_i=min_i,
-                            max_i=max_i,
-                            index_label=index_label,
-                            wrap=wrap,
-                            L=L)
+    if boundary == 'open':
+        stop = start + size - op.max_spin_idx
+        if stop <= start:
+            raise ValueError("requested size %d for sum operator's support smaller than "
+                             "summand's support %d; impossible to satisfy" % \
+                             (size, op.max_spin_idx))
+        wrap_idx = None
 
-    def _get_sigma_tex(self):
-        return r'\sum'
+    elif boundary == 'closed':
+        stop = start + size
+        wrap_idx = stop
+        if start != 0:
+            raise ValueError('cannot set start != 0 for closed boundary conditions.')
 
-    def _get_MSC(self):
-        if self._max_i is None:
-            raise Exception('Must set L or max_i before building MSC representation of IndexSum.')
+    else:
+        raise ValueError("invalid value for argument 'boundary' (can be 'open' or 'closed')")
 
-        all_terms = np.hstack([self.op.get_MSC(shift_index=i,wrap=self.wrap)
-                               for i in range(self._min_i,self._max_i+1)])
-        all_terms['coeffs'] *= self.coeff
-        return condense_terms(all_terms)
+    rtn = Operator()
+    rtn.MSC = msc.MSC_sum(op.get_shifted_MSC(i, wrap_idx) for i in range(start, stop))
 
+    rtn.string = 'index_sum(' + op.string + ', sites %d - %d)' % (start, stop-1)
+    # TODO: make tex prettier by substituting i for the indices
+    rtn.tex = r'\sum_{i=%d}^{%d}' % (start, stop-1) + op.with_brackets(which = 'tex') + '_{i}'
+    rtn.brackets = '[]'
 
-class IndexProduct(_IndexType):
+    return rtn
 
+def index_product(op, size = None, start = 0):
     """
-    The product of the operator ``op`` translated to sites ``min_i`` through ``max_i``, inclusive.
-
-    For illustrative examples, see the Examples pages.
+    Duplicate the operator onto adjacent sites in the spin chain, and multiply the
+    resulting operators together.
+    In most cases, ``op`` should have support on site 0 (and possibly others).
 
     Parameters
     ----------
     op : Operator
-        The operator to translate along the spin chain
+        The operator to translate along the spin chain.
 
-    min_i : int, optional
-        The shift index at which to start the product
+    size : int, optional
+        The size of the support of the resulting operator. If omitted, defaults to
+        the spin chain length set by :meth:`Operator.L` or :meth:`dynamite.config.L`.
 
-    max_i : int or None, optional
-        The shift index at which to end the product (inclusive).
-        If None, product goes to end of spin chain.
-
-    index_label : str, optional
-        The label to use as the index on the product in the LaTeX representation.
-
-    wrap : bool, optional
-        Whether to wrap around, that is, to use periodic boundary conditions.
-
-    L : int, optional
-        The length of the spin chain.
+    start : int, optional
+        The site for the first operator in the sum.
     """
 
-    def __init__(self,op,min_i=0,max_i=None,index_label='i',wrap=False,L=None):
+    if size is None:
+        if op.L is None:
+            raise ValueError('Must specify index_sum size with either the "size" argument '
+                             'or by setting Operator.L (possibly through config.L).')
+        else:
+            size = op.L
 
-        _IndexType.__init__(self,
-                            op=op,
-                            min_i=min_i,
-                            max_i=max_i,
-                            index_label=index_label,
-                            wrap=wrap,
-                            L=L)
+    stop = start + size - op.max_spin_idx
 
-    def _get_sigma_tex(self):
-        return r'\prod'
+    rtn = Operator()
+    rtn.MSC = msc.MSC_product(op.get_shifted_MSC(i, wrap_idx = None) for i in range(start, stop))
 
-    def _get_MSC(self):
-        if self._max_i is None:
-            raise Exception('Must set L or max_i before building MSC representation of '
-                            'IndexProduct.')
-        terms = (self.op.get_MSC(shift_index=i,wrap=self.wrap)
-                 for i in range(self._min_i,self._max_i+1))
-        all_terms = MSC_matrix_product(terms)
-        all_terms['coeffs'] *= self.coeff
-        return condense_terms(all_terms)
+    rtn.string = 'index_product(' + op.string + ', sites %d - %d)' % (start, stop-1)
+    # TODO: make tex prettier by substituting i for the indices
+    rtn.tex = r'\prod_{i=%d}^{%d}' % (start, stop-1) + op.with_brackets(which = 'tex') + '_{i}'
+    rtn.brackets = '[]'
 
+    return rtn
 
-# the bottom level. a single operator (e.g. sigmax)
-class _Fundamental(Operator):
-
-    def __init__(self,index=0,L=None):
-
-        Operator.__init__(self,L=L)
-        self.index = index
-        self.min_length = index + 1
-        self.tex = []
-        self.tex_end = ''
-
-    def _calc_ind(self,shift_index,wrap):
-        ind = self.index+shift_index
-        if self.L is not None and ind >= self.L:
-            if wrap:
-                ind = ind % self.L
-            else:
-                raise IndexError('requested too large an index')
-        return ind
-
-    def _get_index_set(self):
-        indices = set()
-        for t in self.tex:
-            indices = indices | {t[1]}
-        return indices
-
-    def _replace_index(self,ind,rep):
-        for t in self.tex:
-            if t[1] == ind:
-                t[1] = rep
-
-    def _build_tex(self,signs='-',request_parens=False):
-        t = coeff_to_str(self.coeff,signs)
-        for substring,index in self.tex:
-            t += substring + str(index)
-        t += self.tex_end
-        return t
-
-    def _prop_L(self,L):
-        pass
-
-    def _get_MSC(self,shift_index=0,wrap=False):
-        raise NotImplementedError()
-
-class Sigmax(_Fundamental):
-    """
+def sigmax(i=0):
+    r"""
     The Pauli :math:`\sigma_x` operator on site :math:`i`.
     """
+    o = Operator()
+    o.MSC = [(1<<i, 0, 1)]
+    o.tex = r'\sigma^x_{'+str(i)+'}'
+    o.string = 'σx'+str(i).join('[]')
+    return o
 
-    def __init__(self,index=0,L=None):
-
-        if L is None:
-            L = config.L
-
-        _Fundamental.__init__(self,index,L=L)
-        self.tex = [[r'\sigma^x_{',self.index]]
-        self.tex_end = r'}'
-
-    def _get_MSC(self,shift_index=0,wrap=False):
-        ind = self._calc_ind(shift_index,wrap)
-        return np.array([(1<<ind,0,self.coeff)],dtype=backend.MSC_dtype)
-
-
-class Sigmaz(_Fundamental):
-    """
-    The Pauli :math:`\sigma_z` operator on site :math:`i`.
-    """
-
-    def __init__(self,index=0,L=None):
-
-        if L is None:
-            L = config.L
-
-        _Fundamental.__init__(self,index,L=L)
-        self.tex = [[r'\sigma^z_{',self.index]]
-        self.tex_end = r'}'
-
-    def _get_MSC(self,shift_index=0,wrap=False):
-        ind = self._calc_ind(shift_index,wrap)
-        return np.array([(0,1<<ind,self.coeff)],dtype=backend.MSC_dtype)
-
-
-class Sigmay(_Fundamental):
-    """
+def sigmay(i=0):
+    r"""
     The Pauli :math:`\sigma_y` operator on site :math:`i`.
     """
+    o = Operator()
+    o.MSC = [(1<<i, 1<<i, 1j)]
+    o.tex = r'\sigma^y_{'+str(i)+'}'
+    o.string = 'σy'+str(i).join('[]')
+    return o
 
-    def __init__(self,index=0,L=None):
+def sigmaz(i=0):
+    r"""
+    The Pauli :math:`\sigma_z` operator on site :math:`i`.
+    """
+    o = Operator()
+    o.MSC = [(0, 1<<i, 1)]
+    o.tex = r'\sigma^z_{'+str(i)+'}'
+    o.string = 'σz'+str(i).join('[]')
+    return o
 
-        if L is None:
-            L = config.L
-
-        _Fundamental.__init__(self,index,L=L)
-        self.tex = [[r'\sigma^y_{',self.index]]
-        self.tex_end = r'}'
-
-    def _get_MSC(self,shift_index=0,wrap=False):
-        ind = self._calc_ind(shift_index,wrap)
-        return np.array([(1<<ind,1<<ind,1j*self.coeff)],dtype=backend.MSC_dtype)
-
-
-class Identity(_Fundamental):
+def identity():
     """
     The identity operator. Since it is tensored with identities on all
     the rest of the sites, the ``index`` argument has no effect.
     """
+    o = Operator()
+    o.MSC = [(0, 0, 1)]
+    # TODO: do a fancy double-lined 1?
+    o.tex = '1'
+    o.string = '1'
+    return o
 
-    def __init__(self,index=0,L=None):
-
-        if L is None:
-            L = config.L
-
-        _Fundamental.__init__(self,index,L=L)
-        self.tex = []
-        self.tex_end = r'I'
-        self.min_length = 0
-
-    def _get_MSC(self,shift_index=0,wrap=False):
-        return np.array([(0,0,self.coeff)],dtype=backend.MSC_dtype)
-
-
-# also should hide this tex when appropriate
-class Zero(_Fundamental):
+def zero():
     """
     The zero operator---equivalent to a matrix of all zeros of dimension :math:`2^L`.
     Like for the identity, the ``index`` argument has no effect.
     """
-
-    def __init__(self,index=0,L=None):
-
-        if L is None:
-            L = config.L
-
-        _Fundamental.__init__(self,index,L=L)
-        self.tex = []
-        self.tex_end = r'0'
-        self.min_length = 0
-
-    def _get_MSC(self,shift_index=0,wrap=False):
-        return np.array([],dtype=backend.MSC_dtype)
+    o = Operator()
+    o.MSC = []
+    o.tex = '0'
+    o.string = '0'
+    return o

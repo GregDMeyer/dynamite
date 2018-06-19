@@ -2,9 +2,9 @@
 from . import config
 config.initialize()
 
-from .operators import Sigmax,Sigmay,Sigmaz,IndexProduct
+from .operators import sigmax, sigmay, sigmaz, index_product
 
-def commutator(o1,o2):
+def commutator(o1, o2):
     """
     The commutator :math:`[O_1,O_2]`.
 
@@ -13,10 +13,14 @@ def commutator(o1,o2):
     dynamite.operators.Operator
         The commutator
     """
-    return o1*o2 - o2*o1
+    rtn = o1*o2 - o2*o1
+    rtn.string = '[%s, %s]' % (o1.string, o2.string)
+    rtn.tex = r'\left[ %s, %s \right]' % (o1.tex, o2.tex)
+    rtn.brackets = ''
+    return rtn
 
-def Majorana(idx):
-    """
+def majorana(idx):
+    r"""
     A function generating an operator that represents a
     Majorana fermion as a boundary in a spin chain.
 
@@ -40,11 +44,15 @@ def Majorana(idx):
     b_idx = idx//2
     parity = idx % 2
     if parity:
-        m = Sigmay(b_idx)
+        rtn = sigmay(b_idx)
     else:
-        m = Sigmax(b_idx)
+        rtn = sigmax(b_idx)
 
     if b_idx > 0:
-        m = IndexProduct( Sigmaz(),max_i=b_idx-1) * m
+        rtn = index_product(sigmaz(), size=b_idx) * rtn
 
-    return m
+    rtn.string = 'χ[%d]' % idx
+    rtn.tex = r'\chi_{%d}' % idx
+    rtn.brackets = ''
+
+    return rtn
