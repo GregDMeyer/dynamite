@@ -1,6 +1,5 @@
 
 from ._imports import get_import
-from .backend import backend as bknd
 from .states import State
 
 import numpy as np
@@ -298,6 +297,7 @@ def entanglement_entropy(state,cut_size):
     float
         The entanglement entropy
     """
+    bpetsc = get_import('._backend.bpetsc')
 
     reduced = reduced_density_matrix(state,cut_size,fillall=False)
 

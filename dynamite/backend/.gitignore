@@ -1,4 +1,0 @@
-*.o
-config.pxi
-backend.c
-*.so

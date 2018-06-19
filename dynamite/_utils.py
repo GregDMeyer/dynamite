@@ -40,3 +40,18 @@ def parity(x):
         x = x ^ (x>>i)
         i *= 2
     return x & 1
+
+def intlog2(x):
+    '''
+    Compute floor(log2(x)) for integer x.
+    Also, intlog2(0) = -1.
+    '''
+    x = np.array(x)
+    count = np.zeros(x.shape, dtype = np.int)
+    count -= 1
+    mx = np.max(x)
+    while mx:
+        count[x != 0] += 1
+        x >>= 1
+        mx >>= 1
+    return count

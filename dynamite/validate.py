@@ -1,12 +1,13 @@
 
 import numpy as np
+from .msc_tools import msc_dtype
 
 def L(x):
     try:
-        if int(x) != x or x < 1:
+        if int(x) != x or x < 0:
             raise ValueError()
     except:
-        raise ValueError('Spin chain length L must be a positive integer.')
+        raise ValueError('Spin chain length L must be a nonnegative integer (got %s)' % str(x))
 
     return x
 
@@ -16,10 +17,8 @@ def subspace(s):
         raise ValueError('subspace can only be set to objects of Subspace type, or None')
     return s
 
-def MSC(x):
-    from ._imports import get_import
-    backend = get_import('backend')
-    x = np.array(x, copy=False, dtype=backend.MSC_dtype)
+def msc(x):
+    x = np.array(x, copy=False, dtype=msc_dtype)
     return x
 
 def brackets(x):

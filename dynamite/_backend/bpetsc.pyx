@@ -9,21 +9,9 @@ cimport numpy as np
 
 import cython
 
-cdef extern from "backend_impl.h":
+cdef extern from "bpetsc_impl.h":
     ctypedef int PetscInt
     ctypedef float PetscLogDouble
-
-    ctypedef enum subspace_type:
-        _FULL "FULL"
-        _PARITY "PARITY"
-
-    ctypedef struct Subspaces:
-        int left_type
-        int right_type
-        int left_space
-        int right_space
-
-    PetscInt get_dimension(PetscInt L,subspace_type type,int space)
 
     int BuildMat_Full(PetscInt L,
                       np.int_t nterms,
@@ -71,10 +59,6 @@ cdef extern from "shellcontext.h":
     ctypedef int PetscBool
     ctypedef struct shell_context:
         PetscBool gpu
-
-class SubspaceType:
-    FULL = _FULL
-    PARITY = _PARITY
 
 def get_build_version():
     return DNM_VERSION

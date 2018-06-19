@@ -1,8 +1,8 @@
 
-#include "cuda_shell_private.h"
+#include "bcuda_private.h"
 
 extern "C" {
-#include "cuda_shell.h"
+#include "bcuda_impl.h"
 }
 
 PetscErrorCode BuildMat_CUDAShell(PetscInt L,PetscInt nterms,PetscInt* masks,PetscInt* signs,PetscScalar* coeffs,Mat *A)

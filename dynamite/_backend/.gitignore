@@ -1,0 +1,6 @@
+*.o
+config.pxi
+dnm_types.h
+bpetsc.c
+bsubspace.c
+*.so

@@ -1,9 +1,8 @@
-#ifndef BACKEND_H
-#define BACKEND_H
+#pragma once
 
 #include <slepcmfn.h>
 #include "shellcontext.h"
-#include "subspace.h"
+#include "bsubspace_impl.h"
 
 /* allow us to set many values at once */
 #define VECSET_CACHE_SIZE 2048
@@ -38,5 +37,3 @@ PetscErrorCode BuildContext(PetscInt L,PetscInt nterms,
 PetscErrorCode DestroyContext(Mat A);
 
 PetscErrorCode ReducedDensityMatrix(PetscInt L,Vec x,PetscInt cut_size,PetscBool fillall,PetscScalar* m);
-
-#endif /* !BACKEND_H */

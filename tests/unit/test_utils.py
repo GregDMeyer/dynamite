@@ -6,8 +6,9 @@ These tests should NOT require MPI.
 '''
 
 import unittest as ut
+import numpy as np
 
-from dynamite._utils import popcount, parity
+from dynamite._utils import popcount, parity, intlog2
 
 class PopcountParity(ut.TestCase):
 
@@ -31,10 +32,34 @@ class PopcountParity(ut.TestCase):
             with self.subTest(x=x):
                 self.assertEqual(popcount(x), p)
 
-    def test_parity(self):
+    def test_parity_single(self):
         for x,p in self.test_cases:
             with self.subTest(x=x):
                 self.assertEqual(parity(x), p%2)
+
+    def test_parity_array(self):
+        x, p = np.array(self.test_cases, dtype = int).T
+        self.assertTrue(np.all(parity(x) == p%2))
+
+class IntLog2(ut.TestCase):
+
+    test_cases = [
+        (0, -1),
+        (1, 0),
+        (4, 2),
+        (6, 2),
+        (12, 3),
+        (148742, 17)
+    ]
+
+    def test_single(self):
+        for x,l in self.test_cases:
+            with self.subTest(x=x):
+                self.assertEqual(intlog2(x), l)
+
+    def test_array(self):
+        x, l = np.array(self.test_cases, dtype = int).T
+        self.assertTrue(np.all(intlog2(x) == l))
 
 if __name__ == '__main__':
     ut.main()

@@ -8,11 +8,11 @@ These tests should NOT require MPI.
 import unittest as ut
 import numpy as np
 
-from dynamite import msc
+from dynamite import msc_tools
 
 class ToNumpy(ut.TestCase):
     '''
-    Test the msc.MSC_to_numpy method, whose behavior defines the MSC array.
+    Test the msc_tools.MSC_to_numpy method, whose behavior defines the MSC array.
     So in some sense these tests are the definition of the MSC array.
     '''
 
@@ -25,49 +25,49 @@ class ToNumpy(ut.TestCase):
                         msg = '\n\n'.join(['\ndnm:\n'+str(dnm), '\nnpy:\n'+str(npy)]))
 
     def test_identity(self):
-        dnm = msc.MSC_to_numpy([(0, 0, 1)], (5,5))
+        dnm = msc_tools.msc_to_numpy([(0, 0, 1)], (5,5))
         npy = np.identity(5)
         self.check_same(dnm, npy)
 
     def test_identity_wide(self):
-        dnm = msc.MSC_to_numpy([(0, 0, 1)], (3,5),
-                               idx_to_state = lambda x: x if x < 3 else None)
+        dnm = msc_tools.msc_to_numpy([(0, 0, 1)], (3,5),
+                               idx_to_state = lambda x: x if x < 3 else -1)
         npy = np.identity(5)[:3,:]
         self.check_same(dnm, npy)
 
     def test_identity_tall(self):
-        dnm = msc.MSC_to_numpy([(0, 0, 1)], (5,3),
-                               state_to_idx = lambda x: x if x < 3 else None)
+        dnm = msc_tools.msc_to_numpy([(0, 0, 1)], (5,3),
+                               state_to_idx = lambda x: x if x < 3 else -1)
         npy = np.identity(5)[:,:3]
         self.check_same(dnm, npy)
 
     def test_allflip(self):
-        dnm = msc.MSC_to_numpy([(15, 0, 1)], (16,16))
+        dnm = msc_tools.msc_to_numpy([(15, 0, 1)], (16,16))
         npy = np.identity(16)[:,::-1]
         self.check_same(dnm, npy)
 
     def test_sign1(self):
-        dnm = msc.MSC_to_numpy([(0, 1, 1)], (16,16))
+        dnm = msc_tools.msc_to_numpy([(0, 1, 1)], (16,16))
         npy = np.diag([1, -1]*8)
         self.check_same(dnm, npy)
 
     def test_sign2(self):
-        dnm = msc.MSC_to_numpy([(0, 3, 1)], (16,16))
+        dnm = msc_tools.msc_to_numpy([(0, 3, 1)], (16,16))
         npy = np.diag([1, -1, -1, 1]*4)
         self.check_same(dnm, npy)
 
     def test_signL(self):
-        dnm = msc.MSC_to_numpy([(0, 8, 1)], (16,16))
+        dnm = msc_tools.msc_to_numpy([(0, 8, 1)], (16,16))
         npy = np.diag([1]*8 + [-1]*8)
         self.check_same(dnm, npy)
 
     def test_signL2(self):
-        dnm = msc.MSC_to_numpy([(0, 9, 1)], (16,16))
+        dnm = msc_tools.msc_to_numpy([(0, 9, 1)], (16,16))
         npy = np.diag([1, -1]*4 + [-1, 1]*4)
         self.check_same(dnm, npy)
 
     def test_full(self):
-        dnm = msc.MSC_to_numpy([(1, 5, 0.5j), (4, 3, -2)], (8, 8))
+        dnm = msc_tools.msc_to_numpy([(1, 5, 0.5j), (4, 3, -2)], (8, 8))
         npy = np.array(
             [
                 [    0,-0.5j,    0,    0,   -2,    0,    0,    0 ],
@@ -83,7 +83,7 @@ class ToNumpy(ut.TestCase):
         self.check_same(dnm, npy)
 
     def test_map1(self):
-        dnm = msc.MSC_to_numpy([(1, 5, 0.5j), (4, 3, -2)], (8, 8),
+        dnm = msc_tools.msc_to_numpy([(1, 5, 0.5j), (4, 3, -2)], (8, 8),
                                idx_to_state = lambda x: x^4)
         npy = np.array(
             [
@@ -100,7 +100,7 @@ class ToNumpy(ut.TestCase):
         self.check_same(dnm, npy)
 
     def test_map2(self):
-        dnm = msc.MSC_to_numpy([(1, 5, 0.5j), (4, 3, -2)], (8, 8),
+        dnm = msc_tools.msc_to_numpy([(1, 5, 0.5j), (4, 3, -2)], (8, 8),
                                state_to_idx = lambda x: x^4)
         npy = np.array(
             [
@@ -117,7 +117,7 @@ class ToNumpy(ut.TestCase):
         self.check_same(dnm, npy)
 
     def test_map_both(self):
-        dnm = msc.MSC_to_numpy([(1, 5, 0.5j), (4, 3, -2)], (8, 8),
+        dnm = msc_tools.msc_to_numpy([(1, 5, 0.5j), (4, 3, -2)], (8, 8),
                                state_to_idx = lambda x: x^4,
                                idx_to_state = lambda x: x^2)
         npy = np.array(
@@ -145,13 +145,13 @@ class MSCSum(ut.TestCase):
                                ('coeffs', np.complex128)])
 
     def check_same(self, check, target):
-        check = msc.combine_and_sort(check)
-        target = msc.combine_and_sort(np.array(target, dtype=self.dtype))
+        check = msc_tools.combine_and_sort(check)
+        target = msc_tools.combine_and_sort(np.array(target, dtype=self.dtype))
         self.assertTrue(np.array_equal(check, target),
                         msg = '\ncheck:\n'+str(check) + '\ntarget:\n'+str(target))
 
     def test_single(self):
-        check = msc.MSC_sum(np.array([(1, 2, 3)], dtype=self.dtype))
+        check = msc_tools.msc_sum(np.array([(1, 2, 3)], dtype=self.dtype))
         target = [(1, 2, 3)]
         self.check_same(check, target)
 
@@ -160,17 +160,17 @@ class MSCSum(ut.TestCase):
             np.array([(3, 2, 1j), (5, 6, 2)], dtype=self.dtype),
             np.array([(1, 2, 3)], dtype=self.dtype)
         ]
-        check = msc.MSC_sum(lst)
+        check = msc_tools.msc_sum(lst)
         target = [(3, 2, 1j), (5, 6, 2), (1, 2, 3)]
         self.check_same(check, target)
 
     def test_iterable(self):
-        check = msc.MSC_sum(np.array([(1, 2, i**2)], dtype=self.dtype) for i in range(5))
+        check = msc_tools.msc_sum(np.array([(1, 2, i**2)], dtype=self.dtype) for i in range(5))
         target = [(1, 2, 30)]
         self.check_same(check, target)
 
     def test_empty(self):
-        check = msc.MSC_sum([])
+        check = msc_tools.msc_sum([])
         target = []
         self.check_same(check, target)
 
@@ -185,13 +185,13 @@ class MSCProduct(ut.TestCase):
                                ('coeffs', np.complex128)])
 
     def check_same(self, check, target):
-        check = msc.combine_and_sort(check)
-        target = msc.combine_and_sort(np.array(target, dtype=self.dtype))
+        check = msc_tools.combine_and_sort(check)
+        target = msc_tools.combine_and_sort(np.array(target, dtype=self.dtype))
         self.assertTrue(np.array_equal(check, target),
                         msg = '\ncheck:\n'+str(check) + '\ntarget:\n'+str(target))
 
     def test_single(self):
-        check = msc.MSC_product(np.array([(1,2,3)], dtype=self.dtype))
+        check = msc_tools.msc_product(np.array([(1,2,3)], dtype=self.dtype))
         target = [(1,2,3)]
         self.check_same(check, target)
 
@@ -201,7 +201,7 @@ class MSCProduct(ut.TestCase):
             [(2, 0, 3)]
         ]
         lst = [np.array(x, dtype=self.dtype) for x in lst]
-        check = msc.MSC_product(lst)
+        check = msc_tools.msc_product(lst)
         target = [(3, 0, 6)]
         self.check_same(check, target)
 
@@ -211,7 +211,7 @@ class MSCProduct(ut.TestCase):
             [(0, 2, 3)]
         ]
         lst = [np.array(x, dtype=self.dtype) for x in lst]
-        check = msc.MSC_product(lst)
+        check = msc_tools.msc_product(lst)
         target = [(0, 3, 6)]
         self.check_same(check, target)
 
@@ -221,7 +221,7 @@ class MSCProduct(ut.TestCase):
             [(2, 2, 3)]
         ]
         lst = [np.array(x, dtype=self.dtype) for x in lst]
-        check = msc.MSC_product(lst)
+        check = msc_tools.msc_product(lst)
         target = [(3, 3, 6)]
         self.check_same(check, target)
 
@@ -231,7 +231,7 @@ class MSCProduct(ut.TestCase):
             [(0, 1, 3)]
         ]
         lst = [np.array(x, dtype=self.dtype) for x in lst]
-        check = msc.MSC_product(lst)
+        check = msc_tools.msc_product(lst)
         target = [(1, 1, 6)]
         self.check_same(check, target)
 
@@ -241,7 +241,7 @@ class MSCProduct(ut.TestCase):
             [(1, 0, 3)]
         ]
         lst = [np.array(x, dtype=self.dtype) for x in lst]
-        check = msc.MSC_product(lst)
+        check = msc_tools.msc_product(lst)
         target = [(1, 1, -6)]
         self.check_same(check, target)
 
@@ -252,7 +252,7 @@ class MSCProduct(ut.TestCase):
             [(1, 0, 3), (6, 4, 7), (3, 4, 11)]
         ]
         lst = [np.array(x, dtype=self.dtype) for x in lst]
-        check = msc.MSC_product(lst)
+        check = msc_tools.msc_product(lst)
         target = [(0, 1, -6),
                   (7, 5, 14),
                   (2, 5,-22),
@@ -272,69 +272,69 @@ class ShiftMSC(ut.TestCase):
                                ('coeffs', np.complex128)])
 
     def test_single_mask(self):
-        MSC = np.array([(1, 0, 0.5j)], dtype = self.dtype)
+        msc = np.array([(1, 0, 0.5j)], dtype = self.dtype)
         for i in range(5):
             with self.subTest(shift=i):
-                shifted = msc.shift(MSC, i, None)
+                shifted = msc_tools.shift(msc, i, None)
                 self.assertEqual(shifted['masks'], 2**i)
                 self.assertEqual(shifted['signs'], 0)
                 self.assertEqual(shifted['coeffs'], 0.5j)
                 # check that we haven't changed it
-                self.assertTrue(np.all(MSC == np.array([(1, 0, 0.5j)], dtype = self.dtype)))
+                self.assertTrue(np.all(msc == np.array([(1, 0, 0.5j)], dtype = self.dtype)))
 
     def test_single_sign(self):
-        MSC = np.array([(0, 1, 0.5j)], dtype = self.dtype)
+        msc = np.array([(0, 1, 0.5j)], dtype = self.dtype)
         for i in range(5):
             with self.subTest(shift=i):
-                shifted = msc.shift(MSC, i, None)
+                shifted = msc_tools.shift(msc, i, None)
                 self.assertEqual(shifted['masks'], 0)
                 self.assertEqual(shifted['signs'], 2**i)
                 self.assertEqual(shifted['coeffs'], 0.5j)
-                self.assertTrue(np.all(MSC == np.array([(0, 1, 0.5j)], dtype = self.dtype)))
+                self.assertTrue(np.all(msc == np.array([(0, 1, 0.5j)], dtype = self.dtype)))
 
     def test_single_mask_wrap(self):
-        MSC = np.array([(16, 0, 0.5j)], dtype = self.dtype)
+        msc = np.array([(16, 0, 0.5j)], dtype = self.dtype)
         for i in range(1,5):
             with self.subTest(shift=i):
-                shifted = msc.shift(MSC, i, 5)
+                shifted = msc_tools.shift(msc, i, 5)
                 self.assertEqual(shifted['masks'], 2**(i-1))
                 self.assertEqual(shifted['signs'], 0)
                 self.assertEqual(shifted['coeffs'], 0.5j)
-                self.assertTrue(np.all(MSC == np.array([(16, 0, 0.5j)], dtype = self.dtype)))
+                self.assertTrue(np.all(msc == np.array([(16, 0, 0.5j)], dtype = self.dtype)))
 
     def test_single_sign_wrap(self):
-        MSC = np.array([(0, 16, 0.5j)], dtype = self.dtype)
+        msc = np.array([(0, 16, 0.5j)], dtype = self.dtype)
         for i in range(1,5):
             with self.subTest(shift=i):
-                shifted = msc.shift(MSC, i, 5)
+                shifted = msc_tools.shift(msc, i, 5)
                 self.assertEqual(shifted['masks'], 0)
                 self.assertEqual(shifted['signs'], 2**(i-1))
                 self.assertEqual(shifted['coeffs'], 0.5j)
-                self.assertTrue(np.all(MSC == np.array([(0, 16, 0.5j)], dtype = self.dtype)))
+                self.assertTrue(np.all(msc == np.array([(0, 16, 0.5j)], dtype = self.dtype)))
 
     def test_multiple(self):
-        MSC = np.array([(3, 4, 0.5),
+        msc = np.array([(3, 4, 0.5),
                         (4, 1, 1.5),
                         (1, 3, 4.5j)], dtype = self.dtype)
-        orig = MSC.copy()
+        orig = msc.copy()
 
-        shifted = msc.shift(MSC, 2, None)
-        self.assertTrue(np.all(shifted['masks'] == MSC['masks']*4))
-        self.assertTrue(np.all(shifted['signs'] == MSC['signs']*4))
-        self.assertTrue(np.all(shifted['coeffs'] == MSC['coeffs']))
-        self.assertTrue(np.all(MSC == orig))
+        shifted = msc_tools.shift(msc, 2, None)
+        self.assertTrue(np.all(shifted['masks'] == msc['masks']*4))
+        self.assertTrue(np.all(shifted['signs'] == msc['signs']*4))
+        self.assertTrue(np.all(shifted['coeffs'] == msc['coeffs']))
+        self.assertTrue(np.all(msc == orig))
 
     def test_multiple_wrap(self):
-        MSC = np.array([(5, 4, 0.5),
+        msc = np.array([(5, 4, 0.5),
                         (4, 1, 1.5),
                         (1, 3, 4.5j)], dtype = self.dtype)
-        orig = MSC.copy()
+        orig = msc.copy()
 
-        shifted = msc.shift(MSC, 3, 5)
+        shifted = msc_tools.shift(msc, 3, 5)
         self.assertTrue(np.all(shifted['masks'] == np.array([9, 1, 8])))
         self.assertTrue(np.all(shifted['signs'] == np.array([1, 8, 24])))
-        self.assertTrue(np.all(shifted['coeffs'] == MSC['coeffs']))
-        self.assertTrue(np.all(MSC == orig))
+        self.assertTrue(np.all(shifted['coeffs'] == msc['coeffs']))
+        self.assertTrue(np.all(msc == orig))
 
 class ReduceMSC(ut.TestCase):
     '''
@@ -347,7 +347,7 @@ class ReduceMSC(ut.TestCase):
                                ('coeffs', np.complex128)])
 
     def check_same(self, check, target):
-        check = msc.combine_and_sort(check)
+        check = msc_tools.combine_and_sort(check)
         self.assertTrue(np.array_equal(check, target),
                         msg = '\ncheck:\n'+str(check) + '\ntarget:\n'+str(target))
 
@@ -450,15 +450,15 @@ class Serialization(ut.TestCase):
     def test_serialize(self):
         for n, case in enumerate(self.test_cases):
             with self.subTest(n = n):
-                ser = msc.serialize(case['MSC'])
+                ser = msc_tools.serialize(case['MSC'])
                 self.assertEqual(ser, case['serial'])
 
     def test_deserialize(self):
         for n, case in enumerate(self.test_cases):
             with self.subTest(n = n):
-                MSC = msc.deserialize(case['serial'])
-                self.assertTrue(np.all(MSC == case['MSC']),
-                                msg = '\n'+'\n\n'.join([str(MSC), str(case['MSC'])]))
+                msc = msc_tools.deserialize(case['serial'])
+                self.assertTrue(np.all(msc == case['MSC']),
+                                msg = '\n'+'\n\n'.join([str(msc), str(case['MSC'])]))
 
 class MaxSpinIdx(ut.TestCase):
 
@@ -468,32 +468,32 @@ class MaxSpinIdx(ut.TestCase):
 
     def test_single_zero(self):
         check = np.array([(1, 0, 2)], dtype = self.dtype)
-        self.assertEqual(msc.max_spin_idx(check), 0)
+        self.assertEqual(msc_tools.max_spin_idx(check), 0)
 
     def test_single_mask(self):
         check = np.array([(4, 2, 18j)], dtype = self.dtype)
-        self.assertEqual(msc.max_spin_idx(check), 2)
+        self.assertEqual(msc_tools.max_spin_idx(check), 2)
 
     def test_single_sign(self):
         check = np.array([(1, 3, 18j)], dtype = self.dtype)
-        self.assertEqual(msc.max_spin_idx(check), 1)
+        self.assertEqual(msc_tools.max_spin_idx(check), 1)
 
     def test_multiple_mask(self):
         check = np.array([(1, 3, 18j), (9, 2, 1), (2, 5, 18j)], dtype = self.dtype)
-        self.assertEqual(msc.max_spin_idx(check), 3)
+        self.assertEqual(msc_tools.max_spin_idx(check), 3)
 
     def test_multiple_sign(self):
         check = np.array([(1, 3, 18j), (9, 2, 1), (2, 17, 12)], dtype = self.dtype)
-        self.assertEqual(msc.max_spin_idx(check), 4)
+        self.assertEqual(msc_tools.max_spin_idx(check), 4)
 
     def test_empty(self):
         # we want -1 in this case so that for loops based on this terminate correctly
         check = np.array([], dtype = self.dtype)
-        self.assertEqual(msc.max_spin_idx(check), -1)
+        self.assertEqual(msc_tools.max_spin_idx(check), -1)
 
 class NNZ(ut.TestCase):
     '''
-    Test the msc.nnz method.
+    Test the msc_tools.nnz method.
     '''
 
     dtype = np.dtype([('masks', np.int32),
@@ -502,26 +502,26 @@ class NNZ(ut.TestCase):
 
     def test_empty(self):
         check = np.array([], dtype = self.dtype)
-        self.assertEqual(msc.nnz(check), 0)
+        self.assertEqual(msc_tools.nnz(check), 0)
 
     def test_single(self):
         check = np.array([(0, 0, 1)], dtype = self.dtype)
-        self.assertEqual(msc.nnz(check), 1)
+        self.assertEqual(msc_tools.nnz(check), 1)
 
     def test_single_offdiag(self):
         check = np.array([(2, 0, 1)], dtype = self.dtype)
-        self.assertEqual(msc.nnz(check), 1)
+        self.assertEqual(msc_tools.nnz(check), 1)
 
     def test_multiple_sign(self):
         check = np.array([(2, 3, 1j), (2, 0, 1)], dtype = self.dtype)
-        self.assertEqual(msc.nnz(check), 1)
+        self.assertEqual(msc_tools.nnz(check), 1)
 
     def test_multiple(self):
         check = np.array([(0, 0, 1),
                           (1, 0, 2),
                           (1, 1, 3),
                           (2, 4, 0.5j)], dtype = self.dtype)
-        self.assertEqual(msc.nnz(check), 3)
+        self.assertEqual(msc_tools.nnz(check), 3)
 
 if __name__ == '__main__':
     ut.main()

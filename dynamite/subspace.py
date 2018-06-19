@@ -3,34 +3,37 @@ import numpy as np
 from copy import deepcopy
 
 from . import validate
+from ._backend import bsubspace
+from ._utils import parity, intlog2
 
-# TODO: this will be serial_backend eventually
-from .backend import backend
-
-# TODO: implement checks that subspace is valid?
+# TODO: allow automatically choosing subspace for operators
 
 def class_to_enum(subspace_type):
+    '''
+    Convert the class types used in the Python frontend to the enum values
+    used in the C backend.
+    '''
     to_enum = {
-        Parity : backend.SubspaceType.PARITY,
-        Full : backend.SubspaceType.FULL
+        Full   : bsubspace.SubspaceType.FULL,
+        Parity : bsubspace.SubspaceType.PARITY,
+        Auto   : bsubspace.SubspaceType.AUTO,
     }
     return to_enum[subspace_type]
 
 class Subspace:
-    # base class for all subspaces. Each one should define these
-    # member functions.
 
-    _space = None
-
-    def __init__(self,space=None,L=None):
-        self.space = space
-        self.L = L # should use config value
+    def __init__(self, space):
+        self._L = None
+        self._space = self._check_space(space)
 
     def __eq__(self,s):
         if not isinstance(s,Subspace):
             raise ValueError('Cannot compare Subspace to non-Subspace type')
+        return type(s) == type(self) and s.L == self.L and s.space == self.space
 
-        return type(s) == type(self) and s.space == self.space
+    @classmethod
+    def _check_space(cls, value):
+        raise NotImplementedError()
 
     @property
     def space(self):
@@ -40,140 +43,182 @@ class Subspace:
         """
         return self._space
 
-    # need to be careful here--if we change the subspace but the matrix
-    # isn't destroyed, it could mess everything up!
-    @space.setter
-    def space(self):
-        raise NotImplementedError()
-
-    def get_size(self,L=None):
-        """
-        Get the dimension of the Hilbert space for a spin chain length `L`.
-
-        Parameters
-        ----------
-
-        L : int, optional
-            The spin chain length. Can be omitted if Subspace.L is set.
-        """
-
-        if L is None:
-            L = self.L
-
-        L = validate.L(L)
-
-        return self._get_size(L)
+    @property
+    def L(self):
+        '''
+        The spin chain length corresponding to this space.
+        '''
+        return self._L
 
     @classmethod
-    def _get_size(cls,L):
+    def _check_L(cls, L, space):
         raise NotImplementedError()
 
-    def idx_to_state(self,idx):
-        """
-        Maps a matrix or vector index to an integer representing the
-        corresponding spin configuration (or, equivalently, an index
-        in the full Hilbert space)
-        """
+    @L.setter
+    def L(self, value):
+        # check that this value of L is compatible with the subspace
+        value = validate.L(value)
+        value = self._check_L(value, self.space)
+        self._L = value
+
+    @classmethod
+    def _get_dimension(cls, L, space):
         raise NotImplementedError()
 
-    def state_to_idx(self,state):
+    def get_dimension(self):
+        """
+        Get the dimension of the subspace.
+        """
+        return self._get_dimension(self.L, self.space)
+
+    @classmethod
+    def _idx_to_state(cls, idx, L, space):
+        raise NotImplementedError
+
+    def idx_to_state(self, idx):
+        """
+        Maps an index to an integer that in binary corresponds to the spin configuration.
+        Vectorized implementation allows passing a numpy array of indices as idx.
+        """
+        if self.L is None:
+            raise ValueError('Must set spin chain size for Subspace before calling '
+                             'idx_to_state.')
+        idx = np.array(idx, shape = (-1,), copy = False, dtype = bsubspace.dnm_int_t)
+        return self._idx_to_state(idx, self.L, self.space)
+
+    @classmethod
+    def _state_to_idx(cls, state, L, space):
+        raise NotImplementedError
+
+    def state_to_idx(self, state):
         """
         The inverse mapping of :meth:`idx_to_state`.
         """
-        raise NotImplementedError()
-
-    def update_operator(self,which,operator):
-        """
-        Updates an operator when the subspace changes. This is allowed to be
-        overridden by particular subspaces, so that clever things can be done to save
-        memory.
-        """
-        if which == 'left':
-            if operator.left_subspace != self:
-                operator.destroy_mat()
-        elif which == 'right':
-            if operator.right_subspace != self:
-                operator.destroy_mat()
-        else:
-            raise ValueError('which must be "left" or "right"')
+        if self.L is None:
+            raise ValueError('Must set spin chain size for Subspace before calling '
+                             'state_to_idx.')
+        state = np.array(state, shape = (-1,), copy = False, dtype = bsubspace.dnm_int_t)
+        return self._state_to_idx(state, self.L, self.space)
 
     def copy(self):
         return deepcopy(self)
 
-
-class Parity(Subspace):
-
-    @classmethod
-    def _get_size(cls,L):
-        return 1<<(L-1)
-
-    @Subspace.space.setter
-    def space(self,value):
-        if value in [0,'even']:
-            self._space = 0
-        elif value in [1,'odd']:
-            self._space = 1
-        elif value is None:
-            self._space = None
-        else:
-            raise ValueError('Invalid parity space "'+str(value)+'" (valid choices are 0,1,"even","odd",None)')
-
-    @classmethod
-    def parity(cls,x):
-        x = np.array(x)
-        p = x&1
-        x >>= 1
-        while np.any(x):
-            p ^= x&1
-            x >>= 1
-        return p
-
-    def idx_to_state(self,idx):
-
-        # TODO: need to be careful about memory usage if this is called with a huge array
-
-        if self.space is None:
-            raise ValueError('Must set parity space (even or odd) before calling idx_to_state.')
-
-        if self.L is None:
-            raise ValueError('Must set spin chain size for parity object (Parity.L) before calling '
-                             'idx_to_state.')
-
-        p = self.parity(idx)
-        prefix = p^self.space
-        return idx | (prefix << (self.L-1))
-
-    def state_to_idx(self,state):
-        if self.space is None:
-            raise ValueError('Must set parity space (even or odd) before calling state_to_idx.')
-
-        if self.L is None:
-            raise ValueError('Must set spin chain size for parity object (Parity.L) before calling '
-                             'state_to_idx.')
-
-        idxs = state & (~((-1)<<(self.L-1)))
-        bad = self.parity(state) != self.space
-        idxs[bad] = -1
-        return idxs
-
 class Full(Subspace):
 
+    def __init__(self, space = None):
+        Subspace.__init__(self, space = space)
+
     @classmethod
-    def _get_size(cls,L):
-        return 1<<L
+    def _get_dimension(cls, L, space):
+        return 1 << L
 
-    @Subspace.space.setter
-    def space(self,value):
+    @classmethod
+    def _check_space(cls, value):
         if not (value is None or value == 0):
-            raise ValueError('Only valid choice for full space subspace specifier is "None" or 0.')
-        self._space = 0
+            raise ValueError('Only valid choice for full space is "None" or 0.')
+        return 0
 
-    def state_to_idx(self,state):
-        if not 0 <= state < self.get_size():
-            raise ValueError('State %d out of range (%d,%d)' % (state,0,self.get_size()))
+    @classmethod
+    def _check_L(cls, L, space):
+        # any L that passes our normal validation checks works
+        return L
+
+    @classmethod
+    def _idx_to_state(cls, idx, L, space):
+        dim = cls._get_dimension(L, space)
+        out_of_range = np.logical_or(idx < 0, idx >= dim)
+        idx[out_of_range] = -1
+        return idx
+
+    @classmethod
+    def _state_to_idx(cls, state, L, space):
+        dim = cls._get_dimension(L, space)
+        out_of_range = np.logical_or(state < 0, state >= dim)
+        state[out_of_range] = -1
         return state
 
-    def idx_to_state(self,idx):
-        if not 0 <= idx < self.get_size():
-            raise ValueError('State %d out of range (%d,%d)' % (idx,0,self.get_size()))
-        return idx
+class Parity(Subspace):
+    '''
+    The subspaces of states in which the number of up spins is even or odd.
+
+    Parameters
+    ----------
+    space : int
+        Either 0 or 'even' for the even subspace, or 1 or 'odd' for the other.
+    '''
+
+    @classmethod
+    def _get_dimension(cls, L, space):
+        return 1 << (L-1)
+
+    @classmethod
+    def _check_space(cls, value):
+        if value in [0,'even']:
+            return 0
+        elif value in [1,'odd']:
+            return 1
+        else:
+            raise ValueError('Invalid parity space "'+str(value)+'" '
+                             '(valid choices are 0, 1, "even", or "odd")')
+
+    @classmethod
+    def _check_L(cls, L, space):
+        # any L that passes our normal validation checks works
+        return L
+
+    @classmethod
+    def _idx_to_state(cls, idx, L, space):
+        dim = cls._get_dimension(L, space)
+        out_of_range = np.logical_or(idx < 0, idx >= dim)
+        state = bsubspace.parity_i2s(idx, L, space)
+        state[out_of_range] = -1
+        return state
+
+    @classmethod
+    def _state_to_idx(cls, state, L, space):
+        par = parity(state)
+        max_spin_idx = intlog2(state)
+        invalid = np.logical_or(par != space, max_spin_idx >= L)
+        idxs = bsubspace.parity_s2i(state, L, space)
+        idxs[invalid] = -1
+        return idxs
+
+class Auto(Subspace):
+    '''
+    Automatically generate a mapping that takes advantage of any possible spin conservation
+    law, by performing a breadth-first search of the graph of possible states using the operator
+    as an adjacency matrix. The subspace is defined by providing a "start" state; the returned
+    subspace will be whatever subspace contains that state.
+
+    This class can provide scalability advantages over the other subspace classes, because it uses
+    Cuthill-McKee ordering to reduce the bandwidth of the matrix, reducing the amount of
+    communication required between MPI nodes. However, currently the actual computation of the
+    ordering only can occur on process 0.
+
+    Parameters
+    ----------
+    space : int
+        An integer whose binary representation corresponds to the spin configuration of the "start"
+        state mentioned above.
+    '''
+
+    @classmethod
+    def _get_dimension(cls, L, space):
+        raise NotImplementedError()
+
+    @classmethod
+    def _check_space(cls, value):
+        raise NotImplementedError()
+
+    @classmethod
+    def _check_L(cls, L, space):
+        # any L that passes our normal validation checks works
+        return L
+
+    @classmethod
+    def _idx_to_state(cls, idx, L, space):
+        raise NotImplementedError()
+
+    @classmethod
+    def _state_to_idx(cls, state, L, space):
+        raise NotImplementedError()

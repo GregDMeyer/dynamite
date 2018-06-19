@@ -1,12 +1,9 @@
 
-from . import config
-config.initialize()
+# TODO: need to add config.initialize where it's needed
 
 import numpy as np
 from petsc4py import PETSc
 from slepc4py import SLEPc
-
-from .backend import backend
 
 __all__ = [
     'get_version',

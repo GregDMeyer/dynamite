@@ -5,7 +5,7 @@ defines their built-in behavior and operations.
 
 import numpy as np
 
-from . import config, validate, info, msc
+from . import config, validate, info, msc_tools
 from .computations import evolve, eigsolve
 from .subspace import class_to_enum
 from .states import State
@@ -24,7 +24,7 @@ class Operator:
         self._L = None
         self._max_spin_idx = None
         self._mat = None
-        self._MSC = None
+        self._msc = None
         self._is_reduced = False
         self._has_diag_entries = False
         self._shell = config.shell
@@ -47,7 +47,7 @@ class Operator:
             A copy of the operator
         """
         rtn = Operator()
-        rtn.MSC = self.MSC
+        rtn.msc = self.msc
         rtn.is_reduced = self.is_reduced
         rtn.shell = self.shell
         rtn.left_subspace = self.left_subspace.copy()
@@ -131,7 +131,7 @@ class Operator:
         # cleared when MSC changes
 
         if self._max_spin_idx is None:
-            self._max_spin_idx = msc.max_spin_idx(self.MSC)
+            self._max_spin_idx = msc_tools.max_spin_idx(self.msc)
 
         return self._max_spin_idx
 
@@ -168,21 +168,21 @@ class Operator:
         """
         Read-only attribute returning the dimensions of the matrix.
         """
-        return self.left_subspace.get_size(), self.right_subspace.get_size()
+        return self.left_subspace.get_dimension(), self.right_subspace.get_dimension()
 
     @property
     def nnz(self):
         """
         The number of nonzero elements per row of the sparse matrix.
         """
-        return msc.nnz(self.MSC)
+        return msc_tools.nnz(self.msc)
 
     @property
-    def MSC_size(self):
+    def msc_size(self):
         """
         The number of elements in the MSC representation of the matrix.
         """
-        return len(self.MSC)
+        return len(self.msc)
 
     @property
     def density(self):
@@ -369,7 +369,7 @@ class Operator:
         expanded and simplified to the same form no matter how the operator was
         built.
 
-        Call :meth:`Operator.reduce_MSC` first for a more compact table.
+        Call :meth:`Operator.reduce_msc` first for a more compact table.
 
         [This function is not yet implemented]
         '''
@@ -392,7 +392,7 @@ class Operator:
             The byte string containing the serialized object.
 
         '''
-        return msc.serialize(self.MSC)
+        return msc_tools.serialize(self.msc)
 
     def save(self, filename):
         """
@@ -462,9 +462,9 @@ class Operator:
 
         self.destroy_mat()
 
-        self.reduce_MSC()
+        self.reduce_msc()
 
-        term_array = self.MSC
+        term_array = self.msc
 
         self._has_diag_entries = term_array[0]['masks'] == 0
         if diag_entries and not self._has_diag_entries:
@@ -505,32 +505,32 @@ class Operator:
     ### mask, sign, coefficient representation of operators
 
     @property
-    def MSC(self):
+    def msc(self):
         '''
         The (mask, sign, coefficient) representation of the operator. This
         representation is used internally by dynamite.
         '''
-        return self._MSC
+        return self._msc
 
-    @MSC.setter
-    def MSC(self, value):
-        value = validate.MSC(value)
+    @msc.setter
+    def msc(self, value):
+        value = validate.msc(value)
         self._max_spin_idx = None
         self.is_reduced = False
-        self._MSC = value
+        self._msc = value
 
-    def reduce_MSC(self):
+    def reduce_msc(self):
         '''
         Combine and sort terms in the MSC representation, compressing it and
         preparing it for use in the backend.
         '''
-        self.MSC = msc.combine_and_sort(self.MSC)
+        self.msc = msc_tools.combine_and_sort(self.msc)
         self.is_reduced = True
 
     @property
     def is_reduced(self):
         '''
-        Whether :meth:`Operators.reduce_MSC` has been called. Can also be set manually to avoid
+        Whether :meth:`Operators.reduce_msc` has been called. Can also be set manually to avoid
         calling that function, if you are sure that the terms are sorted already.
         '''
         return self._is_reduced
@@ -539,7 +539,7 @@ class Operator:
     def is_reduced(self, value):
         self._is_reduced = value
 
-    def get_shifted_MSC(self, shift, wrap_idx = None):
+    def get_shifted_msc(self, shift, wrap_idx = None):
         '''
         Get the MSC representation of the operator, with all terms translated along
         the spin chain (away from zero) by ``shift`` spins.
@@ -558,7 +558,7 @@ class Operator:
         numpy.ndarray
             A numpy array containing the representation.
         '''
-        return msc.shift(self.MSC, shift, wrap_idx)
+        return msc_tools.shift(self.msc, shift, wrap_idx)
 
     ### interface to numpy
 
@@ -573,7 +573,7 @@ class Operator:
             The array.
         '''
 
-        ary = msc.MSC_to_numpy(self.MSC,
+        ary = msc_tools.msc_to_numpy(self.msc,
                                (self.left_subspace.dim, self.right_subspace.dim),
                                self.left_subspace.idx_to_state,
                                self.right_subspace.state_to_idx)
@@ -616,14 +616,14 @@ class Operator:
 
     def __eq__(self, x):
         if isinstance(x, Operator):
-            return np.array_equal(self.MSC, x.MSC)
+            return np.array_equal(self.msc, x.msc)
         else:
             raise TypeError('Equality not supported for types %s and %s'
                             % (str(type(self)), str(type(x))))
 
     def _op_add(self, o):
         rtn = self.copy()
-        rtn.MSC = msc.MSC_sum([self.MSC, o.MSC])
+        rtn.msc = msc_tools.msc_sum([self.msc, o.msc])
         rtn.tex = self.tex + ' + ' + o.tex
         rtn.string = self.string + ' + ' + o.string
         rtn.brackets = '()'
@@ -631,7 +631,7 @@ class Operator:
 
     def _op_mul(self, o):
         rtn = self.copy()
-        rtn.MSC = msc.MSC_product([self.MSC, o.MSC])
+        rtn.msc = msc_tools.msc_product([self.msc, o.msc])
         rtn.string = self.with_brackets('string') + '*' + o.with_brackets('string')
         rtn.tex = self.with_brackets('tex') + '*' + o.with_brackets('tex')
         rtn.brackets = ''
@@ -639,7 +639,7 @@ class Operator:
 
     def _num_mul(self, x):
         rtn = self.copy()
-        rtn.MSC['coeffs'] *= x
+        rtn.msc['coeffs'] *= x
         rtn.string = '{:.3f}*'.format(x) + self.with_brackets('string')
         rtn.tex = '{:.3f}*'.format(x) + self.with_brackets('tex')
         rtn.brackets = ''
@@ -680,8 +680,8 @@ def from_bytes(data):
         The operator.
     """
     o = Operator()
-    MSC = msc.deserialize(data)
-    o.MSC = MSC
+    msc = msc_tools.deserialize(data)
+    o.msc = msc
     o.string = '[operator from bytes]'
     o.tex = r'\left[\text{operator from bytes}\right]'
     return o
@@ -709,13 +709,13 @@ def op_sum(terms, nshow = 3):
     """
 
     o = Operator()
-    MSC_terms = []
+    msc_terms = []
     strings = []
     texs = []
 
     done = False
     for n,t in enumerate(terms):
-        MSC_terms.append(t.MSC)
+        msc_terms.append(t.msc)
         strings.append(t.string)
         texs.append(t.tex)
         if n >= nshow:
@@ -726,9 +726,9 @@ def op_sum(terms, nshow = 3):
     if not done:
         strings[-1] = '...'
         texs[-1] = r'\cdots'
-        MSC_terms.append(msc.MSC_sum(terms))
+        msc_terms.append(msc_tools.msc_sum(terms))
 
-    o.MSC = msc.MSC_sum(MSC_terms)
+    o.msc = msc_tools.msc_sum(msc_terms)
     o.string = ' + '.join(strings)
     o.tex = ' + '.join(texs)
     o.brackets = '()'
@@ -754,17 +754,17 @@ def op_product(terms):
     # for taking the product of a huge number of terms. So we assume the number
     # of terms is O(1) in this implementation.
 
-    MSC_terms = []
+    msc_terms = []
     strings = []
     texs = []
     for t in terms:
-        MSC_terms.append(t.MSC)
+        msc_terms.append(t.msc)
         strings.append(t.with_brackets(which='string'))
         texs.append(t.with_brackets(which='tex'))
 
-    if MSC_terms:
+    if msc_terms:
         o = Operator()
-        o.MSC = msc.MSC_product(MSC_terms)
+        o.msc = msc_tools.msc_product(msc_terms)
         o.string = '*'.join(strings)
         o.tex = '*'.join(texs)
         o.brackets = ''
@@ -825,7 +825,7 @@ def index_sum(op, size = None, start = 0, boundary = 'open'):
         raise ValueError("invalid value for argument 'boundary' (can be 'open' or 'closed')")
 
     rtn = Operator()
-    rtn.MSC = msc.MSC_sum(op.get_shifted_MSC(i, wrap_idx) for i in range(start, stop))
+    rtn.msc = msc_tools.msc_sum(op.get_shifted_msc(i, wrap_idx) for i in range(start, stop))
 
     rtn.string = 'index_sum(' + op.string + ', sites %d - %d)' % (start, stop-1)
     # TODO: make tex prettier by substituting i for the indices
@@ -863,7 +863,7 @@ def index_product(op, size = None, start = 0):
     stop = start + size - op.max_spin_idx
 
     rtn = Operator()
-    rtn.MSC = msc.MSC_product(op.get_shifted_MSC(i, wrap_idx = None) for i in range(start, stop))
+    rtn.msc = msc_tools.msc_product(op.get_shifted_msc(i, wrap_idx = None) for i in range(start, stop))
 
     rtn.string = 'index_product(' + op.string + ', sites %d - %d)' % (start, stop-1)
     # TODO: make tex prettier by substituting i for the indices
@@ -877,7 +877,7 @@ def sigmax(i=0):
     The Pauli :math:`\sigma_x` operator on site :math:`i`.
     """
     o = Operator()
-    o.MSC = [(1<<i, 0, 1)]
+    o.msc = [(1<<i, 0, 1)]
     o.tex = r'\sigma^x_{'+str(i)+'}'
     o.string = 'σx'+str(i).join('[]')
     return o
@@ -887,7 +887,7 @@ def sigmay(i=0):
     The Pauli :math:`\sigma_y` operator on site :math:`i`.
     """
     o = Operator()
-    o.MSC = [(1<<i, 1<<i, 1j)]
+    o.msc = [(1<<i, 1<<i, 1j)]
     o.tex = r'\sigma^y_{'+str(i)+'}'
     o.string = 'σy'+str(i).join('[]')
     return o
@@ -897,7 +897,7 @@ def sigmaz(i=0):
     The Pauli :math:`\sigma_z` operator on site :math:`i`.
     """
     o = Operator()
-    o.MSC = [(0, 1<<i, 1)]
+    o.msc = [(0, 1<<i, 1)]
     o.tex = r'\sigma^z_{'+str(i)+'}'
     o.string = 'σz'+str(i).join('[]')
     return o
@@ -908,7 +908,7 @@ def identity():
     the rest of the sites, the ``index`` argument has no effect.
     """
     o = Operator()
-    o.MSC = [(0, 0, 1)]
+    o.msc = [(0, 0, 1)]
     # TODO: do a fancy double-lined 1?
     o.tex = '1'
     o.string = '1'
@@ -920,7 +920,7 @@ def zero():
     Like for the identity, the ``index`` argument has no effect.
     """
     o = Operator()
-    o.MSC = []
+    o.msc = []
     o.tex = '0'
     o.string = '0'
     return o

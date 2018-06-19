@@ -6,12 +6,15 @@ The MSC_to_numpy method is the reference implementation that defines the MSC for
 
 from itertools import chain
 import numpy as np
-from ._utils import parity
+from ._utils import parity, intlog2
 
-# TODO: move MSC_dtype here, and get int_size from backend
-from .backend.backend import MSC_dtype
+from ._backend.bbuild import dnm_int_t
 
-def MSC_to_numpy(MSC, dims, idx_to_state = None, state_to_idx = None):
+msc_dtype = np.dtype([('masks', dnm_int_t),
+                      ('signs', dnm_int_t),
+                      ('coeffs', np.complex128)])
+
+def msc_to_numpy(msc, dims, idx_to_state = None, state_to_idx = None):
     '''
     Build a NumPy array from an MSC array. This method isolates to_numpy
     from the rest of the class for testing. It also defines the MSC
@@ -20,7 +23,7 @@ def MSC_to_numpy(MSC, dims, idx_to_state = None, state_to_idx = None):
     Parameters
     ----------
 
-    MSC : np.ndarray(dtype = MSC_dtype)
+    MSC : np.ndarray(dtype = msc_dtype)
         An MSC array.
 
     dims : (int, int)
@@ -52,16 +55,17 @@ def MSC_to_numpy(MSC, dims, idx_to_state = None, state_to_idx = None):
 
     for idx in range(dims[0]):
         bra = idx_to_state(idx)
-        for m,s,c in MSC:
+        for m,s,c in msc:
             ket = m ^ bra
             ridx = state_to_idx(ket)
-            if ridx is not None: # otherwise we went out of the subspace
+            # TODO: do we need to be careful about unsigned integers here?
+            if ridx != -1: # otherwise we went out of the subspace
                 sign = 1 - 2*(parity(s & ket))
                 ary[idx, ridx] += sign * c
 
     return ary
 
-def MSC_sum(iterable):
+def msc_sum(iterable):
     '''
     Defines the matrix addition operation for any number of MSC matrices returned by
     ``iterable``.
@@ -81,11 +85,11 @@ def MSC_sum(iterable):
     try:
         first = next(iterable)
     except StopIteration:
-        return np.ndarray(0, dtype = MSC_dtype)
+        return np.ndarray(0, dtype = msc_dtype)
 
     return np.hstack(chain([first],iterable))
 
-def MSC_product(iterable):
+def msc_product(iterable):
     '''
     Defines the matrix-matrix-matrix-... product operation for MSC matrices.
 
@@ -119,7 +123,7 @@ def MSC_product(iterable):
 
     return rtn
 
-def shift(MSC, shift, wrap_idx):
+def shift(msc, shift, wrap_idx):
     '''
     Shift an MSC representation along the spin chain. Guaranteed to not modify input,
     but not guaranteed to return a copy (could return the same object).
@@ -143,9 +147,9 @@ def shift(MSC, shift, wrap_idx):
     '''
 
     if shift == 0:
-        return MSC
+        return msc
 
-    msc = MSC.copy()
+    msc = msc.copy()
 
     msc['masks'] <<= shift
     msc['signs'] <<= shift
@@ -170,7 +174,7 @@ def shift(MSC, shift, wrap_idx):
 
     return msc
 
-def combine_and_sort(MSC):
+def combine_and_sort(msc):
     '''
     Take an MSC representation, sort it, and combine like terms.
 
@@ -185,21 +189,21 @@ def combine_and_sort(MSC):
         The reduced representation (may be of a smaller dimension).
     '''
 
-    unique, inverse = np.unique(MSC[['masks','signs']], return_inverse = True)
-    rtn = np.ndarray(unique.size, dtype = MSC_dtype)
+    unique, inverse = np.unique(msc[['masks','signs']], return_inverse = True)
+    rtn = np.ndarray(unique.size, dtype = msc.dtype)
 
     rtn['masks'] = unique['masks']
     rtn['signs'] = unique['signs']
 
     rtn['coeffs'] = 0
-    for i,(_,_,c) in enumerate(MSC):
+    for i,(_,_,c) in enumerate(msc):
         rtn[inverse[i]]['coeffs'] += c
 
     rtn = rtn[rtn['coeffs'] != 0]
 
     return rtn
 
-def serialize(MSC):
+def serialize(msc):
     '''
     Take an MSC representation and spin chain length and serialize it into a
     byte string.
@@ -225,14 +229,14 @@ def serialize(MSC):
 
     rtn = b''
 
-    rtn += (str(MSC.size)+'\n').encode('utf-8')
-    rtn += (str(MSC.dtype['masks'].itemsize*8)+'\n').encode('utf-8')
+    rtn += (str(msc.size)+'\n').encode('utf-8')
+    rtn += (str(msc.dtype['masks'].itemsize*8)+'\n').encode('utf-8')
 
-    int_t = MSC.dtype[0].newbyteorder('B')
+    int_t = msc.dtype[0].newbyteorder('B')
     cplx_t = np.dtype(np.complex128).newbyteorder('B')
-    rtn += MSC['masks'].astype(int_t, casting='equiv', copy=False).tobytes()
-    rtn += MSC['signs'].astype(int_t, casting='equiv', copy=False).tobytes()
-    rtn += MSC['coeffs'].astype(cplx_t, casting='equiv', copy=False).tobytes()
+    rtn += msc['masks'].astype(int_t, casting='equiv', copy=False).tobytes()
+    rtn += msc['signs'].astype(int_t, casting='equiv', copy=False).tobytes()
+    rtn += msc['coeffs'].astype(cplx_t, casting='equiv', copy=False).tobytes()
 
     return rtn
 
@@ -253,7 +257,7 @@ def deserialize(data):
 
     start = 0
     stop = data.find(b'\n')
-    MSC_size = int(data[start:stop])
+    msc_size = int(data[start:stop])
 
     start = stop + 1
     stop = data.find(b'\n', start)
@@ -270,25 +274,25 @@ def deserialize(data):
         ('signs', int_t),
         ('coeffs', np.complex128)
     ])
-    MSC = np.ndarray(MSC_size, dtype = dt)
+    msc = np.ndarray(msc_size, dtype = dt)
 
     # TODO: can I do this without making a copy in the calls to np.frombuffer?
     mv = memoryview(data)
     start = stop + 1
-    int_MSC_bytes = MSC_size * int_size // 8
+    int_msc_bytes = msc_size * int_size // 8
 
-    MSC['masks'] = np.frombuffer(mv[start:start+int_MSC_bytes],
+    msc['masks'] = np.frombuffer(mv[start:start+int_msc_bytes],
                                  dtype = np.dtype(int_t).newbyteorder('B'))
-    start += int_MSC_bytes
-    MSC['signs'] = np.frombuffer(mv[start:start+int_MSC_bytes],
+    start += int_msc_bytes
+    msc['signs'] = np.frombuffer(mv[start:start+int_msc_bytes],
                                  dtype = np.dtype(int_t).newbyteorder('B'))
-    start += int_MSC_bytes
-    MSC['coeffs'] = np.frombuffer(mv[start:],
+    start += int_msc_bytes
+    msc['coeffs'] = np.frombuffer(mv[start:],
                                   dtype = np.dtype(np.complex128).newbyteorder('B'))
 
-    return MSC
+    return msc
 
-def max_spin_idx(MSC):
+def max_spin_idx(msc):
     '''
     Compute the largest spin index on which the operator represented by MSC
     has support. Returns -1 for an empty operator.
@@ -303,19 +307,15 @@ def max_spin_idx(MSC):
     int
         The index
     '''
-    if MSC.size == 0:
+    if msc.size == 0:
         return -1
 
-    max_op = np.max([np.max(MSC['masks']), np.max(MSC['signs'])])
-    count = 0
-    while max_op:
-        count += 1
-        max_op >>= 1
-    return count-1
+    max_op = np.max([np.max(msc['masks']), np.max(msc['signs'])])
+    return intlog2(max_op)
 
-def nnz(MSC):
+def nnz(msc):
     '''
     Compute the number of nonzero elements per row of the sparse matrix representation
     of this MSC operator.
     '''
-    return len(np.unique(MSC['masks']))
+    return len(np.unique(msc['masks']))
