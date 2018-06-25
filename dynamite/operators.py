@@ -9,7 +9,6 @@ from . import config, validate, info, msc_tools
 from .computations import evolve, eigsolve
 from .subspace import class_to_enum
 from .states import State
-from ._imports import get_import
 
 class Operator:
     """
@@ -410,7 +409,7 @@ class Operator:
         """
 
         if config.initialized:
-            PETSc = get_import('petsc4py.PETSc')
+            from petsc4py import PETSc
             do_save = PETSc.COMM_WORLD.rank == 0
         else:
             # this should be the case when not running under MPI
@@ -455,15 +454,14 @@ class Operator:
         needs to be built or rebuilt.
         """
 
+        # we wait to import until we need to, avoiding initialization
+        from ._backend import bpetsc
+
         if self.get_length() > self.max_spin_idx:
             info.write(1, 'Trivial identity operators at end of chain--length L could be smaller.')
 
-        backend = get_import('backend')
-
         self.destroy_mat()
-
         self.reduce_msc()
-
         term_array = self.msc
 
         self._has_diag_entries = term_array[0]['masks'] == 0
@@ -471,17 +469,16 @@ class Operator:
             term_array = np.hstack([np.array([(0,0,0)], dtype=term_array.dtype), term_array])
             self._has_diag_entries = True
 
-        # TODO: clean up these arguments into a dictionary or similar
-        self._mat = backend.build_mat(self.get_length,
-                                      np.ascontiguousarray(term_array['masks']),
-                                      np.ascontiguousarray(term_array['signs']),
-                                      np.ascontiguousarray(term_array['coeffs']),
-                                      class_to_enum(type(self.left_subspace)),
-                                      self.left_subspace.space,
-                                      class_to_enum(type(self.right_subspace)),
-                                      self.right_subspace.space,
-                                      bool(self.shell),
-                                      self.shell == 'gpu')
+        self._mat = bpetsc.build_mat(L = self.get_length(),
+                                     masks = np.ascontiguousarray(term_array['masks']),
+                                     signs = np.ascontiguousarray(term_array['signs']),
+                                     coeffs = np.ascontiguousarray(term_array['coeffs']),
+                                     left_type = class_to_enum(type(self.left_subspace)),
+                                     left_space = self.left_subspace.space,
+                                     right_type = class_to_enum(type(self.right_subspace)),
+                                     right_space = self.right_subspace.space,
+                                     shell = bool(self.shell),
+                                     gpu = self.shell == 'gpu')
 
     def destroy_mat(self):
         """
@@ -496,8 +493,9 @@ class Operator:
         # TODO: see if there is a way that I can add destroying the shell
         # context to the __del__ method for the matrix
         if self._shell:
-            backend = get_import('backend')
-            backend.destroy_shell_context(self._mat)
+            config.initialize()
+            from ._backend import bpetsc
+            bpetsc.destroy_shell_context(self._mat)
 
         self._mat.destroy()
         self._mat = None

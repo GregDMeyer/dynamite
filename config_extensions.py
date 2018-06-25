@@ -13,8 +13,8 @@ import slepc4py
 
 extension_names = [
     'bsubspace',
-    'bbuild'
-    #'bpetsc'
+    'bbuild',
+    'bpetsc'
 ]
 
 header_only = {
@@ -22,7 +22,7 @@ header_only = {
 }
 
 cython_only = {
-    'bbuild'
+    'bbuild',
 }
 
 def extensions():
@@ -47,15 +47,16 @@ def extensions():
                         'dynamite/_backend/bcuda_impl.cu',
                         'dynamite/_backend/shellcontext.h',
                         'dynamite/_backend/bsubspace_impl.h']
-            object_files += ['dynamite/_backend/cuda_impl.o'.format(name=name)]
+            if have_nvcc():
+                object_files += ['dynamite/_backend/bcuda_impl.o'.format(name=name)]
             extra_args = configure_petsc_backend()
 
-        exts = [
+        exts += [
             Extension('dynamite._backend.{name}'.format(name=name),
                       sources = ['dynamite/_backend/{name}.pyx'.format(name=name)],
                       depends = depends,
+                      extra_objects = object_files,
                       **extra_args)
-            for name in extension_names if name != 'bpetsc'
         ]
 
     return exts
@@ -118,7 +119,7 @@ def configure_petsc_backend():
     include = []
     lib_paths = []
 
-    include += get_petsc_includes
+    include += get_petsc_includes()
     lib_paths += [join(PETSC_DIR, PETSC_ARCH, 'lib')]
 
     include += [join(SLEPC_DIR, PETSC_ARCH, 'include'),
@@ -132,25 +133,16 @@ def configure_petsc_backend():
                 slepc4py.get_include(),
                 numpy.get_include()]
 
-    object_files = ['dynamite/backend/bpetsc_impl.o']
-
-    # check if we should link to the CUDA code
-    if have_nvcc():
-        object_files = ['dynamite/backend/cuda_shell.o'] + object_files
-
     return dict(
         include_dirs=include,
         libraries=libs,
         library_dirs=lib_paths,
         runtime_library_dirs=lib_paths,
-        extra_objects=object_files
     )
 
 class MakeBuildExt(build_ext):
 
     def run(self):
-
-        write_build_headers()
 
         # build the object files
         for name in extension_names:

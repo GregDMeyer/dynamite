@@ -33,6 +33,8 @@ class _Config:
             The arguments to SLEPc initialization.
         """
 
+        # TODO: see if there's a way we can check if PETSc is already initialized
+
         if self.initialized:
             if slepc_args:
                 raise RuntimeError('initialize has already been called. Perhaps '
@@ -59,11 +61,11 @@ class _Config:
 
         # process 0 check for a new version of dynamite
         if PETSc.COMM_WORLD.rank == 0:
-            from .backend import backend
+            from ._backend import bbuild
             from urllib import request
             import json
 
-            branch = backend.get_build_branch()
+            branch = bbuild.get_build_branch()
             url = 'https://api.github.com/repos/GregDMeyer/dynamite/git/refs/heads/{branch}'
             url = url.format(branch = branch)
 
@@ -76,7 +78,7 @@ class _Config:
 
                     commit = data['object']['sha']
 
-                build_commit = backend.get_build_version()
+                build_commit = bbuild.get_build_version()
                 if not commit.startswith(build_commit):
                     print('Changes have been pushed to GitHub since dynamite was installed. '
                           'Please update!')

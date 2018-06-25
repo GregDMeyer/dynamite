@@ -1,6 +1,5 @@
 
 from . import config
-from ._imports import get_import
 from sys import stderr
 
 valid_levels = [0,1]
@@ -18,7 +17,7 @@ def write(level,msg):
         return
 
     if config.initialized:
-        PETSc = get_import('petsc4py.PETSc')
+        from petsc4py import PETSc
         process_str = ', proc. %d' % PETSc.COMM_WORLD.rank
     else:
         process_str = ''

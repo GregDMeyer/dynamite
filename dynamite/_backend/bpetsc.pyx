@@ -1,3 +1,9 @@
+
+from __future__ import absolute_import
+
+from .. import config
+config.initialize()
+
 from petsc4py.PETSc cimport Vec,  PetscVec
 from petsc4py.PETSc cimport Mat,  PetscMat
 from petsc4py.PETSc cimport Scatter, PetscScatter
@@ -8,6 +14,16 @@ import numpy as np
 cimport numpy as np
 
 import cython
+
+cdef extern from "bsubspace_impl.h":
+    ctypedef struct Subspaces:
+        int left_type
+        int right_type
+        int left_space
+        int right_space
+
+    ctypedef enum subspace_type:
+        pass
 
 cdef extern from "bpetsc_impl.h":
     ctypedef int PetscInt
@@ -59,12 +75,6 @@ cdef extern from "shellcontext.h":
     ctypedef int PetscBool
     ctypedef struct shell_context:
         PetscBool gpu
-
-def get_build_version():
-    return DNM_VERSION
-
-def get_build_branch():
-    return DNM_BRANCH
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
@@ -127,21 +137,6 @@ def destroy_shell_context(Mat A):
 
     if ierr != 0:
         raise Error(ierr)
-
-def get_subspace_dimension(PetscInt L,subspace_type type,int space):
-    return get_dimension(L,type,space)
-
-def have_gpu_shell():
-    return bool(USE_CUDA)
-
-if sizeof(PetscInt) == 4:
-    int_dt = np.int32
-elif sizeof(PetscInt) == 8:
-    int_dt = np.int64
-else:
-    raise TypeError('Only 32 or 64 bit integers supported.')
-
-MSC_dtype = np.dtype([('masks',int_dt),('signs',int_dt),('coeffs',np.complex128)])
 
 def track_memory():
     '''
@@ -215,40 +210,6 @@ def get_cur_memory_usage(which='all'):
     if ierr != 0:
         raise Error(ierr)
     return mem
-
-cdef packed struct MSC_t:
-    PetscInt masks
-    PetscInt signs
-    np.complex128_t coeffs
-
-def product_of_terms(np.ndarray[MSC_t,ndim=1] factors):
-    cdef MSC_t factor,prod
-    cdef np.ndarray[MSC_t,ndim=1] prod_array
-    cdef PetscInt flipped
-    cdef int flip
-
-    prod = factors[0]
-
-    for factor in factors[1:]:
-
-        # keep the sign correct after spin flips.
-        # this is crucial... otherwise everything
-        # would commute!
-        flipped = factor.masks & prod.signs
-        flip = 1
-        while flipped:
-            flip *= -1
-            flipped = flipped & (flipped-1)
-
-        prod.masks = prod.masks ^ factor.masks
-        prod.signs = prod.signs ^ factor.signs
-
-        prod.coeffs *= (factor.coeffs * flip)
-
-    prod_array = np.ndarray((1,),dtype=MSC_dtype)
-    prod_array[0] = prod
-
-    return prod_array
 
 @cython.boundscheck(False)
 @cython.wraparound(False)

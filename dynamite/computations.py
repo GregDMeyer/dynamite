@@ -1,5 +1,5 @@
 
-from ._imports import get_import
+from . import config
 from .states import State
 
 import numpy as np
@@ -66,7 +66,8 @@ def evolve(H,state,t,result=None,tol=1E-15,algo='krylov',
         The result state
     """
 
-    SLEPc = get_import('slepc4py.SLEPc')
+    config.initialize()
+    from slepc4py import SLEPc
 
     if H.L != state.L:
         raise ValueError('Hamiltonian and state have incompatible lengths (H:%d, state:%d)'%
@@ -167,7 +168,8 @@ def eigsolve(H,getvecs=False,nev=1,which=None,target=None):
         and a list of the corresponding eigenvectors.
     """
 
-    SLEPc = get_import('slepc4py.SLEPc')
+    config.initialize()
+    from slepc4py import SLEPc
 
     if which is None:
         if target is not None:
@@ -264,10 +266,13 @@ def reduced_density_matrix(state,cut_size,fillall=True):
         The density matrix
     """
 
+    config.initialize()
+    from ._backend.bpetsc import reduced_density_matrix as backend_rdm
+
     if cut_size != int(cut_size) or not 0 <= cut_size <= state.L:
         raise ValueError('cut_size must be an integer between 0 and L, inclusive.')
 
-    return bknd.reduced_density_matrix(state.vec,cut_size,fillall=fillall)
+    return backend_rdm(state.vec,cut_size,fillall=fillall)
 
 def entanglement_entropy(state,cut_size):
     """
@@ -297,7 +302,6 @@ def entanglement_entropy(state,cut_size):
     float
         The entanglement entropy
     """
-    bpetsc = get_import('._backend.bpetsc')
 
     reduced = reduced_density_matrix(state,cut_size,fillall=False)
 

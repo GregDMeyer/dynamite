@@ -1,6 +1,5 @@
 
 from . import config, validate
-from ._imports import get_import
 from .tools import vectonumpy
 
 import numpy as np
@@ -36,7 +35,8 @@ class State:
 
     def __init__(self,L=None,subspace=None,state=None,seed=None):
 
-        PETSc = get_import('petsc4py.PETSc')
+        config.initialize()
+        from petsc4py import PETSc
 
         if L is None:
             L = config.L
@@ -135,7 +135,8 @@ class State:
             A seed for numpy's PRNG that is used to build the random state.
         """
 
-        PETSc = get_import('petsc4py.PETSc')
+        config.initialize()
+        from petsc4py import PETSc
 
         istart,iend = self.vec.getOwnershipRange()
 
@@ -147,12 +148,12 @@ class State:
             except NotImplementedError:
                 # synchronize the threads
                 PETSc.COMM_WORLD.barrier()
-
                 seed = int(time())
 
         # if my code is still being used in year 2106, wouldn't want it to
         # overflow numpy's PRNG seed range ;)
 
+        # TODO: just use bcast instead of this craziness
         # I also want to make sure that if the time was slightly different on
         # different processes that they don't end up with the same seed
         R.seed(seed + (63 * PETSc.COMM_WORLD.rank) % 2**32)

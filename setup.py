@@ -13,7 +13,9 @@ from Cython.Build import cythonize
 import petsc4py
 import slepc4py
 
-from config_extensions import extensions, MakeBuildExt
+from config_extensions import extensions, MakeBuildExt, write_build_headers
+
+write_build_headers()
 
 setup(
     name            = "dynamite",

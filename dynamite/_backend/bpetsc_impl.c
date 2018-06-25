@@ -19,8 +19,19 @@ PetscErrorCode BuildMat_Full(PetscInt L,PetscInt nterms,
   PetscScalar tmp_val;
 
   /* N is dimension of right subspace, M of left */
-  N = get_dimension(L,s.right_type,s.right_space);
-  M = get_dimension(L,s.left_type,s.left_space);
+  if (s.right_type == PARITY) {
+    N = Parity_Dim(L, s.right_space);
+  }
+  else {
+    N = 1 << L;
+  }
+
+  if (s.left_type == PARITY) {
+    M = Parity_Dim(L, s.left_space);
+  }
+  else {
+    M = 1 << L;
+  }
 
   MPI_Comm_rank(PETSC_COMM_WORLD,&mpi_rank);
   MPI_Comm_size(PETSC_COMM_WORLD,&mpi_size);
@@ -123,8 +134,20 @@ PetscErrorCode BuildMat_Shell(PetscInt L,PetscInt nterms,
   PetscInt N,M,n,m;
   shell_context *ctx;
 
-  N = get_dimension(L,s.right_type,s.right_space);
-  M = get_dimension(L,s.left_type,s.left_space);
+  /* N is dimension of right subspace, M of left */
+  if (s.right_type == PARITY) {
+    N = Parity_Dim(L, s.right_space);
+  }
+  else {
+    N = 1 << L;
+  }
+
+  if (s.left_type == PARITY) {
+    M = Parity_Dim(L, s.left_space);
+  }
+  else {
+    M = 1 << L;
+  }
 
   n = PETSC_DECIDE;
   m = PETSC_DECIDE;
@@ -246,7 +269,7 @@ PetscErrorCode MatMult_Shell(Mat A,Vec x,Vec b)
 
       if (ctx->s.left_type == PARITY) {
         for (cache_idx=0;cache_idx<cache_idx_max;++cache_idx) {
-          lidx[cache_idx] = PARITY_StoI(block_start + cache_idx,ctx->s.left_space,ctx->L);
+          lidx[cache_idx] = PARITY_S2I(block_start + cache_idx,ctx->s.left_space,ctx->L);
         }
       }
       else {
@@ -437,7 +460,7 @@ PetscErrorCode MatNorm_Shell(Mat A,NormType type,PetscReal *nrm)
       csum = 0;
       m = ctx->masks[i];
       if (ctx->s.right_type == PARITY) {
-        state = PARITY_ItoS(idx,ctx->s.right_space,ctx->L);
+        state = PARITY_I2S(idx,ctx->s.right_space,ctx->L);
       }
       else state = idx;
 
@@ -530,7 +553,12 @@ PetscErrorCode BuildContext(PetscInt L,
   ierr = PetscMalloc1(mask_start_max,&(ctx->mask_starts));CHKERRQ(ierr);
 
   proc_size = PETSC_DECIDE;
-  N = get_dimension(L,s.left_type,s.left_space);
+  if (s.right_type == PARITY) {
+    N = Parity_Dim(L, s.right_space);
+  }
+  else {
+    N = 1 << L;
+  }
   ierr = PetscSplitOwnership(PETSC_COMM_WORLD,&proc_size,&N);CHKERRQ(ierr);
 
   /* this assumes proc_size a power of 2! */

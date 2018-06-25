@@ -1,7 +1,7 @@
 
 #pragma once
 #include <petscsys.h>
-#include "subspace.h"
+#include "bsubspace_impl.h"
 
 typedef struct _shell_context {
   PetscInt L;
