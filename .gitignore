@@ -4,3 +4,4 @@ htmlcov
 notes
 build
 dynamite.egg-info
+.pylintrc

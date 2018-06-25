@@ -8,7 +8,6 @@ from slepc4py import SLEPc
 __all__ = [
     'get_version',
     'get_version_str',
-    'vectonumpy',
     'track_memory',
     'get_max_memory_usage',
     'get_cur_memory_usage']
@@ -56,45 +55,6 @@ def get_version_str():
     )
 
     return rtn
-
-def vectonumpy(v,toall=False):
-    '''
-    Collect PETSc vector v (split across processes) to a
-    numpy vector on process 0, or to all processes if
-    `toall == True`.
-
-    Parameters
-    ----------
-    v : petsc4py.PETSc.Vec
-        The input vector
-
-    toall : bool, optional
-        Whether to create numpy vectors on all processes, or
-        just on process 0.
-
-    Returns
-    -------
-    numpy.ndarray or None
-        A numpy array of the vector, or ``None``
-        on all processes other than 0 if `toall == False`.
-    '''
-
-    # collect to process 0
-    if toall:
-        sc,v0 = PETSc.Scatter.toAll(v)
-    else:
-        sc,v0 = PETSc.Scatter.toZero(v)
-    sc.begin(v,v0)
-    sc.end(v,v0)
-
-    # all processes other than 0
-    if not toall and v0.getSize() == 0:
-        return None
-
-    ret = np.ndarray((v0.getSize(),),dtype=np.complex128)
-    ret[:] = v0[:]
-
-    return ret
 
 def track_memory():
     '''

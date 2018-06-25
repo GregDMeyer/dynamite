@@ -1,6 +1,5 @@
 
 from . import config, validate
-from .tools import vectonumpy
 
 import numpy as np
 from os import urandom
@@ -33,7 +32,7 @@ class State:
         generator. This argument is ignored otherwise.
     """
 
-    def __init__(self,L=None,subspace=None,state=None,seed=None):
+    def __init__(self, L = None, subspace = None, state = None, seed = None):
 
         config.initialize()
         from petsc4py import PETSc
@@ -42,8 +41,6 @@ class State:
             L = config.L
 
         self.L = validate.L(L)
-        self._subspace = None
-        self._vec = None
 
         if subspace is None:
             subspace = config.subspace
@@ -52,7 +49,7 @@ class State:
         self._subspace.L = self.L
 
         self._vec = PETSc.Vec().create()
-        self._vec.setSizes(subspace.get_size(L))
+        self._vec.setSizes(subspace.get_dimension())
         self._vec.setFromOptions()
 
         if state is not None:
@@ -81,7 +78,53 @@ class State:
         """
         return self._vec
 
-    def set_product(self,s):
+    @classmethod
+    def _str_to_idx(cls, s, state_to_idx, L):
+        '''
+        Convert a string (either a bitstring of type int or a Python string) to
+        a state index. If an int, the binary representation represents the spin
+        configuration (0=↓, 1=↑) of a product state. If a Python string, the characters
+        'D' and 'U' represent down and up spins, like ``"DUDDU...UDU"`` (D=↓, U=↑).
+
+        Parameters
+        ----------
+        s : int or string
+            The state
+
+        state_to_idx : function(int)
+            A function that converts an integer representing a state to the index of
+            the corresponding basis state in the Hilbert space.
+
+        L : int
+            The length of the spin chain
+
+        Returns
+        -------
+        int
+            The index in the Hilbert space
+        '''
+
+        if isinstance(s, str):
+            if len(s) != L:
+                raise ValueError('state string must have length L')
+
+            if not all(c in ['U','D'] for c in str(s)):
+                raise ValueError('only character U and D allowed in state')
+
+            state = 0
+            for i,c in enumerate(s):
+                if c == 'U':
+                    state += 1<<i
+
+        elif isinstance(s, int):
+            state = s
+
+        else:
+            raise TypeError('State must be an int or str.')
+
+        return state_to_idx(state)
+
+    def set_product(self, s):
         """
         Initialize to a product state. Can be specified either be an integer whose binary
         representation represents the spin configuration (0=↓, 1=↑) of a product state, or a string
@@ -100,63 +143,67 @@ class State:
             A representation of the state.
         """
 
-        if isinstance(s,str):
-            state = 0
-            if len(s) != self.L:
-                raise ValueError('state string must have length L')
-            if not all(c in ['U','D'] for c in s):
-                raise ValueError('only character U and D allowed in state')
-            for i,c in enumerate(s):
-                if c == 'U':
-                    state += 1<<i
-
-        elif isinstance(s,int):
-            state = s
-
-        else:
-            raise TypeError('State must be an int or str.')
-
-        idx = self.subspace.state_to_idx(state)
+        idx = self._str_to_idx(s, self.subspace.state_to_idx, self.L)
 
         self.vec.set(0)
-        self.vec[idx] = 1
+
+        istart, iend = self.vec.getOwnershipRange()
+        if istart <= idx < iend:
+            self.vec[idx] = 1
 
         self.vec.assemblyBegin()
         self.vec.assemblyEnd()
 
-    def set_random(self,seed=None):
+    @classmethod
+    def generate_time_seed(cls):
+
+        config.initialize()
+        from petsc4py import PETSc
+
+        CW = PETSc.COMM_WORLD.tompi4py()
+
+        if CW.rank == 0:
+            seed = int(time())
+        else:
+            seed = None
+
+        return CW.bcast(seed, root = 0)
+
+    def set_random(self, seed = None, normalize = True):
         """
         Initialized to a normalized random state.
+
+        .. note::
+            When running under MPI with multiple processes, the seed is incremented
+            by the MPI rank, so that each process generates different random values.
 
         Parameters
         ----------
 
         seed : int, optional
-            A seed for numpy's PRNG that is used to build the random state.
+            A seed for numpy's PRNG that is used to build the random state. The user
+            should pass the same value on every process.
+
+        normalize : bool
+            Whether to rescale the random state to have norm 1.
         """
 
         config.initialize()
         from petsc4py import PETSc
 
-        istart,iend = self.vec.getOwnershipRange()
+        istart, iend = self.vec.getOwnershipRange()
 
         R = np.random.RandomState()
 
         if seed is None:
             try:
-                seed = int.from_bytes(urandom(4),'big',signed=False)
+                seed = int.from_bytes(urandom(4), 'big', signed=False)
             except NotImplementedError:
-                # synchronize the threads
-                PETSc.COMM_WORLD.barrier()
-                seed = int(time())
+                seed = self.generate_time_seed()
 
-        # if my code is still being used in year 2106, wouldn't want it to
+        # if my code is still being used in year 2038, wouldn't want it to
         # overflow numpy's PRNG seed range ;)
-
-        # TODO: just use bcast instead of this craziness
-        # I also want to make sure that if the time was slightly different on
-        # different processes that they don't end up with the same seed
-        R.seed(seed + (63 * PETSc.COMM_WORLD.rank) % 2**32)
+        R.seed((seed + PETSc.COMM_WORLD.rank) % 2**32)
 
         local_size = iend-istart
         self.vec[istart:iend] =    R.standard_normal(local_size) + \
@@ -164,10 +211,60 @@ class State:
 
         self.vec.assemblyBegin()
         self.vec.assemblyEnd()
-        self.vec.normalize()
 
-    def to_numpy(self):
+        if normalize:
+            self.vec.normalize()
+
+    @classmethod
+    def _to_numpy(cls, vec, to_all = False):
+        '''
+        Collect PETSc vector (split across processes) to a
+        numpy array on process 0, or to all processes if
+        `to_all == True`.
+
+        Parameters
+        ----------
+        vec : petsc4py.PETSc.Vec
+            The input vector
+
+        to_all : bool, optional
+            Whether to create numpy vectors on all processes, or
+            just on process 0.
+
+        Returns
+        -------
+        numpy.ndarray or None
+            A numpy array of the vector, or ``None``
+            on all processes other than 0 if `to_all == False`.
+        '''
+
+        from petsc4py import PETSc
+
+        # collect to process 0
+        if to_all:
+            sc, v0 = PETSc.Scatter.toAll(vec)
+        else:
+            sc, v0 = PETSc.Scatter.toZero(vec)
+
+        sc.begin(vec, v0)
+        sc.end(vec, v0)
+
+        if not to_all and PETSc.COMM_WORLD.rank != 0:
+            return None
+
+        ret = np.ndarray((v0.getSize(),), dtype=np.complex128)
+        ret[:] = v0[:]
+
+        return ret
+
+    def to_numpy(self, to_all = False):
         """
         Return a numpy representation of the state.
+
+        Parameters
+        ----------
+        to_all : bool
+            Whether to return the vector on all MPI ranks (True),
+            or just rank 0 (False).
         """
-        return vectonumpy(self.vec)
+        return self._to_numpy(self.vec, to_all)

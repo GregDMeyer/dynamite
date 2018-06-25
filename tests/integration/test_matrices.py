@@ -6,7 +6,7 @@ import unittest as ut
 import numpy as np
 
 from dynamite import config
-from dynamite.tools import vectonumpy
+from dynamite.states import State
 
 def petsc_mat_to_np(mat):
 
@@ -35,7 +35,7 @@ def petsc_mat_to_np(mat):
         select.assemblyBegin()
         select.assemblyEnd()
         mat.mult(select, column)
-        r = vectonumpy(column)
+        r = State._to_numpy(column)
 
         if PROC_0:
             rtn[:,i] = r
