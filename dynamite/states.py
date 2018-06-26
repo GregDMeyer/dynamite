@@ -86,6 +86,10 @@ class State:
         configuration (0=↓, 1=↑) of a product state. If a Python string, the characters
         'D' and 'U' represent down and up spins, like ``"DUDDU...UDU"`` (D=↓, U=↑).
 
+        .. note::
+            For the string representation, the leftmost character is spin index 0. For
+            an integer representation, the rightmost (least significant) bit is!
+
         Parameters
         ----------
         s : int or string
