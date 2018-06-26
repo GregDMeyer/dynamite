@@ -8,7 +8,7 @@ These tests should NOT require MPI.
 import unittest as ut
 import numpy as np
 
-from dynamite._utils import popcount, parity, intlog2
+from dynamite.bitwise import popcount, parity, intlog2
 
 class PopcountParity(ut.TestCase):
 

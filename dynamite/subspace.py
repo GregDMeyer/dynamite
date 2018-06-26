@@ -4,7 +4,7 @@ from copy import deepcopy
 
 from . import validate
 from ._backend import bsubspace
-from ._utils import parity, intlog2
+from .bitwise import parity, intlog2
 
 # TODO: allow automatically choosing subspace for operators
 

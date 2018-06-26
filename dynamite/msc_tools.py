@@ -6,7 +6,7 @@ The MSC_to_numpy method is the reference implementation that defines the MSC for
 
 from itertools import chain
 import numpy as np
-from ._utils import parity, intlog2
+from .bitwise import parity, intlog2
 
 from ._backend.bbuild import dnm_int_t
 
