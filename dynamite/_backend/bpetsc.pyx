@@ -1,9 +1,4 @@
 
-from __future__ import absolute_import
-
-from .. import config
-config.initialize()
-
 from petsc4py.PETSc cimport Vec,  PetscVec
 from petsc4py.PETSc cimport Mat,  PetscMat
 from petsc4py.PETSc cimport Scatter, PetscScatter

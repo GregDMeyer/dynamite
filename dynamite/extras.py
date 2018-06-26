@@ -1,7 +1,4 @@
 
-from . import config
-config.initialize()
-
 from .operators import sigmax, sigmay, sigmaz, index_product
 
 def commutator(o1, o2):

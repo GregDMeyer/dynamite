@@ -2,6 +2,9 @@
 import unittest as ut
 from unittest.mock import Mock, MagicMock, ANY
 
+from dynamite import config
+config.initialize()
+
 from petsc4py import PETSc
 
 # mock a vector

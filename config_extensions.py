@@ -27,13 +27,15 @@ cython_only = {
 
 def extensions():
 
+    paths = configure_paths()
+
     exts = []
     for name in extension_names:
 
         depends = []
         object_files = []
         extra_args = {
-            'include_dirs' : [numpy.get_include()] + get_petsc_includes()
+            'include_dirs' : paths['include_dirs']
         }
 
         if name not in cython_only:
@@ -49,7 +51,10 @@ def extensions():
                         'dynamite/_backend/bsubspace_impl.h']
             if have_nvcc():
                 object_files += ['dynamite/_backend/bcuda_impl.o'.format(name=name)]
-            extra_args = configure_petsc_backend()
+            extra_args = paths
+
+        if name == 'bbuild':
+            extra_args = paths
 
         exts += [
             Extension('dynamite._backend.{name}'.format(name=name),
@@ -87,23 +92,7 @@ def write_build_headers():
                                    universal_newlines = True).strip()
         f.write('DEF DNM_BRANCH = "%s"\n' % dnm_version)
 
-def get_petsc_includes():
-    if any(e not in environ for e in ['PETSC_DIR', 'PETSC_ARCH']):
-        raise ValueError('Must set environment variables PETSC_DIR '
-                         'and PETSC_ARCH before installing! '
-                         'If executing with sudo, you may want the -E '
-                         'flag to pass environment variables through '
-                         'sudo.')
-
-    PETSC_DIR  = environ['PETSC_DIR']
-    PETSC_ARCH = environ['PETSC_ARCH']
-
-    include = [join(PETSC_DIR, PETSC_ARCH, 'include'),
-               join(PETSC_DIR, 'include')]
-
-    return include
-
-def configure_petsc_backend():
+def configure_paths():
 
     if any(e not in environ for e in ['PETSC_DIR', 'PETSC_ARCH', 'SLEPC_DIR']):
         raise ValueError('Must set environment variables PETSC_DIR, '
@@ -116,28 +105,27 @@ def configure_petsc_backend():
     PETSC_ARCH = environ['PETSC_ARCH']
     SLEPC_DIR  = environ['SLEPC_DIR']
 
-    include = []
-    lib_paths = []
+    includes = []
+    libs = []
 
-    include += get_petsc_includes()
-    lib_paths += [join(PETSC_DIR, PETSC_ARCH, 'lib')]
+    includes += [join(PETSC_DIR, PETSC_ARCH, 'include'),
+                 join(PETSC_DIR, 'include')]
+    libs += [join(PETSC_DIR, PETSC_ARCH, 'lib')]
 
-    include += [join(SLEPC_DIR, PETSC_ARCH, 'include'),
-                join(SLEPC_DIR, 'include')]
-    lib_paths += [join(SLEPC_DIR, PETSC_ARCH, 'lib')]
-
-    libs = ['petsc','slepc']
+    includes += [join(SLEPC_DIR, PETSC_ARCH, 'include'),
+                 join(SLEPC_DIR, 'include')]
+    libs += [join(SLEPC_DIR, PETSC_ARCH, 'lib')]
 
     # python package includes
-    include += [petsc4py.get_include(),
-                slepc4py.get_include(),
-                numpy.get_include()]
+    includes += [petsc4py.get_include(),
+                 slepc4py.get_include(),
+                 numpy.get_include()]
 
     return dict(
-        include_dirs=include,
-        libraries=libs,
-        library_dirs=lib_paths,
-        runtime_library_dirs=lib_paths,
+        include_dirs = includes,
+        library_dirs = libs,
+        runtime_library_dirs = libs,
+        libraries = ['petsc', 'slepc']
     )
 
 class MakeBuildExt(build_ext):

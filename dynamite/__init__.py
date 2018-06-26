@@ -1,6 +1,8 @@
 
+import slepc4py
 from . import validate
 from .subspace import Full
+from ._backend import bbuild
 
 # handle global configuration
 
@@ -16,35 +18,40 @@ class _Config:
     _info_level = 0
     _subspace = Full()
 
-    def initialize(self,slepc_args=None):
+    def initialize(self, slepc_args = None, version_check = True):
         """
         Initialize PETSc/SLEPc with various arguments (which would be
         passed on the command line for a C program).
 
-        Only the first call to this function has any effect, and this
-        function is automatically called with no arguments when any
-        dynamite submodule is imported. Thus, one must call it before
-        importing any submodules.
+        Only the first call to this function has any effect. It is automatically
+        called when using much of the PETSc/SLEPc functionality (including importing
+        `petsc4py.PETSc` or `slepc4py.SLEPc`), so it must be called early (probably
+        right after importing dynamite).
 
         Parameters
         ==========
-
         slepc_args : list of str
             The arguments to SLEPc initialization.
+
+        version_check : bool
+            Whether process 0 should check for a new dynamite version on initialization.
+            Can be set to false if the check is unnecessary or causes problems.
         """
 
-        # TODO: see if there's a way we can check if PETSc is already initialized
+        explain_str = 'Call dynamite.config.initialize(args) before importing ' +\
+                      'any PETSc modules or interfacing with PETSc functionality ' +\
+                      '(like building matrices).'
 
         if self.initialized:
             if slepc_args:
-                raise RuntimeError('initialize has already been called. Perhaps '
-                                   'you already imported a dynamite submodule?')
+                raise RuntimeError('dynamite.config.initialize() has already been called. ' +\
+                                   explain_str)
             else:
                 return
 
-        # this is the only place where we don't use _imports.py to get the
-        # slepc4py/petsc4py modules!
-        import slepc4py
+        if bbuild.petsc_initialized():
+            raise RuntimeError('PETSc has been initialized but dynamite has not. ' +\
+                               explain_str)
 
         if slepc_args is None:
             slepc_args = []
@@ -52,16 +59,14 @@ class _Config:
         slepc4py.init(slepc_args)
         self.initialized = True
 
-        # check that the number of processes is a factor of 2 (currently required)
+        # check that the number of processes is a power of 2 (currently required)
+        # TODO: move this check to be near the code that actually requires this
         from petsc4py import PETSc
         mpi_size = int(PETSc.COMM_WORLD.size)  # this cast is needed for MagicMock
-
         if mpi_size & (mpi_size-1) != 0:
-            raise RuntimeError('Number of MPI processes must be a factor of 2!')
+            raise RuntimeError('Number of MPI processes must be a power of 2!')
 
-        # process 0 check for a new version of dynamite
-        if PETSc.COMM_WORLD.rank == 0:
-            from ._backend import bbuild
+        if version_check and PETSc.COMM_WORLD.rank == 0:
             from urllib import request
             import json
 
@@ -116,19 +121,9 @@ class _Config:
         return self._L
 
     @L.setter
-    def L(self,value):
-
-        if value is None:
-            self._L = value
-            return
-
-        L = int(value)
-        if L != value:
-            raise ValueError('L must be an integer or None.')
-        if L < 1:
-            raise ValueError('L must be >= 1.')
-
-        self._L = L
+    def L(self, value):
+        value = validate.L(value)
+        self._L = value
 
     @property
     def shell(self):
@@ -142,19 +137,10 @@ class _Config:
     @shell.setter
     def shell(self,value):
 
-        if value not in [True,False,'gpu']:
-            raise ValueError('invalid value for config.global_shell')
+        value = validate.shell(value)
 
         if value == 'gpu':
-
-            if not self.initialized:
-                raise RuntimeError('Must call config.initialize() before setting '
-                                   'global_shell to "gpu".')
-
-            from .backend.backend import have_gpu_shell
-
-            # maybe should do this check at build time, not now?
-            if not have_gpu_shell():
+            if not bbuild.have_gpu_shell():
                 raise RuntimeError('GPU shell matrices not enabled (could not find nvcc '
                                    'during build)')
 
