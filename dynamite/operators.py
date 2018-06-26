@@ -573,22 +573,27 @@ class Operator:
 
     ### interface to numpy
 
-    def to_numpy(self):
+    def to_numpy(self, sparse = True):
         '''
-        Get a dense NumPy array representing the operator.
+        Get a SciPy sparse matrix or dense numpy array representing the operator.
+
+        Parameters
+        ----------
+        sparse : bool, optional
+            Whether to return a sparse matrix or a dense array.
 
         Returns
         -------
-
         np.ndarray(dtype = np.complex128)
-            The array.
+            The array
         '''
 
         ary = msc_tools.msc_to_numpy(self.msc,
                                      (self.left_subspace.get_dimension(),
                                       self.right_subspace.get_dimension()),
                                      self.left_subspace.idx_to_state,
-                                     self.right_subspace.state_to_idx)
+                                     self.right_subspace.state_to_idx,
+                                     sparse)
 
         return ary
 

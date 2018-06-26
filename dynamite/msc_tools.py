@@ -6,6 +6,7 @@ The MSC_to_numpy method is the reference implementation that defines the MSC for
 
 from itertools import chain
 import numpy as np
+import scipy.sparse
 from .bitwise import parity, intlog2
 
 from ._backend.bbuild import dnm_int_t
@@ -14,10 +15,9 @@ msc_dtype = np.dtype([('masks', dnm_int_t),
                       ('signs', dnm_int_t),
                       ('coeffs', np.complex128)])
 
-def msc_to_numpy(msc, dims, idx_to_state = None, state_to_idx = None):
+def msc_to_numpy(msc, dims, idx_to_state = None, state_to_idx = None, sparse = True):
     '''
-    Build a NumPy array from an MSC array. This method isolates to_numpy
-    from the rest of the class for testing. It also defines the MSC
+    Build a NumPy array from an MSC array. This method defines the MSC
     representation.
 
     Parameters
@@ -37,14 +37,19 @@ def msc_to_numpy(msc, dims, idx_to_state = None, state_to_idx = None):
         If working in a subspace, a function to map states to indices for
         the *right* subspace.
 
+    sparse : bool, optional
+        Whether to return a scipy sparse matrix or a dense numpy array.
+
     Returns
     -------
-
-    np.ndarray(dtype = np.complex128)
-        A 2-D NumPy array which stores the matrix.
+    scipy.spmatrix or np.ndarray (dtype = np.complex128)
+        The matrix
     '''
-
-    ary = np.zeros(dims, dtype = np.complex128)
+    msc = np.array(msc, copy = False, dtype = msc_dtype)
+    data = np.ndarray(msc.size * np.min(dims), dtype = np.complex128)
+    row_idxs = np.ndarray(data.size, dtype = dnm_int_t)
+    col_idxs = np.ndarray(data.size, dtype = dnm_int_t)
+    mat_idx = 0
 
     # if these aren't supplied, they are the identity
     if idx_to_state is None:
@@ -61,7 +66,15 @@ def msc_to_numpy(msc, dims, idx_to_state = None, state_to_idx = None):
             # TODO: do we need to be careful about unsigned integers here?
             if ridx != -1: # otherwise we went out of the subspace
                 sign = 1 - 2*(parity(s & ket))
-                ary[idx, ridx] += sign * c
+                data[mat_idx] = sign * c
+                row_idxs[mat_idx] = idx
+                col_idxs[mat_idx] = ridx
+                mat_idx += 1
+
+    ary = scipy.sparse.csr_matrix((data, (row_idxs, col_idxs)), shape = dims)
+
+    if not sparse:
+        ary = ary.toarray()
 
     return ary
 
@@ -123,7 +136,7 @@ def msc_product(iterable):
 
     return rtn
 
-def shift(msc, shift, wrap_idx):
+def shift(msc, shift_idx, wrap_idx):
     '''
     Shift an MSC representation along the spin chain. Guaranteed to not modify input,
     but not guaranteed to return a copy (could return the same object).
@@ -133,7 +146,7 @@ def shift(msc, shift, wrap_idx):
     MSC : np.ndarray
         The input MSC representation.
 
-    shift : int
+    shift_idx : int
         The number of spins to shift by.
 
     wrap : int or None
@@ -146,13 +159,13 @@ def shift(msc, shift, wrap_idx):
         The shifted MSC representation.
     '''
 
-    if shift == 0:
+    if shift_idx == 0:
         return msc
 
     msc = msc.copy()
 
-    msc['masks'] <<= shift
-    msc['signs'] <<= shift
+    msc['masks'] <<= shift_idx
+    msc['signs'] <<= shift_idx
 
     if wrap_idx is not None:
 
