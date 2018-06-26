@@ -83,7 +83,7 @@ class Subspace:
         if self.L is None:
             raise ValueError('Must set spin chain size for Subspace before calling '
                              'idx_to_state.')
-        idx = np.array(idx, shape = (-1,), copy = False, dtype = bsubspace.dnm_int_t)
+        idx = np.array(idx, copy = False, dtype = bsubspace.dnm_int_t)
         return self._idx_to_state(idx, self.L, self.space)
 
     @classmethod
@@ -97,7 +97,7 @@ class Subspace:
         if self.L is None:
             raise ValueError('Must set spin chain size for Subspace before calling '
                              'state_to_idx.')
-        state = np.array(state, shape = (-1,), copy = False, dtype = bsubspace.dnm_int_t)
+        state = np.array(state, copy = False, dtype = bsubspace.dnm_int_t)
         return self._state_to_idx(state, self.L, self.space)
 
     def copy(self):

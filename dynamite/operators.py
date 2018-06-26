@@ -20,7 +20,7 @@ class Operator:
 
     def __init__(self):
 
-        self._L = None
+        self._L = config.L
         self._max_spin_idx = None
         self._mat = None
         self._msc = None
@@ -500,6 +500,19 @@ class Operator:
         self._mat.destroy()
         self._mat = None
 
+    def create_states(self):
+        '''
+        Return a bra and ket compatible with this matrix.
+
+        Returns
+        -------
+        tuple
+            The two states
+        '''
+        bra = State(self.L, self.left_subspace)
+        ket = State(self.L, self.right_subspace)
+        return (bra, ket)
+
     ### mask, sign, coefficient representation of operators
 
     @property
@@ -572,9 +585,10 @@ class Operator:
         '''
 
         ary = msc_tools.msc_to_numpy(self.msc,
-                               (self.left_subspace.dim, self.right_subspace.dim),
-                               self.left_subspace.idx_to_state,
-                               self.right_subspace.state_to_idx)
+                                     (self.left_subspace.get_dimension(),
+                                      self.right_subspace.get_dimension()),
+                                     self.left_subspace.idx_to_state,
+                                     self.right_subspace.state_to_idx)
 
         return ary
 

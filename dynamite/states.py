@@ -49,14 +49,19 @@ class State:
         self._subspace.L = self.L
 
         self._vec = PETSc.Vec().create()
-        self._vec.setSizes(subspace.get_dimension())
-        self._vec.setFromOptions()
+        self.vec.setSizes(subspace.get_dimension())
+        self.vec.setFromOptions()
 
         if state is not None:
             if state == 'random':
                 self.set_random(seed=seed)
             else:
                 self.set_product(state)
+
+    def copy(self):
+        rtn = State(self.L, self.subspace.copy())
+        self.vec.copy(rtn.vec)
+        return rtn
 
     @property
     def subspace(self):
@@ -272,3 +277,10 @@ class State:
             or just rank 0 (False).
         """
         return self._to_numpy(self.vec, to_all)
+
+    # TODO: should I try to be clever about this
+    def norm(self):
+        return self.vec.norm()
+
+    def dot(self, x):
+        return self.vec.dot(x.vec)

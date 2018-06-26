@@ -1008,7 +1008,7 @@ static const char __pyx_k_int32[] = "int32";
 static const char __pyx_k_int64[] = "int64";
 static const char __pyx_k_numpy[] = "numpy";
 static const char __pyx_k_import[] = "__import__";
-static const char __pyx_k_e434812[] = "e434812";
+static const char __pyx_k_9d775d6[] = "9d775d6";
 static const char __pyx_k_refactor[] = "refactor";
 static const char __pyx_k_TypeError[] = "TypeError";
 static const char __pyx_k_dnm_int_t[] = "dnm_int_t";
@@ -1022,6 +1022,7 @@ static const char __pyx_k_dynamite__backend_bbuild[] = "dynamite._backend.bbuild
 static const char __pyx_k_dynamite__backend_bbuild_pyx[] = "dynamite/_backend/bbuild.pyx";
 static const char __pyx_k_Error_while_checking_for_PETSc_i[] = "Error while checking for PETSc initialization.";
 static const char __pyx_k_Only_32_or_64_bit_integers_suppo[] = "Only 32 or 64 bit integers supported.";
+static PyObject *__pyx_kp_u_9d775d6;
 static PyObject *__pyx_kp_s_Error_while_checking_for_PETSc_i;
 static PyObject *__pyx_kp_s_Only_32_or_64_bit_integers_suppo;
 static PyObject *__pyx_n_s_RuntimeError;
@@ -1030,7 +1031,6 @@ static PyObject *__pyx_n_s_cline_in_traceback;
 static PyObject *__pyx_n_s_dnm_int_t;
 static PyObject *__pyx_n_s_dynamite__backend_bbuild;
 static PyObject *__pyx_kp_s_dynamite__backend_bbuild_pyx;
-static PyObject *__pyx_n_u_e434812;
 static PyObject *__pyx_n_s_get_build_branch;
 static PyObject *__pyx_n_s_get_build_version;
 static PyObject *__pyx_n_s_have_gpu_shell;
@@ -1093,8 +1093,8 @@ static PyObject *__pyx_pf_8dynamite_8_backend_6bbuild_get_build_version(CYTHON_U
  * def get_build_branch():
  */
   __Pyx_XDECREF(__pyx_r);
-  __Pyx_INCREF(__pyx_n_u_e434812);
-  __pyx_r = __pyx_n_u_e434812;
+  __Pyx_INCREF(__pyx_kp_u_9d775d6);
+  __pyx_r = __pyx_kp_u_9d775d6;
   goto __pyx_L0;
 
   /* "dynamite/_backend/bbuild.pyx":6
@@ -1370,6 +1370,7 @@ static struct PyModuleDef __pyx_moduledef = {
 #endif
 
 static __Pyx_StringTabEntry __pyx_string_tab[] = {
+  {&__pyx_kp_u_9d775d6, __pyx_k_9d775d6, sizeof(__pyx_k_9d775d6), 0, 1, 0, 0},
   {&__pyx_kp_s_Error_while_checking_for_PETSc_i, __pyx_k_Error_while_checking_for_PETSc_i, sizeof(__pyx_k_Error_while_checking_for_PETSc_i), 0, 0, 1, 0},
   {&__pyx_kp_s_Only_32_or_64_bit_integers_suppo, __pyx_k_Only_32_or_64_bit_integers_suppo, sizeof(__pyx_k_Only_32_or_64_bit_integers_suppo), 0, 0, 1, 0},
   {&__pyx_n_s_RuntimeError, __pyx_k_RuntimeError, sizeof(__pyx_k_RuntimeError), 0, 0, 1, 1},
@@ -1378,7 +1379,6 @@ static __Pyx_StringTabEntry __pyx_string_tab[] = {
   {&__pyx_n_s_dnm_int_t, __pyx_k_dnm_int_t, sizeof(__pyx_k_dnm_int_t), 0, 0, 1, 1},
   {&__pyx_n_s_dynamite__backend_bbuild, __pyx_k_dynamite__backend_bbuild, sizeof(__pyx_k_dynamite__backend_bbuild), 0, 0, 1, 1},
   {&__pyx_kp_s_dynamite__backend_bbuild_pyx, __pyx_k_dynamite__backend_bbuild_pyx, sizeof(__pyx_k_dynamite__backend_bbuild_pyx), 0, 0, 1, 0},
-  {&__pyx_n_u_e434812, __pyx_k_e434812, sizeof(__pyx_k_e434812), 0, 1, 0, 1},
   {&__pyx_n_s_get_build_branch, __pyx_k_get_build_branch, sizeof(__pyx_k_get_build_branch), 0, 0, 1, 1},
   {&__pyx_n_s_get_build_version, __pyx_k_get_build_version, sizeof(__pyx_k_get_build_version), 0, 0, 1, 1},
   {&__pyx_n_s_have_gpu_shell, __pyx_k_have_gpu_shell, sizeof(__pyx_k_have_gpu_shell), 0, 0, 1, 1},
