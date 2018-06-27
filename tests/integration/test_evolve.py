@@ -53,7 +53,7 @@ class Hamiltonians(ut.TestCase):
         self.evolve_all(0.1)
 
     def test_long(self):
-        self.evolve_all(10.0)
+        self.evolve_all(50.0)
 
 if __name__ == '__main__':
     ut.main()
