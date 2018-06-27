@@ -452,7 +452,7 @@ class Operator:
         needs to be built or rebuilt.
         """
 
-        # we wait to import until we need to, avoiding initialization
+        config.initialize()
         from ._backend import bpetsc
 
         if self.get_length() > self.max_spin_idx:
