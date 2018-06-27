@@ -12,26 +12,27 @@ def ising(L = None):
     Classic quantum Ising model with a transverse field.
     '''
     H = index_sum(sigmaz(0)*sigmaz(1), size = L)
-    H += 0.5*index_sum(sigmax())
+    H += 0.5*index_sum(sigmax(), size = H.get_length())
     return H
 
 def long_range(L = None):
     '''
-    Long-range (polynomially decaying) interaction with closed boundary conditions.
+    Long-range (polynomially decaying) interaction.
     '''
     # decay exponent
     alpha = 1.13
 
     # nearest neighbor XX
-    H = index_sum(sigmax(0)*sigmax(1), size = L, boundary = 'closed')
+    H = index_sum(sigmax(0)*sigmax(1), size = L)
 
     # long range ZZ interaction
-    H += op_sum(index_sum(1/(i**alpha)*sigmaz(0)*sigmaz(i)) for i in range(1, H.get_length()))
+    H += op_sum(index_sum(1/(i**alpha)*sigmaz(0)*sigmaz(i), size = H.get_length())
+                for i in range(1, H.get_length()))
 
     # some uniform fields
-    H += index_sum(0.5*sigmax())
-    H += index_sum(0.3*sigmay())
-    H += index_sum(0.1*sigmaz())
+    H += index_sum(0.5*sigmax(), H.get_length())
+    H += index_sum(0.3*sigmay(), H.get_length())
+    H += index_sum(0.1*sigmaz(), H.get_length())
 
     return H
 

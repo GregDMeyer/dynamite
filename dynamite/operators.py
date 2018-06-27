@@ -357,7 +357,10 @@ class Operator:
     def __str__(self):
         return self.string
 
-    # TODO: __repr__
+    def __repr__(self):
+        rtn = 'dynamite.Operator on {size} spins:\n'.format(size = self.get_length())
+        rtn += self.string
+        return rtn
 
     def table(self):
         '''
@@ -842,7 +845,11 @@ def index_sum(op, size = None, start = 0, boundary = 'open'):
     rtn = Operator()
     rtn.msc = msc_tools.msc_sum(op.get_shifted_msc(i, wrap_idx) for i in range(start, stop))
 
-    rtn.string = 'index_sum(' + op.string + ', sites %d - %d)' % (start, stop-1)
+    rtn.string = 'index_sum(' + op.string + ', sites %d - %d' % (start, stop-1)
+    if boundary == 'closed':
+        rtn.string += ', wrapped)'
+    else:
+        rtn.string += ')'
     # TODO: make tex prettier by substituting i for the indices
     rtn.tex = r'\sum_{i=%d}^{%d}' % (start, stop-1) + op.with_brackets(which = 'tex') + '_{i}'
     rtn.brackets = '[]'
