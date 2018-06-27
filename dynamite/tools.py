@@ -1,10 +1,4 @@
 
-# TODO: need to add config.initialize where it's needed
-
-import numpy as np
-from petsc4py import PETSc
-from slepc4py import SLEPc
-
 __all__ = [
     'get_version',
     'get_version_str',
@@ -24,12 +18,19 @@ def get_version():
         information for the respective library.
     '''
 
+    from ._backend import bbuild
+
+    from . import config
+    config.initialize()
+    from petsc4py import PETSc
+    from slepc4py import SLEPc
+
     rtn = {}
     rtn['PETSc'] = PETSc.Sys.getVersionInfo()
     rtn['SLEPc'] = SLEPc.Sys.getVersionInfo()
     rtn['dynamite'] = {}
-    rtn['dynamite']['commit'] = backend.get_build_version()
-    rtn['dynamite']['branch'] = backend.get_build_branch()
+    rtn['dynamite']['commit'] = bbuild.get_build_version()
+    rtn['dynamite']['branch'] = bbuild.get_build_branch()
     return rtn
 
 def get_version_str():
@@ -60,17 +61,20 @@ def track_memory():
     '''
     Begin tracking memory usage for a later call to :meth:`get_max_memory_usage`.
     '''
-    return backend.track_memory()
+    from . import config
+    config.initialize()
+    from ._backend import bpetsc
+    return bpetsc.track_memory()
 
 def get_max_memory_usage(which='all'):
     '''
     Get the maximum memory usage up to this point. Only updated whenever
-    objects are destroyed (i.e. with :meth:`dynamite.operators.Operator.destroy_mat`)
+    objects are destroyed (e.g. with :meth:`dynamite.operators.Operator.destroy_mat`)
 
     .. note::
         :meth:`track_memory` must be called before this function is called,
-        and the option ``'-malloc'`` must be supplied to PETSc at runtime to track
-        PETSc memory allocations
+        and the option ``'-malloc'`` must be supplied to PETSc at runtime if
+        ``which == 'petsc'``.
 
     Parameters
     ----------
@@ -83,7 +87,10 @@ def get_max_memory_usage(which='all'):
     float
         The max memory usage in bytes
     '''
-    return backend.get_max_memory_usage(which=which)
+    from . import config
+    config.initialize()
+    from ._backend import bpetsc
+    return bpetsc.get_max_memory_usage(which=which)
 
 def get_cur_memory_usage(which='all'):
     '''
@@ -100,4 +107,7 @@ def get_cur_memory_usage(which='all'):
     float
         The max memory usage in bytes
     '''
-    return backend.get_cur_memory_usage(which=which)
+    from . import config
+    config.initialize()
+    from ._backend import bpetsc
+    return bpetsc.get_cur_memory_usage(which=which)
