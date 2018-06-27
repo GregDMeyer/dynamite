@@ -169,6 +169,17 @@ class Sums(ut.TestCase):
         dnm = op_sum([sigmay(0), sigmay(1)])
         self.check_same(dnm.msc, [(1, 1, 1j), (2, 2, 1j)])
 
+    def test_large_generator(self):
+        dnm = op_sum((i+1)*sigmax(i) for i in range(0,15,2))
+        self.check_same(dnm.msc, [(1, 0, 1),
+                                  (4, 0, 3),
+                                  (16, 0, 5),
+                                  (64, 0, 7),
+                                  (256, 0, 9),
+                                  (1024, 0, 11),
+                                  (4096, 0, 13),
+                                  (16384, 0, 15)])
+
 class Products(ut.TestCase):
 
     dtype = np.dtype([('masks', np.int32),
@@ -567,6 +578,24 @@ class MSC(ut.TestCase):
         self.assertFalse(o.is_reduced)
         o.is_reduced = True
         self.assertTrue(o.is_reduced)
+
+from dynamite.operators import from_bytes
+class FromBytes(ut.TestCase):
+
+    def test_simple(self):
+        test_cases = [{
+            'MSC' : np.array([(1, 5, -0.2j), (0, 1, 2)],
+                             dtype = msc_tools.msc_dtype),
+            'serial' : b'2\n32\n' + \
+                           b'\x00\x00\x00\x01\x00\x00\x00\x00' + \
+                           b'\x00\x00\x00\x05\x00\x00\x00\x01' + \
+                           b'\x80\x00\x00\x00\x00\x00\x00\x00\xbf\xc9\x99\x99\x99\x99\x99\x9a' + \
+                           b'@\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00',
+        }]
+
+        for t in test_cases:
+            op = from_bytes(t['serial'])
+            self.assertTrue(np.array_equal(op.msc, t['MSC']))
 
 if __name__ == '__main__':
     ut.main()

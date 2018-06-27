@@ -31,13 +31,13 @@ class ToNumpy(ut.TestCase):
 
     def test_identity_wide(self):
         dnm = msc_tools.msc_to_numpy([(0, 0, 1)], (3,5),
-                               idx_to_state = lambda x: x if x < 3 else -1)
+                                     idx_to_state = lambda x: x if x < 3 else -1)
         npy = np.identity(5)[:3,:]
         self.check_same(dnm, npy)
 
     def test_identity_tall(self):
         dnm = msc_tools.msc_to_numpy([(0, 0, 1)], (5,3),
-                               state_to_idx = lambda x: x if x < 3 else -1)
+                                     state_to_idx = lambda x: x if x < 3 else -1)
         npy = np.identity(5)[:,:3]
         self.check_same(dnm, npy)
 
@@ -82,9 +82,25 @@ class ToNumpy(ut.TestCase):
         )
         self.check_same(dnm, npy)
 
+    def test_dense(self):
+        dnm = msc_tools.msc_to_numpy([(1, 5, 0.5j), (4, 3, -2)], (8, 8), sparse = False)
+        npy = np.array(
+            [
+                [    0,-0.5j,    0,    0,   -2,    0,    0,    0 ],
+                [ 0.5j,    0,    0,    0,    0,    2,    0,    0 ],
+                [    0,    0,    0,-0.5j,    0,    0,    2,    0 ],
+                [    0,    0, 0.5j,    0,    0,    0,    0,   -2 ],
+                [   -2,    0,    0,    0,    0, 0.5j,    0,    0 ],
+                [    0,    2,    0,    0,-0.5j,    0,    0,    0 ],
+                [    0,    0,    2,    0,    0,    0,    0, 0.5j ],
+                [    0,    0,    0,   -2,    0,    0,-0.5j,    0 ],
+            ]
+        )
+        self.check_same(dnm, npy)
+
     def test_map1(self):
         dnm = msc_tools.msc_to_numpy([(1, 5, 0.5j), (4, 3, -2)], (8, 8),
-                               idx_to_state = lambda x: x^4)
+                                     idx_to_state = lambda x: x^4)
         npy = np.array(
             [
                 [   -2,    0,    0,    0,    0, 0.5j,    0,    0 ],
@@ -101,7 +117,7 @@ class ToNumpy(ut.TestCase):
 
     def test_map2(self):
         dnm = msc_tools.msc_to_numpy([(1, 5, 0.5j), (4, 3, -2)], (8, 8),
-                               state_to_idx = lambda x: x^4)
+                                     state_to_idx = lambda x: x^4)
         npy = np.array(
             [
                 [   -2,    0,    0,    0,    0,-0.5j,    0,    0 ],
@@ -118,8 +134,8 @@ class ToNumpy(ut.TestCase):
 
     def test_map_both(self):
         dnm = msc_tools.msc_to_numpy([(1, 5, 0.5j), (4, 3, -2)], (8, 8),
-                               state_to_idx = lambda x: x^4,
-                               idx_to_state = lambda x: x^2)
+                                     state_to_idx = lambda x: x^4,
+                                     idx_to_state = lambda x: x^2)
         npy = np.array(
             [
                 [    0,    0,    2,    0,    0,    0,    0,-0.5j ],
@@ -259,6 +275,17 @@ class MSCProduct(ut.TestCase):
                   (3, 3,-15),
                   (4, 7,-35),
                   (1, 7, 55)]
+        self.check_same(check, target)
+
+    def test_one_empty(self):
+        lst = [
+            [],
+            [(0, 1, 2), (3, 3, 5)],
+            [(1, 0, 3), (6, 4, 7), (3, 4, 11)]
+        ]
+        lst = [np.array(x, dtype=self.dtype) for x in lst]
+        check = msc_tools.msc_product(lst)
+        target = []
         self.check_same(check, target)
 
 class ShiftMSC(ut.TestCase):
