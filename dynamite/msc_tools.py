@@ -332,3 +332,44 @@ def nnz(msc):
     of this MSC operator.
     '''
     return len(np.unique(msc['masks']))
+
+def table(msc, L):
+    '''
+    Build a table in string format that shows all of the terms in the MSC matrix.
+
+    Displays only the real part of coefficients, since complex coefficients would imply
+    non-Hermitian matrices.
+    '''
+
+    rtn = '   coeff. | {pad}operator{pad} \n' +\
+          '====================={epad}\n'
+
+    npad = max(L - 8, 0)
+    rtn = rtn.format(pad = ' '*(npad//2), epad = '='*npad)
+
+    terms = []
+    for m, s, c in msc:
+
+        if 1E-2 < abs(c) < 1E2:
+            term = ' {:8.3f} '
+        else:
+            term = ' {:.2e} '
+
+        term += '| '
+
+        for i in range(L):
+            maskbit = (m >> i) & 1
+            signbit = (s >> i) & 1
+
+            term += [['-', 'Z'],
+                     ['X', 'Y']][maskbit][signbit]
+
+            if maskbit and signbit:
+                c *= -1j
+
+        term = term.format(c.real)
+        terms.append(term)
+
+    rtn += '\n'.join(terms)
+
+    return rtn

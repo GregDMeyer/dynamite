@@ -369,10 +369,8 @@ class Operator:
         built.
 
         Call :meth:`Operator.reduce_msc` first for a more compact table.
-
-        [This function is not yet implemented]
         '''
-        raise NotImplementedError
+        return msc_tools.table(self.msc, self.get_length())
 
     def _repr_latex_(self):
         return '$' + self.tex + '$'
@@ -743,7 +741,7 @@ def op_sum(terms, nshow = 3):
     if not done:
         strings[-1] = '...'
         texs[-1] = r'\cdots'
-        msc_terms.append(msc_tools.msc_sum(terms))
+        msc_terms.append(msc_tools.msc_sum(t.msc for t in terms))
 
     o.msc = msc_tools.msc_sum(msc_terms)
     o.string = ' + '.join(strings)
