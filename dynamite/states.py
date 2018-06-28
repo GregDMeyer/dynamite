@@ -153,6 +153,8 @@ class State:
         """
 
         idx = self._str_to_idx(s, self.subspace.state_to_idx, self.L)
+        if idx == -1:
+            raise ValueError('Provided initial state not in requested subspace.')
 
         self.vec.set(0)
 
