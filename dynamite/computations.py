@@ -89,7 +89,7 @@ def evolve(H, state, t, result=None, **kwargs):
 
     return result
 
-def eigsolve(H, getvecs=False, nev=1, which='smallest', target=None):
+def eigsolve(H, getvecs=False, nev=1, which='smallest', target=None, tol=None):
     r"""
     Solve for a subset of the eigenpairs of the Hamiltonian.
 
@@ -138,6 +138,9 @@ def eigsolve(H, getvecs=False, nev=1, which='smallest', target=None):
         (e.g. ``--download-mumps`` option in ``configure``) to use
         this option in parallel.
 
+    tol : float
+        The tolerance for the computation.
+
     Returns
     -------
     numpy.array or tuple(numpy.array, list(dynamite.states.State))
@@ -167,6 +170,8 @@ def eigsolve(H, getvecs=False, nev=1, which='smallest', target=None):
         # https://www.mail-archive.com/petsc-users@mcs.anl.gov/msg22867.html
         eps.setOperators(H.get_mat(diag_entries=True))
     else:
+        if which=='target':
+            raise ValueError("Must specify target when setting which='target'")
         eps.setOperators(H.get_mat())
 
     eps.setDimensions(nev)
@@ -178,18 +183,17 @@ def eigsolve(H, getvecs=False, nev=1, which='smallest', target=None):
         'target':SLEPc.EPS.Which.TARGET_MAGNITUDE,
         }[which])
 
-    if target is None and which=='target':
-        raise ValueError("Must specify target when setting which='target'")
+    eps.setTolerances(tol = tol)
 
     eps.setFromOptions()
     eps.solve()
     nconv = eps.getConverged()
 
-    evals = np.ndarray((nconv,), dtype=np.complex128)
+    evals = np.ndarray((nconv,), dtype=np.float)
     evecs = []
 
     for i in range(nconv):
-        evals[i] = eps.getEigenpair(i, None)
+        evals[i] = eps.getEigenpair(i, None).real
         if getvecs:
             v = State(H.L, H.subspace)
             eps.getEigenpair(i, v.vec)
