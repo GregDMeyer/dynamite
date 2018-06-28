@@ -62,22 +62,18 @@ class Analytic(Checker):
         # TODO: check eigenvectors here
 
         with self.subTest(which = 'smallest'):
-            evals, evecs = H.eigsolve(nev = 1 + H.get_length(),
+            evals, evecs = H.eigsolve(nev = 2,
                                       getvecs = True,
                                       which = 'smallest')
             self.is_close(evals[0], -H.get_length())
-            for i in range(1, H.get_length()+1):
-                with self.subTest(eval_idx = i):
-                    self.is_close(evals[i], -H.get_length()+2)
+            self.is_close(evals[1], -H.get_length() + 2)
 
         with self.subTest(which = 'largest'):
-            evals, evecs = H.eigsolve(nev = 1 + H.get_length(),
+            evals, evecs = H.eigsolve(nev = 2,
                                       getvecs = True,
                                       which = 'largest')
             self.is_close(evals[0], H.get_length())
-            for i in range(1, H.get_length()+1):
-                with self.subTest(eval_idx = i):
-                    self.is_close(evals[i], H.get_length()-2)
+            self.is_close(evals[1], H.get_length() - 2)
 
 class Hamiltonians(Checker):
 
@@ -96,7 +92,7 @@ class Hamiltonians(Checker):
 
                 with self.subTest(which = 'smallest'):
                     evals, evecs = H.eigsolve(nev = 5, getvecs = True, tol = 1E-12)
-                    self.check_all(H, evals, evecs, tol = 1E-11)
+                    self.check_all(H, evals, evecs, tol = 1E-10)
 
 if __name__ == '__main__':
     from dynamite import config

@@ -98,6 +98,11 @@ def eigsolve(H, getvecs=False, nev=1, which='smallest', target=None, tol=None):
     are sought and how many can be adjusted with the options.
 
     .. note::
+        Krylov algorithms have difficulty with degenerate or very nearly degenerate
+        eigenvalues. Degenerate eigenvalues may be missed, and near-degenerate
+        eigenstates may be inaccurate.
+
+    .. note::
         Do not try to use this function to solve for the whole spectrum!
         It's very efficient at finding a few eigenvalues, but no
         faster than other routines for finding all of them. In the
