@@ -620,8 +620,7 @@ class Operator:
         if isinstance(x, Operator):
             return self._op_mul(x)
         elif isinstance(x, State):
-            # TODO: check that the subspaces match?
-            return self.get_mat() * x.vec
+            return self._vec_mul(x)
         else:
             return self._num_mul(x)
 
@@ -655,9 +654,49 @@ class Operator:
         rtn.brackets = ''
         return rtn
 
+    def dot(self, x, result = None):
+        '''
+        Compute the matrix-vector product :math:`\vec{y} = A\vec{x}`
+
+        Parameters
+        ----------
+        x : dynamite.states.State
+            The input state x.
+
+        result : dynamite.states.State, optional
+            A state in which to store the result. If omitted, a new State object
+            is created.
+
+        Returns
+        -------
+        dynamite.states.State
+            The result
+        '''
+        if self.right_subspace != x.subspace:
+            # TODO: just set the matrix subspace based on the vector's space?
+            raise ValueError('Subspaces of matrix and input vector do not match.')
+
+        if result is None:
+            result = State(L = self.left_subspace.L,
+                           subspace = self.left_subspace)
+
+        if self.left_subspace != result.subspace:
+            raise ValueError('Subspaces of matrix and result vector do not match.')
+
+        self.get_mat().mult(x.vec, result.vec)
+        return result
+
+    def _vec_mul(self, x):
+        return self.dot(x)
+
     def _num_mul(self, x):
         rtn = self.copy()
-        rtn.msc['coeffs'] *= x
+
+        try:
+            rtn.msc['coeffs'] *= x
+        except (ValueError,TypeError):
+            raise ValueError('Error attempting to multiply operator by type "%s"' % str(type(x)))
+
         rtn.string = '{:.3f}*'.format(x) + self.with_brackets('string')
         rtn.tex = '{:.3f}*'.format(x) + self.with_brackets('tex')
         rtn.brackets = ''
