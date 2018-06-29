@@ -60,18 +60,26 @@ def msc_to_numpy(msc, dims, idx_to_state = None, state_to_idx = None, sparse = T
 
     for idx in range(dims[0]):
         bra = idx_to_state(idx)
-        for m,s,c in msc:
-            ket = m ^ bra
-            ridx = state_to_idx(ket)
-            # TODO: do we need to be careful about unsigned integers here?
-            if ridx != -1: # otherwise we went out of the subspace
-                sign = 1 - 2*(parity(s & ket))
-                data[mat_idx] = sign * c
-                row_idxs[mat_idx] = idx
-                col_idxs[mat_idx] = ridx
-                mat_idx += 1
+        ket = msc['masks'] ^ bra
+        ridx = state_to_idx(ket)
+        # TODO: do we need to be careful about unsigned integers here?
 
-    ary = scipy.sparse.csr_matrix((data, (row_idxs, col_idxs)), shape = dims)
+        good = np.nonzero(ridx != -1)[0]
+        nnew = len(good)
+        if nnew == 0:
+            continue
+
+        good_ridx = ridx[good]
+        good_kets = ket[good]
+        sign = 1 - 2*(parity(msc['signs'][good] & good_kets))
+
+        nnew = len(good)
+        data[mat_idx:mat_idx+nnew] = sign * msc['coeffs'][good]
+        row_idxs[mat_idx:mat_idx+nnew] = idx
+        col_idxs[mat_idx:mat_idx+nnew] = good_ridx
+        mat_idx += nnew
+
+    ary = scipy.sparse.csc_matrix((data, (row_idxs, col_idxs)), shape = dims)
 
     if not sparse:
         ary = ary.toarray()

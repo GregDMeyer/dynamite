@@ -96,5 +96,5 @@ class Hamiltonians(Checker):
 
 if __name__ == '__main__':
     from dynamite import config
-    config.L = 14
+    config.L = 12
     ut.main()

@@ -1,11 +1,16 @@
 
 __all__ = [
     'ising',
-    'long_range'
+    'long_range',
+    'localized',
+    'syk'
 ]
 
+from itertools import combinations
 import numpy as np
-from dynamite.operators import sigmax, sigmay, sigmaz, index_sum, op_sum
+from dynamite import config
+from dynamite.operators import sigmax, sigmay, sigmaz, index_sum, op_sum, op_product
+from dynamite.extras import majorana
 
 def ising(L = None):
     '''
@@ -42,4 +47,21 @@ def localized(L = None):
     '''
     H = index_sum(op_sum(s(0)*s(1) for s in (sigmax, sigmay, sigmaz)), size = L)
     H += op_sum(np.random.uniform(-1, 1)*sigmaz(i) for i in range(H.get_length()))
+    return H
+
+def syk(L = None):
+    '''
+    Sachdev-Ye-Kitaev model.
+    '''
+    np.random.seed(0)
+
+    if L is None:
+        L = config.L
+
+    # only compute the majoranas once
+    majoranas = [majorana(i) for i in range(L*2)]
+
+    H = op_sum(op_product(majoranas[idx] for idx in idxs).scale(np.random.uniform(-1,1))
+               for idxs in combinations(range(L*2),4))
+
     return H

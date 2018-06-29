@@ -1,14 +1,11 @@
 
 import unittest as ut
 import numpy as np
-from scipy import linalg
+from scipy.sparse import linalg
 import hamiltonians
 
 from dynamite import config
 from dynamite.operators import sigmax, index_product
-
-config.L = 8
-config.initialize()
 
 class Analytic(ut.TestCase):
     '''
@@ -28,8 +25,11 @@ class Analytic(ut.TestCase):
 
 class Hamiltonians(ut.TestCase):
 
-    def evolve_all(self, t):
+    def evolve_all(self, t, skip=set()):
         for H_name in hamiltonians.__all__:
+            if H_name in skip:
+                continue
+
             with self.subTest(H = H_name):
                 H = getattr(hamiltonians, H_name)()
                 bra, ket = H.create_states()
@@ -38,12 +38,12 @@ class Hamiltonians(ut.TestCase):
                 H_np = H.to_numpy()
                 ket_np = ket.to_numpy()
 
-                H.evolve(ket, t = t, result = bra)
+                H.evolve(ket, t=t, result=bra)
                 self.assertLess(np.abs(1 - bra.norm()), 1E-9)
                 bra_check = bra.to_numpy()
 
                 if ket_np is not None:
-                    bra_np = linalg.expm(-1j*t*H_np).dot(ket_np)
+                    bra_np = linalg.expm_multiply(-1j*t*H_np, ket_np)
                     self.assertLess(np.abs(1 - bra_check.dot(bra_np.conj())), 1E-9)
 
     def test_zero(self):
@@ -53,7 +53,12 @@ class Hamiltonians(ut.TestCase):
         self.evolve_all(0.1)
 
     def test_long(self):
-        self.evolve_all(50.0)
+        # otherwise this takes forever
+        old_L = config.L
+        config.L = max(4, config.L - 4)
+        self.evolve_all(50.0, skip={'syk'})
+        config.L = old_L
 
 if __name__ == '__main__':
+    config.L = 10
     ut.main()

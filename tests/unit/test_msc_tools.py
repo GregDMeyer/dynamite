@@ -36,8 +36,13 @@ class ToNumpy(ut.TestCase):
         self.check_same(dnm, npy)
 
     def test_identity_tall(self):
+        def state_to_idx(x):
+            rtn = x.copy()
+            rtn[rtn >= 3] = -1
+            return rtn
+
         dnm = msc_tools.msc_to_numpy([(0, 0, 1)], (5,3),
-                                     state_to_idx = lambda x: x if x < 3 else -1)
+                                     state_to_idx = state_to_idx)
         npy = np.identity(5)[:,:3]
         self.check_same(dnm, npy)
 
