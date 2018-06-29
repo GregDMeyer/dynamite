@@ -4,6 +4,7 @@ defines their built-in behavior and operations.
 """
 
 import numpy as np
+from itertools import combinations
 
 from . import config, validate, info, msc_tools
 from .computations import evolve, eigsolve
@@ -689,17 +690,29 @@ class Operator:
     def _vec_mul(self, x):
         return self.dot(x)
 
-    def _num_mul(self, x):
-        rtn = self.copy()
+    def scale(self, x):
+        '''
+        Scale an operator by a numerical value without making a copy. This is more
+        efficient than just doing x*Operator.
 
+        Parameters
+        ----------
+        x : numeric type
+            The coefficient to scale by
+        '''
         try:
-            rtn.msc['coeffs'] *= x
+            self.msc['coeffs'] *= x
         except (ValueError,TypeError):
             raise ValueError('Error attempting to multiply operator by type "%s"' % str(type(x)))
 
-        rtn.string = '{:.3f}*'.format(x) + self.with_brackets('string')
-        rtn.tex = '{:.3f}*'.format(x) + self.with_brackets('tex')
-        rtn.brackets = ''
+        self.string = '{:.3f}*'.format(x) + self.with_brackets('string')
+        self.tex = '{:.3f}*'.format(x) + self.with_brackets('tex')
+        self.brackets = ''
+        return self
+
+    def _num_mul(self, x):
+        rtn = self.copy()
+        rtn.scale(x)
         return rtn
 
 def load_from_file(filename):
@@ -829,6 +842,27 @@ def op_product(terms):
         o = identity()
 
     return o
+
+def all_to_all(ops, n=2, coupling_func=lambda *args: 1):
+    '''
+    Return a sum of all couplings of ``n`` of the operators. For example, with
+    four operators A, B, C, and D, with ``n=2`` this function will return the operator
+    AB + AC + AD + BC + BD + CD. With ``n=3``, it will return ABC + ABD + ACD + BCD.
+
+    Parameters
+    ----------
+    ops : iterable of :class:`dynamite.operators.Operator` objects
+        The operators to couple
+
+    n : int
+        The number of operators per term of the sum
+
+    coupling_func : function(*args)
+        A function of ``n`` index arguments, which returns the coefficient for the term
+        specified by the indices. Called as coupling_func(i, j, ...).
+    '''
+    # TODO: fancy string/tex?
+    raise NotImplementedError()
 
 def index_sum(op, size = None, start = 0, boundary = 'open'):
     """

@@ -103,8 +103,12 @@ elif args.H == 'long_range':
 
 elif args.H == 'SYK':
     seed(0)
-    H = sum(uniform(-1,1)*op_product(majorana(idx) for idx in idxs)
-            for idxs in combinations(range(args.L*2),4))
+
+    # only compute the majoranas once
+    majoranas = [majorana(i) for i in range(args.L*2)]
+
+    H = op_sum(op_product(majoranas[idx] for idx in idxs).scale(uniform(-1,1))
+               for idxs in combinations(range(args.L*2),4))
 
 elif args.H == 'ising':
     H = index_sum(sigmaz(0)*sigmaz(1)) + 0.2*index_sum(sigmax())
