@@ -599,6 +599,28 @@ class Operator:
 
         return ary
 
+    def spy(self, max_size=1024):
+        '''
+        Use matplotlib to show the nonzero structure of the matrix.
+
+        Parameters
+        ----------
+        max_size : int
+            The maximum matrix dimension for which this function can be called.
+            Calling it for too large a matrix will not be informative and probably run
+            out of memory, so this is a small safeguard.
+        '''
+        if any(dim > max_size for dim in self.dim):
+            raise ValueError('Matrix too big to spy. Either build a smaller operator, or adjust '
+                             'the maximum spy size with the argument "max_size"')
+
+        from matplotlib import pyplot as plt
+        plt.figure()
+        normalized = np.array((self.to_numpy() != 0).toarray(), dtype = np.float)
+        transformed = np.log(normalized + 1E-9)
+        plt.imshow(transformed, cmap='Greys')
+        plt.show()
+
     ### unary and binary operations
 
     def __add__(self, x):
