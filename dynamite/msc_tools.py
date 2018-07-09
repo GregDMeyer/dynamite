@@ -47,6 +47,7 @@ def msc_to_numpy(msc, dims, idx_to_state = None, state_to_idx = None, sparse = T
     '''
     msc = np.array(msc, copy = False, dtype = msc_dtype)
     data = np.ndarray(msc.size * np.min(dims), dtype = np.complex128)
+    # data[:] = -1 # for testing if we have correctly sized buffers
     row_idxs = np.ndarray(data.size, dtype = dnm_int_t)
     col_idxs = np.ndarray(data.size, dtype = dnm_int_t)
     mat_idx = 0
@@ -78,6 +79,11 @@ def msc_to_numpy(msc, dims, idx_to_state = None, state_to_idx = None, sparse = T
         row_idxs[mat_idx:mat_idx+nnew] = idx
         col_idxs[mat_idx:mat_idx+nnew] = good_ridx
         mat_idx += nnew
+
+    # trim to the amount we used
+    data = data[:mat_idx]
+    row_idxs = row_idxs[:mat_idx]
+    col_idxs = col_idxs[:mat_idx]
 
     ary = scipy.sparse.csc_matrix((data, (row_idxs, col_idxs)), shape = dims)
 

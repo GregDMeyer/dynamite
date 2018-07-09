@@ -46,6 +46,44 @@ class ToNumpy(ut.TestCase):
         npy = np.identity(5)[:,:3]
         self.check_same(dnm, npy)
 
+    def test_cut_off(self):
+        def state_to_idx(x):
+            rtn = x.copy()
+            rtn[rtn >= 3] = -1
+            return rtn
+
+        dnm = msc_tools.msc_to_numpy([(0, 0, 1)], (5,5),
+                                     state_to_idx = state_to_idx)
+        npy = np.array(
+            [
+                [1, 0, 0, 0, 0],
+                [0, 1, 0, 0, 0],
+                [0, 0, 1, 0, 0],
+                [0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0],
+            ]
+        )
+        self.check_same(dnm, npy)
+
+    def test_twoterms_tall(self):
+        def state_to_idx(x):
+            rtn = x.copy()
+            rtn[rtn >= 3] = -1
+            return rtn
+
+        dnm = msc_tools.msc_to_numpy([(0, 0, 1), (2, 0, 2)], (5,3),
+                                     state_to_idx = state_to_idx)
+        npy = np.array(
+            [
+                [1, 0, 2],
+                [0, 1, 0],
+                [2, 0, 1],
+                [0, 2, 0],
+                [0, 0, 0],
+            ]
+        )
+        self.check_same(dnm, npy)
+
     def test_allflip(self):
         dnm = msc_tools.msc_to_numpy([(15, 0, 1)], (16,16))
         npy = np.identity(16)[:,::-1]
