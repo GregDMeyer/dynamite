@@ -673,7 +673,7 @@ class Operator:
         rtn = self.copy()
         rtn.msc = msc_tools.msc_product([self.msc, o.msc])
         rtn.string = self.with_brackets('string') + '*' + o.with_brackets('string')
-        rtn.tex = self.with_brackets('tex') + '*' + o.with_brackets('tex')
+        rtn.tex = self.with_brackets('tex') + o.with_brackets('tex')
         rtn.brackets = ''
         return rtn
 
@@ -858,7 +858,7 @@ def op_product(terms):
         o = Operator()
         o.msc = msc_tools.msc_product(msc_terms)
         o.string = '*'.join(strings)
-        o.tex = '*'.join(texs)
+        o.tex = ''.join(texs)
         o.brackets = ''
     else:
         o = identity()
@@ -946,7 +946,7 @@ def index_sum(op, size = None, start = 0, boundary = 'open'):
     else:
         rtn.string += ')'
     # TODO: make tex prettier by substituting i for the indices
-    rtn.tex = r'\sum_{i=%d}^{%d}' % (start, stop-1) + op.with_brackets(which = 'tex') + '_{i}'
+    rtn.tex = r'\sum_{i=%d}^{%d}' % (start, stop-1) + op.with_brackets(which = 'tex').join('{}') + '_{i}'
     rtn.brackets = '[]'
 
     return rtn
@@ -984,7 +984,7 @@ def index_product(op, size = None, start = 0):
 
     rtn.string = 'index_product(' + op.string + ', sites %d - %d)' % (start, stop-1)
     # TODO: make tex prettier by substituting i for the indices
-    rtn.tex = r'\prod_{i=%d}^{%d}' % (start, stop-1) + op.with_brackets(which = 'tex') + '_{i}'
+    rtn.tex = r'\prod_{i=%d}^{%d}' % (start, stop-1) + op.with_brackets(which = 'tex').join('{}') + '_{i}'
     rtn.brackets = '[]'
 
     return rtn
