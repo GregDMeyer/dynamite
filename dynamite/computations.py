@@ -153,6 +153,8 @@ def eigsolve(H, getvecs=False, nev=1, which='smallest', target=None, tol=None):
         and a list of the corresponding eigenvectors.
     """
 
+    # TODO: require that left subspace and right subspace are the same
+
     config.initialize()
     from slepc4py import SLEPc
 

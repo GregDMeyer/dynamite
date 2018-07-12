@@ -59,13 +59,7 @@ class _Config:
         slepc4py.init(slepc_args)
         self.initialized = True
 
-        # check that the number of processes is a power of 2 (currently required)
-        # TODO: move this check to be near the code that actually requires this
         from petsc4py import PETSc
-        mpi_size = int(PETSc.COMM_WORLD.size)  # this cast is needed for MagicMock
-        if mpi_size & (mpi_size-1) != 0:
-            raise RuntimeError('Number of MPI processes must be a power of 2!')
-
         if version_check and PETSc.COMM_WORLD.rank == 0:
             from urllib import request
             import json

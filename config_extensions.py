@@ -34,9 +34,7 @@ def extensions():
 
         depends = []
         object_files = []
-        extra_args = {
-            'include_dirs' : paths['include_dirs']
-        }
+        extra_args = paths
 
         if name not in cython_only:
             depends += ['dynamite/_backend/{name}_impl.h'.format(name=name)]
@@ -45,16 +43,13 @@ def extensions():
                 object_files = ['dynamite/_backend/{name}_impl.o'.format(name=name)]
 
         if name == 'bpetsc':
-            depends += ['dynamite/_backend/bcuda_impl.h',
+            depends += ['dynamite/_backend/bsubspace.pxd'
+                        'dynamite/_backend/bcuda_impl.h',
                         'dynamite/_backend/bcuda_impl.cu',
                         'dynamite/_backend/shellcontext.h',
                         'dynamite/_backend/bsubspace_impl.h']
             if have_nvcc():
                 object_files += ['dynamite/_backend/bcuda_impl.o'.format(name=name)]
-            extra_args = paths
-
-        if name == 'bbuild':
-            extra_args = paths
 
         exts += [
             Extension('dynamite._backend.{name}'.format(name=name),

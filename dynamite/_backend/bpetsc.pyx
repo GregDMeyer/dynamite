@@ -1,4 +1,6 @@
 
+from . cimport bsubspace
+
 from petsc4py.PETSc cimport Vec,  PetscVec
 from petsc4py.PETSc cimport Mat,  PetscMat
 from petsc4py.PETSc cimport Scatter, PetscScatter
@@ -11,43 +13,44 @@ cimport numpy as np
 import cython
 
 cdef extern from "bsubspace_impl.h":
-    ctypedef struct Subspaces:
+    ctypedef struct subspaces_t:
         int left_type
         int right_type
-        int left_space
-        int right_space
+        void *left_data
+        void *right_data
 
     ctypedef enum subspace_type:
-        pass
+        _FULL "FULL"
+        _PARITY "PARITY"
+        _AUTO "AUTO"
 
 cdef extern from "bpetsc_impl.h":
     ctypedef int PetscInt
     ctypedef float PetscLogDouble
 
-    int BuildMat_Full(PetscInt L,
-                      np.int_t nterms,
-                      PetscInt* masks,
-                      PetscInt* signs,
-                      np.complex128_t* coeffs,
-                      Subspaces s,
-                      PetscMat *A)
+    ctypedef struct msc_t:
+      int nmasks
+      int* masks
+      int* mask_offsets
+      int* signs
+      np.complex128_t* coeffs
 
-    int BuildMat_Shell(PetscInt L,
-                       np.int_t nterms,
-                       PetscInt* masks,
-                       PetscInt* signs,
-                       np.complex128_t* coeffs,
-                       Subspaces s,
-                       PetscMat *A)
+    int BuildMat(msc_t *msc,
+                 subspaces_t *subspaces,
+                 PetscMat *A)
 
-    int DestroyContext(PetscMat A)
+    # int BuildShell(msc_t *msc,
+    #                subspaces_t *subspaces,
+    #                PetscMat *A)
+    #
+    # int DestroyContext(PetscMat A)
 
     int ReducedDensityMatrix(PetscInt L,
                              PetscVec x,
                              PetscInt cut_size,
                              bint fillall,
                              np.complex128_t* m)
-    int MatShellGetContext(PetscMat,void* ctx)
+    # int MatShellGetContext(PetscMat,void* ctx)
 
     int PetscMemoryGetCurrentUsage(PetscLogDouble* mem)
     int PetscMallocGetCurrentUsage(PetscLogDouble* mem)
@@ -71,30 +74,36 @@ cdef extern from "shellcontext.h":
     ctypedef struct shell_context:
         PetscBool gpu
 
-@cython.boundscheck(False)
-@cython.wraparound(False)
 def build_mat(int L,
-              np.ndarray[PetscInt,mode="c"] masks not None,
-              np.ndarray[PetscInt,mode="c"] signs not None,
-              np.ndarray[np.complex128_t,mode="c"] coeffs not None,
+              PetscInt [:] masks,
+              PetscInt [:] mask_offsets,
+              PetscInt [:] signs,
+              np.complex128_t [:] coeffs,
               subspace_type left_type,
-              int left_space,
+              left_data,
               subspace_type right_type,
-              int right_space,
+              right_data,
               bint shell=False,
               bint gpu=False):
 
-    cdef int ierr,n
-    cdef Subspaces s
+    cdef int ierr, nterms, nmasks
+    cdef subspaces_t subspaces
+    cdef msc_t msc
+
+    msc.nmasks      = masks.size
+    msc.masks       = &masks[0]
+    msc.mask_offsets = &mask_offsets[0]
+    msc.signs       = &signs[0]
+    msc.coeffs      = &coeffs[0]
 
     M = Mat()
-    n = masks.shape[0]
 
-    s.left_type = left_type
-    s.left_space = left_space
-    s.right_type = right_type
-    s.right_space = right_space
+    subspaces.left_type = left_type
+    bsubspace.set_data_pointer(left_type, left_data, &(subspaces.left_data))
+    subspaces.right_type = right_type
+    bsubspace.set_data_pointer(right_type, right_data, &(subspaces.right_data))
 
+    # TODO: use an enum for shell types
     if shell and gpu:
         IF USE_CUDA:
             if not (left_type == _FULL and right_type == _FULL):
@@ -104,9 +113,11 @@ def build_mat(int L,
             raise RuntimeError("dynamite was not built with CUDA shell "
                                "functionality (requires nvcc during build).")
     elif shell:
-        ierr = BuildMat_Shell(L,n,&masks[0],&signs[0],&coeffs[0],s,&M.mat)
+        if left_type == _AUTO or right_type == _AUTO:
+            raise TypeError('Shell matrices currently not supported for Auto subspace.')
+        # ierr = BuildShell(&msc, &subspaces, &M.mat)
     else:
-        ierr = BuildMat_Full(L,n,&masks[0],&signs[0],&coeffs[0],s,&M.mat)
+        ierr = BuildMat(&msc, &subspaces, &M.mat)
 
     if ierr != 0:
         raise Error(ierr)
@@ -128,7 +139,8 @@ def destroy_shell_context(Mat A):
             ierr = DestroyContext(A.mat)
 
     ELSE:
-        ierr = DestroyContext(A.mat)
+        # ierr = DestroyContext(A.mat)
+        pass
 
     if ierr != 0:
         raise Error(ierr)

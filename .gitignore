@@ -5,3 +5,4 @@ notes
 build
 dynamite.egg-info
 .pylintrc
+.ipynb_checkpoints

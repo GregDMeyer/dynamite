@@ -5,7 +5,7 @@
 
 typedef struct _shell_context {
   PetscInt L;
-  Subspaces s;
+  subspaces_t s;
   PetscInt nterms;
   PetscInt *masks;
   PetscInt *signs;

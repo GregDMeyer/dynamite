@@ -1,3 +1,9 @@
+'''
+Classes that define the various subspaces on which operators can be defined.
+
+The methods generally are just an interface to the backend, so that there is only
+one implementation of each of the functions.
+'''
 
 import numpy as np
 from copy import deepcopy
@@ -21,27 +27,26 @@ def class_to_enum(subspace_type):
     return to_enum[subspace_type]
 
 class Subspace:
+    '''
+    Base subspace class.
+    '''
 
-    def __init__(self, space):
+    def __init__(self):
         self._L = None
-        self._space = self._check_space(space)
 
-    def __eq__(self,s):
-        if not isinstance(s,Subspace):
+    def __eq__(self, s):
+        '''
+        Returns true if the two subspaces correspond to the same mapping, even if they
+        are different classes.
+        '''
+        if not isinstance(s, Subspace):
             raise ValueError('Cannot compare Subspace to non-Subspace type')
-        return type(s) == type(self) and s.L == self.L and s.space == self.space
 
-    @classmethod
-    def _check_space(cls, value):
-        raise NotImplementedError()
+        if self.get_dimension() != s.get_dimension():
+            return False
 
-    @property
-    def space(self):
-        """
-        A parameter defining the subspace---for example, for parity,
-        it might be even or odd.
-        """
-        return self._space
+        idxs = np.arange(self.get_dimension())
+        return np.array_equal(self.idx_to_state(idxs), s.idx_to_state(idxs))
 
     @property
     def L(self):
@@ -50,92 +55,101 @@ class Subspace:
         '''
         return self._L
 
-    @classmethod
-    def _check_L(cls, L, space):
-        raise NotImplementedError()
+    def check_L(self, value):
+        # by default, any L that passes our normal validation checks works
+        return value
 
     @L.setter
     def L(self, value):
         # check that this value of L is compatible with the subspace
         value = validate.L(value)
-        value = self._check_L(value, self.space)
+        value = self.check_L(value)
         self._L = value
-
-    @classmethod
-    def _get_dimension(cls, L, space):
-        raise NotImplementedError()
 
     def get_dimension(self):
         """
         Get the dimension of the subspace.
         """
-        return self._get_dimension(self.L, self.space)
+        raise NotImplementedError()
 
     @classmethod
-    def _idx_to_state(cls, idx, L, space):
-        raise NotImplementedError
+    def _numeric_to_array(cls, x):
+        '''
+        Convert numeric values of any type to the type expected by the backend
+        functions.
+        '''
+        x = np.array(x, copy = False, dtype = bsubspace.dnm_int_t).reshape((-1,))
+        return np.ascontiguousarray(x)
 
     def idx_to_state(self, idx):
         """
         Maps an index to an integer that in binary corresponds to the spin configuration.
         Vectorized implementation allows passing a numpy array of indices as idx.
         """
-        if self.L is None:
-            raise ValueError('Must set spin chain size for Subspace before calling '
-                             'idx_to_state.')
-        idx = np.array(idx, copy = False, dtype = bsubspace.dnm_int_t).reshape((-1,))
-        return self._idx_to_state(idx, self.L, self.space)
-
-    @classmethod
-    def _state_to_idx(cls, state, L, space):
-        raise NotImplementedError
+        raise NotImplementedError()
 
     def state_to_idx(self, state):
         """
         The inverse mapping of :meth:`idx_to_state`.
         """
-        if self.L is None:
-            raise ValueError('Must set spin chain size for Subspace before calling '
-                             'state_to_idx.')
-        state = np.array(state, copy = False, dtype = bsubspace.dnm_int_t).reshape((-1,))
-        return self._state_to_idx(state, self.L, self.space)
+        raise NotImplementedError()
 
     def copy(self):
         return deepcopy(self)
 
+    def get_cdata(self):
+        '''
+        Returns an object containing the subspace data accessible by the backend C.
+        '''
+        raise NotImplementedError()
+
 class Full(Subspace):
 
-    def __init__(self, space = None):
-        Subspace.__init__(self, space = space)
+    def __init__(self):
+        Subspace.__init__(self)
+
+    def get_dimension(self):
+        """
+        Get the dimension of the subspace.
+        """
+        return self._get_dimension(self.L)
 
     @classmethod
-    def _get_dimension(cls, L, space):
-        return 1 << L
+    def _get_dimension(cls, L):
+        return bsubspace.get_dimension_Full(cls._get_cdata(L))
+
+    def idx_to_state(self, idx):
+        """
+        Maps an index to an integer that in binary corresponds to the spin configuration.
+        Vectorized implementation allows passing a numpy array of indices as idx.
+        """
+        return self._idx_to_state(idx, self.L)
+
+    def state_to_idx(self, state):
+        """
+        The inverse mapping of :meth:`idx_to_state`.
+        """
+        return self._state_to_idx(state, self.L)
 
     @classmethod
-    def _check_space(cls, value):
-        if not (value is None or value == 0):
-            raise ValueError('Only valid choice for full space is "None" or 0.')
-        return 0
+    def _idx_to_state(cls, idx, L):
+        idx = cls._numeric_to_array(idx)
+        return bsubspace.idx_to_state_Full(idx, cls._get_cdata(L))
 
     @classmethod
-    def _check_L(cls, L, space):
-        # any L that passes our normal validation checks works
-        return L
+    def _state_to_idx(cls, state, L):
+        state = cls._numeric_to_array(state)
+        return bsubspace.state_to_idx_Full(state, cls._get_cdata(L))
+
+    def get_cdata(self):
+        '''
+        Returns an object containing the subspace data accessible by the C backend.
+        '''
+        return self._get_cdata(self.L)
 
     @classmethod
-    def _idx_to_state(cls, idx, L, space):
-        dim = cls._get_dimension(L, space)
-        out_of_range = np.logical_or(idx < 0, idx >= dim)
-        idx[out_of_range] = -1
-        return idx
-
-    @classmethod
-    def _state_to_idx(cls, state, L, space):
-        dim = cls._get_dimension(L, space)
-        out_of_range = np.logical_or(state < 0, state >= dim)
-        state[out_of_range] = -1
-        return state
+    def _get_cdata(cls, L):
+        return bsubspace.CFull(L)
 
 class Parity(Subspace):
     '''
@@ -147,9 +161,13 @@ class Parity(Subspace):
         Either 0 or 'even' for the even subspace, or 1 or 'odd' for the other.
     '''
 
-    @classmethod
-    def _get_dimension(cls, L, space):
-        return 1 << (L-1)
+    def __init__(self, space):
+        Subspace.__init__(self)
+        self._space = self._check_space(space)
+
+    @property
+    def space(self):
+        return self._space
 
     @classmethod
     def _check_space(cls, value):
@@ -161,27 +179,48 @@ class Parity(Subspace):
             raise ValueError('Invalid parity space "'+str(value)+'" '
                              '(valid choices are 0, 1, "even", or "odd")')
 
+    def get_dimension(self):
+        """
+        Get the dimension of the subspace.
+        """
+        return self._get_dimension(self.L, self.space)
+
     @classmethod
-    def _check_L(cls, L, space):
-        # any L that passes our normal validation checks works
-        return L
+    def _get_dimension(cls, L, space):
+        return bsubspace.get_dimension_Parity(cls._get_cdata(L, space))
+
+    def idx_to_state(self, idx):
+        """
+        Maps an index to an integer that in binary corresponds to the spin configuration.
+        Vectorized implementation allows passing a numpy array of indices as idx.
+        """
+        idx = self._numeric_to_array(idx)
+        return self._idx_to_state(idx, self.L, self.space)
+
+    def state_to_idx(self, state):
+        """
+        The inverse mapping of :meth:`idx_to_state`.
+        """
+        state = self._numeric_to_array(state)
+        return self._state_to_idx(state, self.L, self.space)
 
     @classmethod
     def _idx_to_state(cls, idx, L, space):
-        dim = cls._get_dimension(L, space)
-        out_of_range = np.logical_or(idx < 0, idx >= dim)
-        state = bsubspace.parity_i2s(idx, L, space)
-        state[out_of_range] = -1
-        return state
+        return bsubspace.idx_to_state_Parity(idx, cls._get_cdata(L, space))
 
     @classmethod
     def _state_to_idx(cls, state, L, space):
-        par = parity(state)
-        max_spin_idx = intlog2(state)
-        invalid = np.logical_or(par != space, max_spin_idx >= L)
-        idxs = bsubspace.parity_s2i(state, L, space)
-        idxs[invalid] = -1
-        return idxs
+        return bsubspace.state_to_idx_Parity(state, cls._get_cdata(L, space))
+
+    def get_cdata(self):
+        '''
+        Returns an object containing the subspace data accessible by the C backend.
+        '''
+        return self._get_cdata(self.L, self.space)
+
+    @classmethod
+    def _get_cdata(cls, L, space):
+        return bsubspace.CParity(L, space)
 
 class Auto(Subspace):
     '''
@@ -197,28 +236,69 @@ class Auto(Subspace):
 
     Parameters
     ----------
-    space : int
+    H : dynamite.operators.Operator
+        The operator for which this custom subspace will be defined.
+
+    state : int
         An integer whose binary representation corresponds to the spin configuration of the "start"
         state mentioned above.
+
+    size_guess : int
+        A guess for the dimension of the subspace. By default, memory is allocated for the full
+        space, and then trimmed off if not used.
     '''
 
-    @classmethod
-    def _get_dimension(cls, L, space):
-        raise NotImplementedError()
+    def __init__(self, H, state, size_guess=None):
+        Subspace.__init__(self)
 
-    @classmethod
-    def _check_space(cls, value):
-        raise NotImplementedError()
+        self._L = H.get_length()
 
-    @classmethod
-    def _check_L(cls, L, space):
-        # any L that passes our normal validation checks works
-        return L
+        if size_guess is None:
+            size_guess = 2**H.get_length()
 
-    @classmethod
-    def _idx_to_state(cls, idx, L, space):
-        raise NotImplementedError()
+        self.state_map = np.ndarray((size_guess,), dtype=bsubspace.dnm_int_t)
 
-    @classmethod
-    def _state_to_idx(cls, state, L, space):
-        raise NotImplementedError()
+        # TODO: use some sort of custom hash table for this data structure?
+        # python's dict won't work because it's not vectorized, and too slow anyway
+        self.state_rmap = np.ndarray((2**H.get_length(),), dtype=bsubspace.dnm_int_t)
+        self.state_rmap[:] = -1
+
+        H.reduce_msc()
+
+        dim = bsubspace.compute_rcm(H.msc['masks'], H.msc['signs'], H.msc['coeffs'],
+                                    self.state_map, self.state_rmap, state, H.get_length())
+
+        self.state_map = self.state_map[:dim]
+
+    def check_L(self, value):
+        if value != self.L:
+            raise TypeError('Cannot change L for Auto subspace type.')
+        return value
+
+    def get_dimension(self):
+        """
+        Get the dimension of the subspace.
+        """
+        return bsubspace.get_dimension_Auto(self.get_cdata())
+
+    def idx_to_state(self, idx):
+        """
+        Maps an index to an integer that in binary corresponds to the spin configuration.
+        Vectorized implementation allows passing a numpy array of indices as idx.
+        """
+        idx = self._numeric_to_array(idx)
+        return bsubspace.idx_to_state_Auto(idx, self.get_cdata())
+
+    def state_to_idx(self, state):
+        """
+        The inverse mapping of :meth:`idx_to_state`.
+        """
+        state = self._numeric_to_array(state)
+        return bsubspace.state_to_idx_Auto(state, self.get_cdata())
+
+    def get_cdata(self):
+        '''
+        Returns an object containing the subspace data accessible by the C backend.
+        '''
+        return bsubspace.CAuto(np.ascontiguousarray(self.state_map),
+                               np.ascontiguousarray(self.state_rmap))

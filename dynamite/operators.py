@@ -50,8 +50,12 @@ class Operator:
         rtn.msc = self.msc
         rtn.is_reduced = self.is_reduced
         rtn.shell = self.shell
-        rtn.left_subspace = self.left_subspace.copy()
-        rtn.right_subspace = self.right_subspace.copy()
+
+        if self.left_subspace is self.right_subspace:
+            rtn.subspace = self.subspace.copy()
+        else:
+            rtn.left_subspace = self.left_subspace.copy()
+            rtn.right_subspace = self.right_subspace.copy()
 
         rtn.tex = self.tex
         rtn.string = self.string
@@ -242,7 +246,7 @@ class Operator:
         gets or sets both at the same time. If they are different, it
         raises an error.
         """
-        if self.left_subspace != self.right_subspace:
+        if self.left_subspace is not self.right_subspace:
             raise ValueError('Left subspace and right subspace not the same, '
                              'use left_subspace and right_subspace to access each.')
 
@@ -251,6 +255,7 @@ class Operator:
     @left_subspace.setter
     def left_subspace(self, s):
         validate.subspace(s)
+        s.L = self.get_length()
         if s != self.left_subspace:
             self.destroy_mat()
         self._left_subspace = s
@@ -258,6 +263,7 @@ class Operator:
     @right_subspace.setter
     def right_subspace(self, s):
         validate.subspace(s)
+        s.L = self.get_length()
         if s != self.right_subspace:
             self.destroy_mat()
         self._right_subspace = s
@@ -471,14 +477,22 @@ class Operator:
             term_array = np.hstack([np.array([(0,0,0)], dtype=term_array.dtype), term_array])
             self._has_diag_entries = True
 
+        masks, indices = np.unique(term_array['masks'], return_index=True)
+
+        # need to add the last index
+        mask_offsets = np.ndarray((indices.size+1,), dtype=term_array.dtype['masks'])
+        mask_offsets[:-1] = indices
+        mask_offsets[-1]  = term_array.shape[0]
+
         self._mat = bpetsc.build_mat(L = self.get_length(),
-                                     masks = np.ascontiguousarray(term_array['masks']),
+                                     masks = np.ascontiguousarray(masks),
+                                     mask_offsets = np.ascontiguousarray(mask_offsets),
                                      signs = np.ascontiguousarray(term_array['signs']),
                                      coeffs = np.ascontiguousarray(term_array['coeffs']),
                                      left_type = class_to_enum(type(self.left_subspace)),
-                                     left_space = self.left_subspace.space,
+                                     left_data = self.left_subspace.get_cdata(),
                                      right_type = class_to_enum(type(self.right_subspace)),
-                                     right_space = self.right_subspace.space,
+                                     right_data = self.right_subspace.get_cdata(),
                                      shell = bool(self.shell),
                                      gpu = self.shell == 'gpu')
 

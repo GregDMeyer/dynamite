@@ -11,17 +11,19 @@
 #define LKP_MASK (LKP_SIZE-1)
 #define intmin(a,b) ((a)^(((a)^(b))&(((a)<(b))-1)))
 
-PetscErrorCode BuildMat_Full(PetscInt L,PetscInt nterms,
-                             const PetscInt* masks,
-                             const PetscInt* signs,
-                             const PetscScalar* coeffs,
-                             Subspaces s,
-                             Mat *A);
-PetscErrorCode BuildMat_Shell(PetscInt L,PetscInt nterms,
-                              const PetscInt* masks,
-                              const PetscInt* signs,
-                              const PetscScalar* coeffs,
-                              Subspaces s,
+typedef struct _msc_t {
+  PetscInt nmasks;
+  PetscInt* masks;
+  PetscInt* mask_offsets;
+  PetscInt* signs;
+  PetscScalar* coeffs;
+} msc_t;
+
+PetscErrorCode BuildMat(const msc_t *msc, subspaces_t *subspaces, Mat *A);
+
+PetscErrorCode BuildMat_Shell(PetscInt L, const msc_t *msc,
+                              const void *left_subspace_data,
+                              const void *right_subspace_data,
                               Mat *A);
 
 PetscErrorCode MatMult_Shell(Mat A,Vec x,Vec b);
@@ -32,7 +34,7 @@ PetscErrorCode BuildContext(PetscInt L,PetscInt nterms,
                             const PetscInt* masks,
                             const PetscInt* signs,
                             const PetscScalar* coeffs,
-                            Subspaces s,
+                            subspaces_t s,
                             shell_context **ctx_p);
 PetscErrorCode DestroyContext(Mat A);
 

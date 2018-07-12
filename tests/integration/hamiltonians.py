@@ -45,6 +45,7 @@ def localized(L = None):
     '''
     Random-field Heisenberg.
     '''
+    np.random.seed(0)
     H = index_sum(op_sum(s(0)*s(1) for s in (sigmax, sigmay, sigmaz)), size = L)
     H += op_sum(np.random.uniform(-1, 1)*sigmaz(i) for i in range(H.get_length()))
     return H
