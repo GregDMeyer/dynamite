@@ -1,7 +1,6 @@
 #pragma once
 
 #include <slepcmfn.h>
-#include "shellcontext.h"
 #include "bsubspace_impl.h"
 
 /* allow us to set many values at once */
@@ -11,6 +10,14 @@
 #define LKP_MASK (LKP_SIZE-1)
 #define intmin(a,b) ((a)^(((a)^(b))&(((a)<(b))-1)))
 
+#define TERM_REAL(mask, sign) (!(__builtin_parity((mask) & (sign))))
+
+typedef enum _shell_impl {
+  NO_SHELL,
+  CPU_SHELL,
+  GPU_SHELL
+} shell_impl;
+
 typedef struct _msc_t {
   PetscInt nmasks;
   PetscInt* masks;
@@ -19,22 +26,25 @@ typedef struct _msc_t {
   PetscScalar* coeffs;
 } msc_t;
 
-PetscErrorCode BuildMat(const msc_t *msc, subspaces_t *subspaces, Mat *A);
+typedef struct _shell_context {
+  PetscInt nmasks;
+  PetscInt* masks;
+  PetscInt* mask_offsets;
+  PetscInt* signs;
+  PetscReal* real_coeffs;     // we store only the real or complex part -- whichever is nonzero
+  const void *left_subspace_data;
+  const void *right_subspace_data;
+  PetscReal nrm;
+} shell_context;
 
-PetscErrorCode BuildMat_Shell(PetscInt L, const msc_t *msc,
-                              const void *left_subspace_data,
-                              const void *right_subspace_data,
-                              Mat *A);
+PetscErrorCode BuildMat(const msc_t *msc, subspaces_t *subspaces, shell_impl shell, Mat *A);
 
-PetscErrorCode MatMult_Shell(Mat A,Vec x,Vec b);
+/* define a type for context destroying functions, and we keep that in the context */
+// TODO
 
-PetscErrorCode MatNorm_Shell(Mat A,NormType type,PetscReal *nrm);
-
-PetscErrorCode BuildContext(PetscInt L,PetscInt nterms,
-                            const PetscInt* masks,
-                            const PetscInt* signs,
-                            const PetscScalar* coeffs,
-                            subspaces_t s,
+PetscErrorCode BuildContext(const msc_t *msc,
+                            const void* left_subspace_data,
+                            const void* right_subspace_data,
                             shell_context **ctx_p);
 PetscErrorCode DestroyContext(Mat A);
 

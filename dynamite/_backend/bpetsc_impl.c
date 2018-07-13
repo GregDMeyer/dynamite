@@ -1,48 +1,6 @@
 
 #include "bpetsc_impl.h"
 
-// #undef  __FUNCT__
-// #define __FUNCT__ "BuildMat_Shell"
-// PetscErrorCode BuildMat_Shell(PetscInt L,PetscInt nterms,
-//                               const PetscInt* masks,
-//                               const PetscInt* signs,
-//                               const PetscScalar* coeffs,
-//                               subspaces_t s,
-//                               Mat *A)
-// {
-//   PetscErrorCode ierr;
-//   PetscInt N,M,n,m;
-//   shell_context *ctx;
-//
-//   /* N is dimension of right subspace, M of left */
-//   if (s.right_type == PARITY) {
-//     N = Parity_Dim(L, s.right_space);
-//   }
-//   else {
-//     N = 1 << L;
-//   }
-//
-//   if (s.left_type == PARITY) {
-//     M = Parity_Dim(L, s.left_space);
-//   }
-//   else {
-//     M = 1 << L;
-//   }
-//
-//   n = PETSC_DECIDE;
-//   m = PETSC_DECIDE;
-//   PetscSplitOwnership(PETSC_COMM_WORLD,&n,&N);
-//   PetscSplitOwnership(PETSC_COMM_WORLD,&m,&M);
-//
-//   ierr = BuildContext(L,nterms,masks,signs,coeffs,s,&ctx);CHKERRQ(ierr);
-//
-//   ierr = MatCreateShell(PETSC_COMM_WORLD,m,n,M,N,ctx,A);CHKERRQ(ierr);
-//   ierr = MatShellSetOperation(*A,MATOP_MULT,(void(*)(void))MatMult_Shell);
-//   ierr = MatShellSetOperation(*A,MATOP_NORM,(void(*)(void))MatNorm_Shell);
-//
-//   return ierr;
-//
-// }
 //
 // static inline void _radd(PetscScalar *x,PetscReal c)
 // {
@@ -306,184 +264,73 @@
 //   return ierr;
 // }
 //
-// #undef  __FUNCT__
-// #define __FUNCT__ "MatNorm_Shell"
-// PetscErrorCode MatNorm_Shell(Mat A,NormType type,PetscReal *nrm)
-// {
-//   PetscErrorCode ierr;
-//   PetscInt m,idx,state,i,Istart,Iend;
-//   PetscScalar csum,sign;
-//   PetscReal sum,local_max,global_max;
-//   shell_context *ctx;
-//
-//   if (type != NORM_INFINITY) {
-//     SETERRQ(PETSC_COMM_WORLD,PETSC_ERR_ARG_OUTOFRANGE,"Only NORM_INFINITY is implemented for shell matrices.");
-//   }
-//
-//   ierr = MatShellGetContext(A,&ctx);CHKERRQ(ierr);
-//
-//   /*
-//     keep the norm cached so we don't have to compute it all the time.
-//     if we already have it, just return it
-//   */
-//   if (ctx->nrm != -1) {
-//     (*nrm) = ctx->nrm;
-//     return ierr;
-//   }
-//
-//   ierr = MatGetOwnershipRange(A,&Istart,&Iend);CHKERRQ(ierr);
-//
-//   local_max = 0;
-//   for (idx=Istart;idx<Iend;++idx) {
-//     sum = 0;
-//     for (i=0;i<ctx->nterms;) {
-//       csum = 0;
-//       m = ctx->masks[i];
-//       if (ctx->s.right_type == PARITY) {
-//         state = PARITY_I2S(idx,ctx->s.right_space,ctx->L);
-//       }
-//       else state = idx;
-//
-//       /* sum all terms for this matrix element */
-//       do {
-//         /* this requires gcc builtins */
-//         sign = 1 - 2*(__builtin_popcount(state & ctx->signs[i]) % 2);
-//         if (!ctx->creal[i]) sign *= I;
-//         csum += sign * ctx->coeffs[i];
-//         ++i;
-//       } while (i<ctx->nterms && m == ctx->masks[i]);
-//
-//       sum += PetscAbsComplex(csum);
-//     }
-//     if (sum > local_max) {
-//       local_max = sum;
-//     }
-//   }
-//
-//   ierr = MPIU_Allreduce(&local_max,&global_max,1,MPIU_REAL,MPI_MAX,PETSC_COMM_WORLD);CHKERRQ(ierr);
-//
-//   ctx->nrm = global_max;
-//   (*nrm) = global_max;
-//
-//   return ierr;
-//
-// }
-//
-// #undef  __FUNCT__
-// #define __FUNCT__ "BuildContext"
-// PetscErrorCode BuildContext(PetscInt L,
-//                             PetscInt nterms,
-//                             const PetscInt* masks,
-//                             const PetscInt* signs,
-//                             const PetscScalar* coeffs,
-//                             subspaces_t s,
-//                             shell_context **ctx_p)
-// {
-//   PetscErrorCode ierr;
-//   shell_context *ctx;
-//   PetscInt i,j,mpi_size,proc_size,proc_L,N,m,tmp,mask_start_max;
-//
-//   ierr = PetscMalloc1(1,ctx_p);CHKERRQ(ierr);
-//   ctx = (*ctx_p);
-//
-//   ctx->L = L;
-//   ctx->nterms = nterms;
-//   ctx->nrm = -1;
-//   ctx->s = s;
-//   ctx->gpu = PETSC_FALSE;
-//
-//   /* we need to keep track of this stuff on our own. the numpy array might get garbage collected */
-//   ierr = PetscMalloc1(nterms,&(ctx->masks));CHKERRQ(ierr);
-//   ierr = PetscMalloc1(nterms,&(ctx->signs));CHKERRQ(ierr);
-//   ierr = PetscMalloc1(nterms,&(ctx->coeffs));CHKERRQ(ierr);
-//   ierr = PetscMalloc1(nterms,&(ctx->creal));CHKERRQ(ierr);
-//
-//   for (i=0;i<nterms;++i) {
-//     ctx->masks[i] = masks[i];
-//     ctx->signs[i] = signs[i];
-//
-//     ctx->coeffs[i] = PetscRealPart(coeffs[i]);
-//     ctx->creal[i] = (ctx->coeffs[i] != 0);
-//     if (!ctx->creal[i]) ctx->coeffs[i] = PetscImaginaryPart(coeffs[i]);
-//   }
-//
-//   /* compute the sign lookup tables */
-//   ierr = PetscMalloc1(LKP_SIZE,&(ctx->lookup));CHKERRQ(ierr);
-//   for (i=0;i<LKP_SIZE;++i) {
-//     ierr = PetscMalloc1(LKP_SIZE,ctx->lookup+i);CHKERRQ(ierr);
-//     for (j=0;j<LKP_SIZE;++j) {
-//       tmp = __builtin_popcount(i&j)&1;
-//       ctx->lookup[i][j] = -(tmp^(tmp-1));
-//     }
-//   }
-//
-//   ierr = MPI_Comm_size(PETSC_COMM_WORLD,&mpi_size);
-//
-//   /* count the number of masks going to each processor */
-//   if (s.left_type == PARITY) {
-//     /* this is kind of subtle and neat. basically we're considering the
-//      * extra masks due to the extra parity bit as if there were twice
-//      * as many processors.
-//      */
-//     mask_start_max = 2*mpi_size+1;
-//   }
-//   else {
-//     mask_start_max = mpi_size+1;
-//   }
-//   ierr = PetscMalloc1(mask_start_max,&(ctx->mask_starts));CHKERRQ(ierr);
-//
-//   proc_size = PETSC_DECIDE;
-//   if (s.right_type == PARITY) {
-//     N = Parity_Dim(L, s.right_space);
-//   }
-//   else {
-//     N = 1 << L;
-//   }
-//   ierr = PetscSplitOwnership(PETSC_COMM_WORLD,&proc_size,&N);CHKERRQ(ierr);
-//
-//   /* this assumes proc_size a power of 2! */
-//   proc_L = __builtin_ctz(proc_size);
-//
-//   ctx->mask_starts[0] = 0;
-//   m = 1;
-//   for (i=1;i<ctx->nterms;++i) {
-//     for (;(m<<proc_L) <= ctx->masks[i];++m) {
-//       ctx->mask_starts[m] = i;
-//     }
-//   }
-//   /* maybe a few of the last ones had none, have
-//    * to iterate through those
-//    */
-//   for (;m<mask_start_max;++m) {
-//     ctx->mask_starts[m] = ctx->nterms;
-//   }
-//
-//   return ierr;
-// }
-//
-// #undef  __FUNCT__
-// #define __FUNCT__ "DestroyContext"
-// PetscErrorCode DestroyContext(Mat A)
-// {
-//   PetscErrorCode ierr;
-//   PetscInt i;
-//   shell_context *ctx;
-//
-//   ierr = MatShellGetContext(A,&ctx);CHKERRQ(ierr);
-//
-//   ierr = PetscFree(ctx->masks);CHKERRQ(ierr);
-//   ierr = PetscFree(ctx->signs);CHKERRQ(ierr);
-//   ierr = PetscFree(ctx->coeffs);CHKERRQ(ierr);
-//
-//   for (i=0;i<LKP_SIZE;++i) {
-//     ierr = PetscFree(ctx->lookup[i]);CHKERRQ(ierr);
-//   }
-//   ierr = PetscFree(ctx->lookup);CHKERRQ(ierr);
-//
-//   ierr = PetscFree(ctx);CHKERRQ(ierr);
-//
-//   return ierr;
-// }
+
+#undef  __FUNCT__
+#define __FUNCT__ "BuildContext"
+/*
+ * Build the shell context. We rely on the subspace data to not get garbage collected--
+ * it is the caller's responsibility to ensure that.
+ */
+PetscErrorCode BuildContext(const msc_t *msc,
+                            const void *left_subspace_data,
+                            const void *right_subspace_data,
+                            shell_context **ctx_p)
+{
+  PetscErrorCode ierr;
+  shell_context *ctx;
+  PetscInt nterms, i;
+  PetscReal real_part;
+
+  ierr = PetscMalloc1(1, ctx_p);CHKERRQ(ierr);
+  ctx = (*ctx_p);
+
+  ctx->nmasks = msc->nmasks;
+  ctx->nrm = -1;
+  nterms = msc->mask_offsets[msc->nmasks];
+
+  /* we need to keep track of this stuff on our own. the numpy array might get garbage collected */
+  ierr = PetscMalloc1(msc->nmasks, &(ctx->masks));CHKERRQ(ierr);
+  ierr = PetscMemcpy(ctx->masks, msc->masks, msc->nmasks*sizeof(PetscInt));CHKERRQ(ierr);
+
+  ierr = PetscMalloc1(msc->nmasks+1, &(ctx->mask_offsets));CHKERRQ(ierr);
+  ierr = PetscMemcpy(ctx->mask_offsets, msc->mask_offsets,
+                     (msc->nmasks+1)*sizeof(PetscInt));CHKERRQ(ierr);
+
+  ierr = PetscMalloc1(nterms, &(ctx->signs));CHKERRQ(ierr);
+  ierr = PetscMemcpy(ctx->signs, msc->signs, nterms*sizeof(PetscInt));CHKERRQ(ierr);
+
+  ierr = PetscMalloc1(nterms, &(ctx->real_coeffs));CHKERRQ(ierr);
+  for (i=0; i < nterms; ++i) {
+    real_part = PetscRealPart(msc->coeffs[i]);
+    ctx->real_coeffs[i] = (real_part != 0) ? real_part : PetscImaginaryPart(msc->coeffs[i]);
+  }
+
+  ctx->left_subspace_data = left_subspace_data;
+  ctx->right_subspace_data = right_subspace_data;
+
+  return ierr;
+}
+
+#undef  __FUNCT__
+#define __FUNCT__ "DestroyContext"
+PetscErrorCode DestroyContext(Mat A)
+{
+  PetscErrorCode ierr;
+  shell_context *ctx;
+
+  ierr = MatShellGetContext(A,&ctx);CHKERRQ(ierr);
+
+  ierr = PetscFree(ctx->masks);CHKERRQ(ierr);
+  ierr = PetscFree(ctx->mask_offsets);CHKERRQ(ierr);
+  ierr = PetscFree(ctx->signs);CHKERRQ(ierr);
+  ierr = PetscFree(ctx->real_coeffs);CHKERRQ(ierr);
+
+  // TODO: use function pointers to destroy subspace data here
+
+  ierr = PetscFree(ctx);CHKERRQ(ierr);
+
+  return ierr;
+}
 
 #undef  __FUNCT__
 #define __FUNCT__ "ReducedDensityMatrix"
@@ -587,22 +434,22 @@ PetscErrorCode ReducedDensityMatrix(PetscInt L,
 /*
  * Build the matrix using the appropriate BuildMat function for the subspaces.
  */
-PetscErrorCode BuildMat(const msc_t *msc, subspaces_t *subspaces, Mat *A)
+PetscErrorCode BuildMat(const msc_t *msc, subspaces_t *subspaces, shell_impl shell, Mat *A)
 {
   PetscErrorCode ierr = 0;
   switch (subspaces->left_type) {
     case FULL:
       switch (subspaces->right_type) {
         case FULL:
-          ierr = BuildMat_Full_Full(msc, subspaces->left_data, subspaces->right_data, A);
+          ierr = BuildMat_Full_Full(msc, subspaces->left_data, subspaces->right_data, shell, A);
           break;
 
         case PARITY:
-          ierr = BuildMat_Full_Parity(msc, subspaces->left_data, subspaces->right_data, A);
+          ierr = BuildMat_Full_Parity(msc, subspaces->left_data, subspaces->right_data, shell, A);
           break;
 
         case AUTO:
-          ierr = BuildMat_Full_Auto(msc, subspaces->left_data, subspaces->right_data, A);
+          ierr = BuildMat_Full_Auto(msc, subspaces->left_data, subspaces->right_data, shell, A);
           break;
       }
       break;
@@ -610,15 +457,15 @@ PetscErrorCode BuildMat(const msc_t *msc, subspaces_t *subspaces, Mat *A)
     case PARITY:
       switch (subspaces->right_type) {
         case FULL:
-          ierr = BuildMat_Parity_Full(msc, subspaces->left_data, subspaces->right_data, A);
+          ierr = BuildMat_Parity_Full(msc, subspaces->left_data, subspaces->right_data, shell, A);
           break;
 
         case PARITY:
-          ierr = BuildMat_Parity_Parity(msc, subspaces->left_data, subspaces->right_data, A);
+          ierr = BuildMat_Parity_Parity(msc, subspaces->left_data, subspaces->right_data, shell, A);
           break;
 
         case AUTO:
-          ierr = BuildMat_Parity_Auto(msc, subspaces->left_data, subspaces->right_data, A);
+          ierr = BuildMat_Parity_Auto(msc, subspaces->left_data, subspaces->right_data, shell, A);
           break;
       }
       break;
@@ -626,15 +473,15 @@ PetscErrorCode BuildMat(const msc_t *msc, subspaces_t *subspaces, Mat *A)
     case AUTO:
       switch (subspaces->right_type) {
         case FULL:
-          ierr = BuildMat_Auto_Full(msc, subspaces->left_data, subspaces->right_data, A);
+          ierr = BuildMat_Auto_Full(msc, subspaces->left_data, subspaces->right_data, shell, A);
           break;
 
         case PARITY:
-          ierr = BuildMat_Auto_Parity(msc, subspaces->left_data, subspaces->right_data, A);
+          ierr = BuildMat_Auto_Parity(msc, subspaces->left_data, subspaces->right_data, shell, A);
           break;
 
         case AUTO:
-          ierr = BuildMat_Auto_Auto(msc, subspaces->left_data, subspaces->right_data, A);
+          ierr = BuildMat_Auto_Auto(msc, subspaces->left_data, subspaces->right_data, shell, A);
           break;
       }
       break;

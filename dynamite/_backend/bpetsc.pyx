@@ -28,6 +28,11 @@ cdef extern from "bpetsc_impl.h":
     ctypedef int PetscInt
     ctypedef float PetscLogDouble
 
+    ctypedef enum shell_impl:
+        NO_SHELL
+        CPU_SHELL
+        GPU_SHELL
+
     ctypedef struct msc_t:
       int nmasks
       int* masks
@@ -37,20 +42,16 @@ cdef extern from "bpetsc_impl.h":
 
     int BuildMat(msc_t *msc,
                  subspaces_t *subspaces,
+                 shell_impl shell,
                  PetscMat *A)
 
-    # int BuildShell(msc_t *msc,
-    #                subspaces_t *subspaces,
-    #                PetscMat *A)
-    #
-    # int DestroyContext(PetscMat A)
+    int DestroyContext(PetscMat A)
 
     int ReducedDensityMatrix(PetscInt L,
                              PetscVec x,
                              PetscInt cut_size,
                              bint fillall,
                              np.complex128_t* m)
-    # int MatShellGetContext(PetscMat,void* ctx)
 
     int PetscMemoryGetCurrentUsage(PetscLogDouble* mem)
     int PetscMallocGetCurrentUsage(PetscLogDouble* mem)
@@ -69,10 +70,11 @@ IF USE_CUDA:
                                PetscMat *A)
         int DestroyContext_CUDA(PetscMat A)
 
-cdef extern from "shellcontext.h":
-    ctypedef int PetscBool
-    ctypedef struct shell_context:
-        PetscBool gpu
+shell_impl_d = {
+    False : NO_SHELL,
+    'cpu' : CPU_SHELL,
+    'gpu' : GPU_SHELL
+}
 
 def build_mat(int L,
               PetscInt [:] masks,
@@ -83,8 +85,7 @@ def build_mat(int L,
               left_data,
               subspace_type right_type,
               right_data,
-              bint shell=False,
-              bint gpu=False):
+              shell_impl shell):
 
     cdef int ierr, nterms, nmasks
     cdef subspaces_t subspaces
@@ -104,7 +105,7 @@ def build_mat(int L,
     bsubspace.set_data_pointer(right_type, right_data, &(subspaces.right_data))
 
     # TODO: use an enum for shell types
-    if shell and gpu:
+    if shell == GPU_SHELL:
         IF USE_CUDA:
             if not (left_type == _FULL and right_type == _FULL):
                 raise TypeError('Subspaces not currently supported for CUDA shell matrices.')
@@ -112,12 +113,12 @@ def build_mat(int L,
         ELSE:
             raise RuntimeError("dynamite was not built with CUDA shell "
                                "functionality (requires nvcc during build).")
-    elif shell:
+
+    elif shell == CPU_SHELL:
         if left_type == _AUTO or right_type == _AUTO:
             raise TypeError('Shell matrices currently not supported for Auto subspace.')
-        # ierr = BuildShell(&msc, &subspaces, &M.mat)
-    else:
-        ierr = BuildMat(&msc, &subspaces, &M.mat)
+
+    ierr = BuildMat(&msc, &subspaces, shell, &M.mat)
 
     if ierr != 0:
         raise Error(ierr)
@@ -126,22 +127,7 @@ def build_mat(int L,
 
 def destroy_shell_context(Mat A):
     cdef int ierr
-    cdef shell_context* ctx
-
-    IF USE_CUDA:
-        ierr = MatShellGetContext(A.mat,&ctx)
-        if ierr != 0:
-            raise Error(ierr)
-
-        if ctx.gpu:
-            ierr = DestroyContext_CUDA(A.mat)
-        else:
-            ierr = DestroyContext(A.mat)
-
-    ELSE:
-        # ierr = DestroyContext(A.mat)
-        pass
-
+    ierr = DestroyContext(A.mat)
     if ierr != 0:
         raise Error(ierr)
 

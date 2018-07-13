@@ -493,8 +493,7 @@ class Operator:
                                      left_data = self.left_subspace.get_cdata(),
                                      right_type = class_to_enum(type(self.right_subspace)),
                                      right_data = self.right_subspace.get_cdata(),
-                                     shell = bool(self.shell),
-                                     gpu = self.shell == 'gpu')
+                                     shell = bpetsc.shell_impl_d[self.shell])
 
     def destroy_mat(self):
         """

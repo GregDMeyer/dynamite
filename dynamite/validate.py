@@ -27,6 +27,6 @@ def brackets(x):
     return x
 
 def shell(s):
-    if s not in [True, False, 'gpu']:
+    if s not in [False, 'cpu', 'gpu']:
         raise ValueError('Options for shell matrices are True, False, or "gpu".')
     return s
