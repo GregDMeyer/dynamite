@@ -27,6 +27,19 @@ typedef struct _data_Full
   PetscInt L;
 } data_Full;
 
+static PetscErrorCode CopySubspaceData_Full(data_Full** out_p, const data_Full* in) {
+  PetscErrorCode ierr;
+  ierr = PetscMalloc1(1, out_p);CHKERRQ(ierr);
+  ierr = PetscMemcpy(*out_p, in, sizeof(data_Full));CHKERRQ(ierr);
+  return ierr;
+}
+
+static PetscErrorCode DestroySubspaceData_Full(data_Full* data) {
+  PetscErrorCode ierr;
+  ierr = PetscFree(data);CHKERRQ(ierr);
+  return ierr;
+}
+
 static inline PetscInt Dim_Full(const data_Full* data) {
   return 1 << data->L;
 }
@@ -54,6 +67,19 @@ typedef struct _data_Parity
   PetscInt L;
   PetscInt space;
 } data_Parity;
+
+static PetscErrorCode CopySubspaceData_Parity(data_Parity** out_p, const data_Parity* in) {
+  PetscErrorCode ierr;
+  ierr = PetscMalloc1(1, out_p);CHKERRQ(ierr);
+  ierr = PetscMemcpy(*out_p, in, sizeof(data_Parity));CHKERRQ(ierr);
+  return ierr;
+}
+
+static PetscErrorCode DestroySubspaceData_Parity(data_Parity* data) {
+  PetscErrorCode ierr;
+  ierr = PetscFree(data);CHKERRQ(ierr);
+  return ierr;
+}
 
 #define PARITY_BIT(L) (1<<((L)-1))
 #define PARITY_MASK(L) (PARITY_BIT(L)-1)
@@ -95,9 +121,31 @@ static inline void I2S_Parity_array(int n, const data_Parity* data, const PetscI
 typedef struct _data_Auto
 {
   PetscInt dim;
+  PetscInt rdim;
   PetscInt* state_map;
   PetscInt* state_rmap;
 } data_Auto;
+
+static PetscErrorCode CopySubspaceData_Auto(data_Auto** out_p, const data_Auto* in) {
+  PetscErrorCode ierr;
+  ierr = PetscMalloc1(1, out_p);CHKERRQ(ierr);
+  ierr = PetscMemcpy(*out_p, in, sizeof(data_Auto));CHKERRQ(ierr);
+
+  ierr = PetscMalloc1(in->dim, &((*out_p)->state_map));CHKERRQ(ierr);
+  ierr = PetscMemcpy((*out_p)->state_map, in->state_map, in->dim*sizeof(PetscInt));CHKERRQ(ierr);
+  ierr = PetscMalloc1(in->rdim, &((*out_p)->state_rmap));CHKERRQ(ierr);
+  ierr = PetscMemcpy((*out_p)->state_rmap, in->state_rmap, in->rdim*sizeof(PetscInt));CHKERRQ(ierr);
+
+  return ierr;
+}
+
+static PetscErrorCode DestroySubspaceData_Auto(data_Auto* data) {
+  PetscErrorCode ierr;
+  ierr = PetscFree(data->state_map);CHKERRQ(ierr);
+  ierr = PetscFree(data->state_rmap);CHKERRQ(ierr);
+  ierr = PetscFree(data);CHKERRQ(ierr);
+  return ierr;
+}
 
 static inline PetscInt Dim_Auto(const data_Auto* data) {
   return data->dim;

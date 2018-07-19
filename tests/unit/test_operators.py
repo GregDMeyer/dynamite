@@ -464,8 +464,8 @@ class Properties(ut.TestCase):
         o = Operator()
         self.assertEqual(o.shell, False)
 
-        o.shell = True
-        self.assertEqual(o.shell, True)
+        o.shell = 'cpu'
+        self.assertEqual(o.shell, 'cpu')
 
         o.shell = 'gpu'
         self.assertEqual(o.shell, 'gpu')

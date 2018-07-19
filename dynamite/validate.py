@@ -30,3 +30,8 @@ def shell(s):
     if s not in [False, 'cpu', 'gpu']:
         raise ValueError('Options for shell matrices are True, False, or "gpu".')
     return s
+
+def info_level(level):
+    valid_levels = [0,1,2]
+    if level not in valid_levels:
+        raise ValueError('invalid info level. options are %s' % str(valid_levels))

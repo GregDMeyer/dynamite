@@ -59,25 +59,24 @@ def msc_to_numpy(msc, dims, idx_to_state = None, state_to_idx = None, sparse = T
     if state_to_idx is None:
         state_to_idx = lambda x: x
 
-    for idx in range(dims[0]):
-        bra = idx_to_state(idx)
-        ket = msc['masks'] ^ bra
-        ridx = state_to_idx(ket)
-        # TODO: do we need to be careful about unsigned integers here?
+    for row_idx in range(dims[0]):
+        ket = idx_to_state(row_idx)
+        bra = msc['masks'] ^ ket
+        col_idx = state_to_idx(bra)
 
-        good = np.nonzero(ridx != -1)[0]
+        good = np.nonzero(col_idx != -1)[0]
         nnew = len(good)
         if nnew == 0:
             continue
 
-        good_ridx = ridx[good]
-        good_kets = ket[good]
-        sign = 1 - 2*(parity(msc['signs'][good] & good_kets))
+        good_col_idx = col_idx[good]
+        good_bras = bra[good]
+        sign = 1 - 2*(parity(msc['signs'][good] & good_bras))
 
         nnew = len(good)
         data[mat_idx:mat_idx+nnew] = sign * msc['coeffs'][good]
-        row_idxs[mat_idx:mat_idx+nnew] = idx
-        col_idxs[mat_idx:mat_idx+nnew] = good_ridx
+        row_idxs[mat_idx:mat_idx+nnew] = row_idx
+        col_idxs[mat_idx:mat_idx+nnew] = good_col_idx
         mat_idx += nnew
 
     # trim to the amount we used

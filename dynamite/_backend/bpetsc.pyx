@@ -45,8 +45,6 @@ cdef extern from "bpetsc_impl.h":
                  shell_impl shell,
                  PetscMat *A)
 
-    int DestroyContext(PetscMat A)
-
     int ReducedDensityMatrix(PetscInt L,
                              PetscVec x,
                              PetscInt cut_size,
@@ -68,7 +66,6 @@ IF USE_CUDA:
                                PetscInt* signs,
                                np.complex128_t* coeffs,
                                PetscMat *A)
-        int DestroyContext_CUDA(PetscMat A)
 
 shell_impl_d = {
     False : NO_SHELL,
@@ -114,9 +111,9 @@ def build_mat(int L,
             raise RuntimeError("dynamite was not built with CUDA shell "
                                "functionality (requires nvcc during build).")
 
-    elif shell == CPU_SHELL:
-        if left_type == _AUTO or right_type == _AUTO:
-            raise TypeError('Shell matrices currently not supported for Auto subspace.')
+    # elif shell == CPU_SHELL:
+    #     if left_type == _AUTO or right_type == _AUTO:
+    #         raise TypeError('Shell matrices currently not supported for Auto subspace.')
 
     ierr = BuildMat(&msc, &subspaces, shell, &M.mat)
 
@@ -124,12 +121,6 @@ def build_mat(int L,
         raise Error(ierr)
 
     return M
-
-def destroy_shell_context(Mat A):
-    cdef int ierr
-    ierr = DestroyContext(A.mat)
-    if ierr != 0:
-        raise Error(ierr)
 
 def track_memory():
     '''

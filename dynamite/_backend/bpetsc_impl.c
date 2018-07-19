@@ -266,73 +266,6 @@
 //
 
 #undef  __FUNCT__
-#define __FUNCT__ "BuildContext"
-/*
- * Build the shell context. We rely on the subspace data to not get garbage collected--
- * it is the caller's responsibility to ensure that.
- */
-PetscErrorCode BuildContext(const msc_t *msc,
-                            const void *left_subspace_data,
-                            const void *right_subspace_data,
-                            shell_context **ctx_p)
-{
-  PetscErrorCode ierr;
-  shell_context *ctx;
-  PetscInt nterms, i;
-  PetscReal real_part;
-
-  ierr = PetscMalloc1(1, ctx_p);CHKERRQ(ierr);
-  ctx = (*ctx_p);
-
-  ctx->nmasks = msc->nmasks;
-  ctx->nrm = -1;
-  nterms = msc->mask_offsets[msc->nmasks];
-
-  /* we need to keep track of this stuff on our own. the numpy array might get garbage collected */
-  ierr = PetscMalloc1(msc->nmasks, &(ctx->masks));CHKERRQ(ierr);
-  ierr = PetscMemcpy(ctx->masks, msc->masks, msc->nmasks*sizeof(PetscInt));CHKERRQ(ierr);
-
-  ierr = PetscMalloc1(msc->nmasks+1, &(ctx->mask_offsets));CHKERRQ(ierr);
-  ierr = PetscMemcpy(ctx->mask_offsets, msc->mask_offsets,
-                     (msc->nmasks+1)*sizeof(PetscInt));CHKERRQ(ierr);
-
-  ierr = PetscMalloc1(nterms, &(ctx->signs));CHKERRQ(ierr);
-  ierr = PetscMemcpy(ctx->signs, msc->signs, nterms*sizeof(PetscInt));CHKERRQ(ierr);
-
-  ierr = PetscMalloc1(nterms, &(ctx->real_coeffs));CHKERRQ(ierr);
-  for (i=0; i < nterms; ++i) {
-    real_part = PetscRealPart(msc->coeffs[i]);
-    ctx->real_coeffs[i] = (real_part != 0) ? real_part : PetscImaginaryPart(msc->coeffs[i]);
-  }
-
-  ctx->left_subspace_data = left_subspace_data;
-  ctx->right_subspace_data = right_subspace_data;
-
-  return ierr;
-}
-
-#undef  __FUNCT__
-#define __FUNCT__ "DestroyContext"
-PetscErrorCode DestroyContext(Mat A)
-{
-  PetscErrorCode ierr;
-  shell_context *ctx;
-
-  ierr = MatShellGetContext(A,&ctx);CHKERRQ(ierr);
-
-  ierr = PetscFree(ctx->masks);CHKERRQ(ierr);
-  ierr = PetscFree(ctx->mask_offsets);CHKERRQ(ierr);
-  ierr = PetscFree(ctx->signs);CHKERRQ(ierr);
-  ierr = PetscFree(ctx->real_coeffs);CHKERRQ(ierr);
-
-  // TODO: use function pointers to destroy subspace data here
-
-  ierr = PetscFree(ctx);CHKERRQ(ierr);
-
-  return ierr;
-}
-
-#undef  __FUNCT__
 #define __FUNCT__ "ReducedDensityMatrix"
 PetscErrorCode ReducedDensityMatrix(PetscInt L,
                                     Vec x,
@@ -391,43 +324,43 @@ PetscErrorCode ReducedDensityMatrix(PetscInt L,
 
 #define LEFT_SUBSPACE Full
   #define RIGHT_SUBSPACE Full
-    #include "buildmat_template.c"
+    #include "bpetsc_template_2.c"
   #undef RIGHT_SUBSPACE
 
   #define RIGHT_SUBSPACE Parity
-    #include "buildmat_template.c"
+    #include "bpetsc_template_2.c"
   #undef RIGHT_SUBSPACE
 
   #define RIGHT_SUBSPACE Auto
-    #include "buildmat_template.c"
+    #include "bpetsc_template_2.c"
   #undef RIGHT_SUBSPACE
 #undef LEFT_SUBSPACE
 
 #define LEFT_SUBSPACE Parity
   #define RIGHT_SUBSPACE Full
-    #include "buildmat_template.c"
+    #include "bpetsc_template_2.c"
   #undef RIGHT_SUBSPACE
 
   #define RIGHT_SUBSPACE Parity
-    #include "buildmat_template.c"
+    #include "bpetsc_template_2.c"
   #undef RIGHT_SUBSPACE
 
   #define RIGHT_SUBSPACE Auto
-    #include "buildmat_template.c"
+    #include "bpetsc_template_2.c"
   #undef RIGHT_SUBSPACE
 #undef LEFT_SUBSPACE
 
 #define LEFT_SUBSPACE Auto
   #define RIGHT_SUBSPACE Full
-    #include "buildmat_template.c"
+    #include "bpetsc_template_2.c"
   #undef RIGHT_SUBSPACE
 
   #define RIGHT_SUBSPACE Parity
-    #include "buildmat_template.c"
+    #include "bpetsc_template_2.c"
   #undef RIGHT_SUBSPACE
 
   #define RIGHT_SUBSPACE Auto
-    #include "buildmat_template.c"
+    #include "bpetsc_template_2.c"
   #undef RIGHT_SUBSPACE
 #undef LEFT_SUBSPACE
 

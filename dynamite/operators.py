@@ -501,17 +501,8 @@ class Operator:
         matrix does not exist (has not been built or has already been destroyed),
         the function has no effect.
         """
-
         if self._mat is None:
             return
-
-        # TODO: see if there is a way that I can add destroying the shell
-        # context to the __del__ method for the matrix
-        if self._shell:
-            config.initialize()
-            from ._backend import bpetsc
-            bpetsc.destroy_shell_context(self._mat)
-
         self._mat.destroy()
         self._mat = None
 
@@ -710,6 +701,7 @@ class Operator:
         '''
         if self.right_subspace != x.subspace:
             # TODO: just set the matrix subspace based on the vector's space?
+            # TODO: this is inefficient!
             raise ValueError('Subspaces of matrix and input vector do not match.')
 
         if result is None:

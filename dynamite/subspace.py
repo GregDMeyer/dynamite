@@ -8,9 +8,8 @@ one implementation of each of the functions.
 import numpy as np
 from copy import deepcopy
 
-from . import validate
+from . import validate, info
 from ._backend import bsubspace
-from .bitwise import parity, intlog2
 
 # TODO: allow automatically choosing subspace for operators
 
@@ -145,6 +144,7 @@ class Full(Subspace):
         '''
         Returns an object containing the subspace data accessible by the C backend.
         '''
+        info.write(2, 'Getting C subspace data for Full subspace.')
         return self._get_cdata(self.L)
 
     @classmethod
@@ -216,6 +216,7 @@ class Parity(Subspace):
         '''
         Returns an object containing the subspace data accessible by the C backend.
         '''
+        info.write(2, 'Getting C subspace data for Parity subspace.')
         return self._get_cdata(self.L, self.space)
 
     @classmethod
@@ -300,5 +301,6 @@ class Auto(Subspace):
         '''
         Returns an object containing the subspace data accessible by the C backend.
         '''
+        info.write(2, 'Getting C subspace data for Auto subspace.')
         return bsubspace.CAuto(np.ascontiguousarray(self.state_map),
                                np.ascontiguousarray(self.state_rmap))

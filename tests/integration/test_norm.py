@@ -24,8 +24,8 @@ class Hamiltonians(ut.TestCase):
                 H.shell = False
                 shell_norm = H.get_mat().norm(PETSc.NormType.INFINITY)
 
-                # TODO: perhaps see if we can reduce the error! or determine its source
-                # (I would expect the error to be the same size as for mult, but it's bigger)
+                # the extra factor of 1E2 error is because PETSc ignores rounding
+                # errors when they compute their norm!!
                 eps = H.nnz * np.finfo(np.complex128).eps * 1E2
                 self.assertLess(np.abs(petsc_norm-shell_norm), eps,
                                 msg = '\npetsc: %e\nshell: %e' % (petsc_norm, shell_norm))

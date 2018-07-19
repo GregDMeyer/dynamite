@@ -9,6 +9,11 @@ from dynamite.operators import identity, sigmax, sigmay, index_sum, index_produc
 from dynamite.subspace import Full, Parity, Auto
 from dynamite.states import State
 
+def generate_hamiltonian_tests(cls):
+    for H_name in hamiltonians.__all__:
+        setattr(cls, 'test_'+H_name, lambda self, n=H_name: self.check_hamiltonian(n))
+    return cls
+
 class FullSpace(ut.TestCase):
 
     def check_nonzeros(self, state, nonzeros):
@@ -44,27 +49,26 @@ class FullSpace(ut.TestCase):
         correct = {0 : 1}
         self.check_nonzeros(r, correct)
 
+@generate_hamiltonian_tests
 class FullHamiltonians(ut.TestCase):
+    def check_hamiltonian(self, H_name):
+        H = getattr(hamiltonians, H_name)()
+        bra, ket = H.create_states()
+        ket.set_random(seed = 0)
 
-    def test_all(self):
-        for H_name in hamiltonians.__all__:
-            with self.subTest(H = H_name):
-                H = getattr(hamiltonians, H_name)()
-                bra, ket = H.create_states()
-                ket.set_random(seed = 0)
+        ket_np = ket.to_numpy()
 
-                ket_np = ket.to_numpy()
+        H.dot(ket, bra)
+        bra_check = bra.to_numpy()
 
-                H.dot(ket, bra)
-                bra_check = bra.to_numpy()
+        if ket_np is not None:
+            H_np = H.to_numpy()
+            bra_np = H_np.dot(ket_np)
+            inner_prod = bra_check.dot(bra_np.conj())
+            inner_prod /= np.linalg.norm(bra_check) * np.linalg.norm(bra_np)
+            self.assertLess(np.abs(1 - inner_prod), 1E-9)
 
-                if ket_np is not None:
-                    H_np = H.to_numpy()
-                    bra_np = H_np.dot(ket_np)
-                    inner_prod = bra_check.dot(bra_np.conj())
-                    inner_prod /= np.linalg.norm(bra_check) * np.linalg.norm(bra_np)
-                    self.assertLess(np.abs(1 - inner_prod), 1E-9)
-
+@generate_hamiltonian_tests
 class Subspaces(ut.TestCase):
 
     def compare_to_full(self, H, x, check_subspace):
@@ -84,6 +88,7 @@ class Subspaces(ut.TestCase):
             The subspace to multiply under.
         '''
         # compare all possible combinations of going to and from the full space
+        self.assertTrue(isinstance(x.subspace, Full))
 
         to_space = identity()
         to_space.left_subspace = check_subspace
@@ -100,10 +105,7 @@ class Subspaces(ut.TestCase):
         x_s = to_space * x
         y_s2s = H * x_s
 
-        from_space = identity()
-        from_space.right_subspace = check_subspace
         H.left_subspace = Full()
-
         y_s2f = H * x_s
         y_s2f = to_space * y_s2f
 
@@ -155,20 +157,39 @@ class Subspaces(ut.TestCase):
         sp = Parity('odd')
         self.compare_to_full(H, x, sp)
 
-    def test_auto_hamiltonians(self):
-        for H_name in hamiltonians.__all__:
-            with self.subTest(H = H_name):
-                for space in [1, 2]:
-                    with self.subTest(space = space):
-                        H = getattr(hamiltonians, H_name)()
-                        sp = Auto(H, (1 << (H.L//2))-space)
+    def test_multiply_repeat(self):
+        '''
+        This sequence of events triggered a bug caused by needed data being
+        garbage collected. This test ensures that the bug is fixed.
+        '''
+        for space in [1, 2]:
+            with self.subTest(space = space):
+                H = hamiltonians.ising()
+                sp = Auto(H, (1 << (H.L//2))-space)
+                x = State(state = 'random', seed = 0)
 
-                        k = State(subspace = sp, state = 'random', seed = 0)
-                        I = identity()
-                        I.right_subspace = sp
-                        ket = I*k
+                to_space = identity()
+                to_space.left_subspace = sp
+                x = to_space*x
 
-                        self.compare_to_full(H, ket, sp)
+                from_space = identity()
+                from_space.right_subspace = sp
+                x = from_space*x
+                to_space*x
+
+    def check_hamiltonian(self, H_name):
+        for space in [1, 2]:
+            with self.subTest(space = space):
+                H = getattr(hamiltonians, H_name)()
+                sp = Auto(H, (1 << (H.L//2))-space)
+
+                k = State(subspace = sp, state = 'random', seed = 0)
+                I = identity()
+                I.right_subspace = sp
+                ket = I*k
+                # TODO: need to go back to full space!
+
+                self.compare_to_full(H, ket, sp)
 
 if __name__ == '__main__':
     from dynamite import config

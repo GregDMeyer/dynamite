@@ -27,9 +27,20 @@ PetscErrorCode C(BuildPetsc,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
  */
 PetscErrorCode C(BuildCPUShell,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
   const msc_t *msc,
-  const void* left_subspace_data,
-  const void* right_subspace_data,
+  const C(data,LEFT_SUBSPACE)* left_subspace_data,
+  const C(data,RIGHT_SUBSPACE)* right_subspace_data,
   Mat *A);
+
+/*
+ * Build the shell context.
+ */
+PetscErrorCode C(BuildContext,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
+  const msc_t *msc,
+  const C(data,LEFT_SUBSPACE)* left_subspace_data,
+  const C(data,RIGHT_SUBSPACE)* right_subspace_data,
+  shell_context **ctx_p);
+
+PetscErrorCode C(MatDestroyCtx_CPU,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A);
 
 /*
  * Compute the number of nonzeros per row, for memory allocation purposes.
@@ -43,6 +54,13 @@ PetscErrorCode C(ComputeNonzeros,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
  * MatMult for CPU shell matrices.
  */
 PetscErrorCode C(MatMult_CPU,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, Vec x, Vec b);
+
+/*
+ * MatMult kernel for CPU shell matrices.
+ */
+void C(MatMult_CPU_kernel,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
+  const PetscScalar* x_array, PetscScalar* b_array, shell_context *ctx,
+  PetscInt row_start, PetscInt row_end, PetscInt col_start, PetscInt col_end);
 
 /*
  * MatNorm for CPU shell matrices.

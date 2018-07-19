@@ -1,7 +1,6 @@
 
 import slepc4py
 from . import validate
-from .subspace import Full
 from ._backend import bbuild
 
 # handle global configuration
@@ -16,7 +15,7 @@ class _Config:
     _L = None
     _shell = False
     _info_level = 0
-    _subspace = Full()
+    _subspace = None
 
     def initialize(self, slepc_args = None, version_check = True):
         """
@@ -146,6 +145,9 @@ class _Config:
         The subspace to use for all operators and states. Can also be set for individual
         operators and states--see :meth:`dynamite.operators.Operator.subspace` for details.
         """
+        if self._subspace is None:
+            from . import subspace
+            self._subspace = subspace.Full()
         return self._subspace
 
     @subspace.setter
@@ -163,9 +165,7 @@ class _Config:
 
     @info_level.setter
     def info_level(self,value):
-        # need to do this import here, or it will be cyclic
-        from info import validate_level
-        validate_level(value)
+        validate.info_level(value)
         self._info_level = value
 
 config = _Config()
