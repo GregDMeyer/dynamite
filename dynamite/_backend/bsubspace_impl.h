@@ -27,14 +27,14 @@ typedef struct _data_Full
   PetscInt L;
 } data_Full;
 
-static PetscErrorCode CopySubspaceData_Full(data_Full** out_p, const data_Full* in) {
+static inline PetscErrorCode CopySubspaceData_Full(data_Full** out_p, const data_Full* in) {
   PetscErrorCode ierr;
   ierr = PetscMalloc1(1, out_p);CHKERRQ(ierr);
   ierr = PetscMemcpy(*out_p, in, sizeof(data_Full));CHKERRQ(ierr);
   return ierr;
 }
 
-static PetscErrorCode DestroySubspaceData_Full(data_Full* data) {
+static inline PetscErrorCode DestroySubspaceData_Full(data_Full* data) {
   PetscErrorCode ierr;
   ierr = PetscFree(data);CHKERRQ(ierr);
   return ierr;
@@ -68,14 +68,14 @@ typedef struct _data_Parity
   PetscInt space;
 } data_Parity;
 
-static PetscErrorCode CopySubspaceData_Parity(data_Parity** out_p, const data_Parity* in) {
+static inline PetscErrorCode CopySubspaceData_Parity(data_Parity** out_p, const data_Parity* in) {
   PetscErrorCode ierr;
   ierr = PetscMalloc1(1, out_p);CHKERRQ(ierr);
   ierr = PetscMemcpy(*out_p, in, sizeof(data_Parity));CHKERRQ(ierr);
   return ierr;
 }
 
-static PetscErrorCode DestroySubspaceData_Parity(data_Parity* data) {
+static inline PetscErrorCode DestroySubspaceData_Parity(data_Parity* data) {
   PetscErrorCode ierr;
   ierr = PetscFree(data);CHKERRQ(ierr);
   return ierr;
@@ -126,7 +126,7 @@ typedef struct _data_Auto
   PetscInt* state_rmap;
 } data_Auto;
 
-static PetscErrorCode CopySubspaceData_Auto(data_Auto** out_p, const data_Auto* in) {
+static inline PetscErrorCode CopySubspaceData_Auto(data_Auto** out_p, const data_Auto* in) {
   PetscErrorCode ierr;
   ierr = PetscMalloc1(1, out_p);CHKERRQ(ierr);
   ierr = PetscMemcpy(*out_p, in, sizeof(data_Auto));CHKERRQ(ierr);
@@ -139,7 +139,7 @@ static PetscErrorCode CopySubspaceData_Auto(data_Auto** out_p, const data_Auto* 
   return ierr;
 }
 
-static PetscErrorCode DestroySubspaceData_Auto(data_Auto* data) {
+static inline PetscErrorCode DestroySubspaceData_Auto(data_Auto* data) {
   PetscErrorCode ierr;
   ierr = PetscFree(data->state_map);CHKERRQ(ierr);
   ierr = PetscFree(data->state_rmap);CHKERRQ(ierr);

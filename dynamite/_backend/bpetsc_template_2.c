@@ -233,8 +233,12 @@ PetscErrorCode C(BuildContext,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
     ctx->real_coeffs[i] = (real_part != 0) ? real_part : PetscImaginaryPart(msc->coeffs[i]);
   }
 
-  ierr = C(CopySubspaceData,LEFT_SUBSPACE)(&(ctx->left_subspace_data), left_subspace_data);CHKERRQ(ierr);
-  ierr = C(CopySubspaceData,RIGHT_SUBSPACE)(&(ctx->right_subspace_data), right_subspace_data);CHKERRQ(ierr);
+  ierr = C(CopySubspaceData,LEFT_SUBSPACE)(
+    (C(data,LEFT_SUBSPACE)**)&(ctx->left_subspace_data),
+    (C(data,LEFT_SUBSPACE)*)left_subspace_data);CHKERRQ(ierr);
+  ierr = C(CopySubspaceData,RIGHT_SUBSPACE)(
+    (C(data,RIGHT_SUBSPACE)**)&(ctx->right_subspace_data),
+    (C(data,RIGHT_SUBSPACE)*)right_subspace_data);CHKERRQ(ierr);
 
   return ierr;
 }

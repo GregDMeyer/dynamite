@@ -32,8 +32,8 @@ typedef struct _shell_context {
   PetscInt* mask_offsets;
   PetscInt* signs;
   PetscReal* real_coeffs;     // we store only the real or complex part -- whichever is nonzero
-  const void *left_subspace_data;
-  const void *right_subspace_data;
+  void *left_subspace_data;
+  void *right_subspace_data;
   PetscReal nrm;
 } shell_context;
 
