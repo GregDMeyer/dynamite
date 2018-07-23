@@ -27,8 +27,10 @@ def brackets(x):
     return x
 
 def shell(s):
-    if s not in [False, 'cpu', 'gpu']:
-        raise ValueError('Options for shell matrices are True, False, or "gpu".')
+    valid_options = [False, 'cpu', 'gpu']
+    if s not in valid_options:
+        raise ValueError('Options for shell matrices are %s.' % \
+                         ', '.join(str(x) for x in valid_options))
     return s
 
 def info_level(level):

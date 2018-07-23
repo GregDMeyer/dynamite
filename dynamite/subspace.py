@@ -250,6 +250,8 @@ class Auto(Subspace):
     '''
 
     def __init__(self, H, state, size_guess=None):
+        # TODO: allow string representation for state
+        
         Subspace.__init__(self)
 
         self._L = H.get_length()

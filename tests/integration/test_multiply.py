@@ -14,7 +14,50 @@ def generate_hamiltonian_tests(cls):
         setattr(cls, 'test_'+H_name, lambda self, n=H_name: self.check_hamiltonian(n))
     return cls
 
-class FullSpace(ut.TestCase):
+class MPITestCase(ut.TestCase):
+
+    @classmethod
+    def check_all_procs(cls, success):
+
+        from dynamite import config
+        config.initialize()
+
+        from petsc4py import PETSc
+        CW = PETSc.COMM_WORLD.tompi4py()
+
+        for i in range(CW.size):
+            remote = CW.bcast(success, root = i)
+            success = success and remote
+
+        return success
+
+    def assertEqual(self, first, second, msg=None):
+        success = first == second
+        all_success = self.check_all_procs(success)
+        if not all_success:
+            if success:
+                ut.TestCase.assertTrue(self, all_success, msg = 'failed on another process')
+            else:
+                ut.TestCase.assertEqual(self, first, second, msg)
+
+    def assertLess(self, first, second, msg=None):
+        success = first < second
+        all_success = self.check_all_procs(success)
+        if not all_success:
+            if success:
+                ut.TestCase.assertTrue(self, all_success, msg = 'failed on another process')
+            else:
+                ut.TestCase.assertLess(self, first, second, msg)
+
+    def assertTrue(self, expr, msg = None):
+        all_success = self.check_all_procs(expr)
+        if not all_success:
+            if expr:
+                ut.TestCase.assertTrue(self, all_success, msg = 'failed on another process')
+            else:
+                ut.TestCase.assertTrue(self, expr, msg)
+
+class FullSpace(MPITestCase):
 
     def check_nonzeros(self, state, nonzeros):
         '''
@@ -30,11 +73,14 @@ class FullSpace(ut.TestCase):
             and the values are the nonzero values
         '''
         istart, iend = state.vec.getOwnershipRange()
-        for i in range(istart, iend):
-            if i in nonzeros:
-                self.assertEqual(state.vec[i], nonzeros[i], msg = 'idx: %d' % i)
+        for i in range(state.subspace.get_dimension()):
+            if istart <= i < iend:
+                if i in nonzeros:
+                    self.assertEqual(state.vec[i], nonzeros[i], msg = 'idx: %d' % i)
+                else:
+                    self.assertEqual(state.vec[i], 0, msg = 'idx: %d' % i)
             else:
-                self.assertEqual(state.vec[i], 0, msg = 'idx: %d' % i)
+                self.assertEqual(0, 0)
 
     def test_identity(self):
         s = State(state = 10)
@@ -50,7 +96,7 @@ class FullSpace(ut.TestCase):
         self.check_nonzeros(r, correct)
 
 @generate_hamiltonian_tests
-class FullHamiltonians(ut.TestCase):
+class FullHamiltonians(MPITestCase):
     def check_hamiltonian(self, H_name):
         H = getattr(hamiltonians, H_name)()
         bra, ket = H.create_states()
@@ -66,10 +112,13 @@ class FullHamiltonians(ut.TestCase):
             bra_np = H_np.dot(ket_np)
             inner_prod = bra_check.dot(bra_np.conj())
             inner_prod /= np.linalg.norm(bra_check) * np.linalg.norm(bra_np)
-            self.assertLess(np.abs(1 - inner_prod), 1E-9)
+        else:
+            inner_prod = 1
+
+        self.assertLess(np.abs(1 - inner_prod), 1E-9)
 
 @generate_hamiltonian_tests
-class Subspaces(ut.TestCase):
+class Subspaces(MPITestCase):
 
     def compare_to_full(self, H, x, check_subspace):
         '''

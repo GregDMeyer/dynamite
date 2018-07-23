@@ -274,9 +274,12 @@ PetscErrorCode C(MatMult_CPU,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, Vec x, Vec 
 {
   PetscErrorCode ierr;
   PetscInt mpi_size, mpi_rank;
-  PetscInt x_local_size, x_local_max_size, *x_local_sizes, row_start, row_end, col_start, col_end;
-  PetscInt proc_idx;
+  MPI_Request send_request, recv_request;
+  PetscInt x_size, x_local_size, max_proc_size, *x_local_sizes, *x_local_starts;
+  PetscInt block_start, row_start, row_end, col_start, col_end;
+  PetscInt proc_shift, proc_idx, send_count, recv_count;
   const PetscScalar* local_x_array;
+  const PetscScalar* source_array;
   PetscScalar* x_array[2];
   PetscScalar* b_array;
   shell_context *ctx;
@@ -284,46 +287,111 @@ PetscErrorCode C(MatMult_CPU,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, Vec x, Vec 
   MPI_Comm_size(PETSC_COMM_WORLD, &mpi_size);
   MPI_Comm_rank(PETSC_COMM_WORLD, &mpi_rank);
 
+  /* TODO: check that vectors are of correct type */
+
   ierr = MatShellGetContext(A, &ctx);CHKERRQ(ierr);
 
   ierr = VecSet(b, 0);CHKERRQ(ierr);
 
+  ierr = VecGetArrayRead(x, &(local_x_array));CHKERRQ(ierr);
+  ierr = VecGetArray(b, &(b_array));CHKERRQ(ierr);
+
   /* if there is only one process, just do one call to the kernel */
   if (mpi_size == 1) {
-    ierr = VecGetArrayRead(x, &(local_x_array));CHKERRQ(ierr);
-    ierr = VecGetArray(b, &(b_array));CHKERRQ(ierr);
 
     ierr = VecGetOwnershipRange(x, &col_start, &col_end);CHKERRQ(ierr);
     ierr = VecGetOwnershipRange(b, &row_start, &row_end);CHKERRQ(ierr);
 
     C(MatMult_CPU_kernel,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
       local_x_array, b_array, ctx, row_start, row_end, col_start, col_end);CHKERRQ(ierr);
-
-    ierr = VecRestoreArrayRead(x, &(local_x_array));CHKERRQ(ierr);
-    ierr = VecRestoreArray(b, (&b_array));CHKERRQ(ierr);
   }
   else {
 
-    // /* find the local sizes of all processors */
-    // ierr = VecGetLocalSize(x, &x_local_size);CHKERRQ(ierr);
-    // ierr = PetscMalloc1(mpi_size, &x_local_sizes);CHKERRQ(ierr);
-    // MPIU_Alltoall(&x_local_size, 1, MPIU_INT, &x_local_sizes, 1, MPIU_INT, PETSC_COMM_WORLD);
-    //
-    // ierr = PetscMalloc1(x_local_max_size, &(x_array[0]));CHKERRQ(ierr);
-    // ierr = PetscMalloc1(x_local_max_size, &(x_array[1]));CHKERRQ(ierr);
-    //
-    // for (block_start = 0; block_start < max_proc_size; block_start += BLOCK_SIZE) {
-    //   for (proc_idx = 1; proc_idx < mpi_size; ++proc_idx) {
-    //     /* do a round-robin of the data */
-    //     /* eventually, skip the ones we don't need */
-    //   }
-    // }
-    //
-    // ierr = PetscFree(x_local_sizes);CHKERRQ(ierr);
-    // ierr = PetscFree(x_array[0]);CHKERRQ(ierr);
-    // ierr = PetscFree(x_array[1]);CHKERRQ(ierr);
+    /* find the local sizes of all processors */
+    ierr = VecGetSize(x, &x_size);CHKERRQ(ierr);
+    ierr = VecGetLocalSize(x, &x_local_size);CHKERRQ(ierr);
+    ierr = PetscMalloc1(mpi_size, &x_local_sizes);CHKERRQ(ierr);
+    MPI_Allgather(&x_local_size, 1, MPIU_INT, x_local_sizes, 1, MPIU_INT, PETSC_COMM_WORLD);
+
+    ierr = PetscMalloc1(BLOCK_SIZE, &(x_array[0]));CHKERRQ(ierr);
+    ierr = PetscMalloc1(BLOCK_SIZE, &(x_array[1]));CHKERRQ(ierr);
+
+    /* compute the starting indices, and largest size on any processor */
+    ierr = PetscMalloc1(mpi_size+1, &x_local_starts);CHKERRQ(ierr);
+    max_proc_size = 0;
+    x_local_starts[0] = 0;
+    for (proc_idx = 0; proc_idx < mpi_size; ++proc_idx) {
+      if (max_proc_size < x_local_sizes[proc_idx]) max_proc_size = x_local_sizes[proc_idx];
+      x_local_starts[proc_idx+1] = x_local_starts[proc_idx] + x_local_sizes[proc_idx];
+    }
+
+    ierr = VecGetOwnershipRange(b, &row_start, &row_end);CHKERRQ(ierr);
+
+    /* iterate through blocks on our process */
+    for (block_start = 0; block_start < max_proc_size; block_start += BLOCK_SIZE) {
+
+      for (proc_shift = 0; proc_shift < mpi_size; ++proc_shift) {
+        /* do a round-robin of the data */
+        /* eventually, skip the ones we don't need */
+        proc_idx = (mpi_rank+proc_shift) % mpi_size;
+
+        col_start = block_start + x_local_starts[proc_idx];
+        col_end = PetscMin(col_start + BLOCK_SIZE, x_local_starts[proc_idx + 1]);
+
+        /* self to self */
+        if (proc_shift == 0) {
+          source_array = local_x_array + block_start;
+        }
+        else {
+          source_array = x_array[proc_shift%2];
+          MPI_Wait(&recv_request, MPI_STATUS_IGNORE);
+        }
+
+        if (proc_shift < mpi_size - 1) {
+
+          // TODO: put this stuff into a different function
+
+          /* prepare to receive */
+          recv_count = PetscMax(x_local_sizes[(mpi_rank+proc_shift+1)%mpi_size], block_start);
+          recv_count = PetscMin(recv_count, BLOCK_SIZE + block_start) - block_start;
+          if (recv_count > 0) {
+            if (proc_shift > 0) {
+              /* make sure we completed the previous send operation already */
+              MPI_Wait(&send_request, MPI_STATUS_IGNORE);
+            }
+            /* TODO: is this the right way to catch MPI errors with PETSc? */
+            MPI_Irecv(x_array[(proc_shift+1)%2], recv_count, MPIU_SCALAR,
+                              (mpi_rank+1)%mpi_size, 0,
+                              PETSC_COMM_WORLD, &recv_request);
+          }
+
+          /* you guys silly I'm still gonna send it */
+          send_count = col_end - col_start;
+          if (send_count > 0) {
+            /* TODO: is this the right way to catch MPI errors with PETSc? */
+            MPI_Isend(source_array, send_count, MPIU_SCALAR,
+                              (mpi_size+mpi_rank-1)%mpi_size, 0,
+                              PETSC_COMM_WORLD, &send_request);
+          }
+
+        }
+
+        /* finally actually do the computation */
+        C(MatMult_CPU_kernel,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
+          source_array, b_array, ctx, row_start, row_end, col_start, col_end);CHKERRQ(ierr);
+
+      }
+    }
+
+    ierr = PetscFree(x_local_sizes);CHKERRQ(ierr);
+    ierr = PetscFree(x_local_starts);CHKERRQ(ierr);
+    ierr = PetscFree(x_array[0]);CHKERRQ(ierr);
+    ierr = PetscFree(x_array[1]);CHKERRQ(ierr);
 
   }
+
+  ierr = VecRestoreArrayRead(x, &(local_x_array));CHKERRQ(ierr);
+  ierr = VecRestoreArray(b, (&b_array));CHKERRQ(ierr);
 
   return ierr;
 }
@@ -438,7 +506,7 @@ PetscErrorCode C(MatNorm_CPU,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
     }
   }
 
-  ierr = MPIU_Allreduce(&local_max, &global_max, 1, MPIU_REAL, MPIU_MAX, PETSC_COMM_WORLD);CHKERRQ(ierr);
+  MPIU_Allreduce(&local_max, &global_max, 1, MPIU_REAL, MPIU_MAX, PETSC_COMM_WORLD);CHKERRQ(ierr);
 
   ctx->nrm = global_max;
   (*nrm) = global_max;

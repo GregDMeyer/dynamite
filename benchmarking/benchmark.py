@@ -24,7 +24,7 @@ parser.add_argument('--file', help='The file from which to load the operator.')
 parser.add_argument('-w', type=int, default=1,
                     help='Magnitude of the disorder for MBL Hamiltonian.')
 
-parser.add_argument('--shell', action='store_true',
+parser.add_argument('--shell', type=str, default=False,
                     help='Make a shell matrix instead of a regular matrix.')
 parser.add_argument('--slepc_args', type=str, default='',
                     help='Arguments to pass to SLEPc.')
@@ -175,8 +175,8 @@ if args.mult:
     s = State(state=args.init_state, subspace = H.subspace)
     r = s.copy()
     for _ in range(args.mult_count):
-        H.get_mat().mult(s,r)
-        H.get_mat().mult(r,s)
+        H.dot(s,r)
+        H.dot(r,s)
     stats['mult_time'] = default_timer() - start
     if __debug__:
         Print('multiplication complete.')

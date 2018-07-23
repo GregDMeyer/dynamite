@@ -2,8 +2,8 @@
 import unittest as ut
 from test_multiply import *
 
-#init_args = ['-start_in_debugger', 'noxterm']
 init_args = []
+#init_args = ['-start_in_debugger']
 
 from dynamite import config
 config.initialize(init_args)
