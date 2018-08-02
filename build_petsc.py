@@ -3,6 +3,9 @@
 '''
 This file is intended to be used to configure PETSc for dynamite.
 It should be run in the PETSc root source directory.
+
+To see all possible options, run "./configure --help" in the PETSc root directory.
+You may want to pipe to "less"; it is a big help page ;)
 '''
 
 configure_options = [

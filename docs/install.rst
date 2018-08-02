@@ -6,42 +6,31 @@ Installing
 
 Dynamite is built on the `PETSc <www.mcs.anl.gov/petsc/>`_ and `SLEPc <http://slepc.upv.es/>`_ packages, as well as the Python wrappers around them, ``petsc4py`` and ``slepc4py``. The first step is to install those.
 
-Building PETSc
+Download dynamite
+-----------------
+
+.. code:: bash
+
+    git clone https://github.com/GregDMeyer/dynamite.git
+
+Build PETSc
 --------------
 
-To build PETSc in your working directory, as per the `download page <https://www.mcs.anl.gov/petsc/download/index.html>`_, do the following:
+To build PETSc in your working directory, as per the `download page <https://www.mcs.anl.gov/petsc/download/index.html>`_, do the following. There is a configuration script that comes with dynamite which should help:
 
 .. code:: bash
 
     git clone -b maint https://bitbucket.org/petsc/petsc petsc
     cd petsc
-    ./configure --with-scalar-type=complex --with-petsc-arch=complex-opt \
-    --with-debugging=0 --download-mpich --with-fortran-kernels=1 \
-    COPTFLAGS=-O3 CXXOPTFLAGS=-O3 FOPTFLAGS=-O3
+    cp ../dynamite/build_petsc.py .
+    ./build_petsc.py
 
-Note that you may want to adjust some of these options---see below for an explanation of each of them.
+Note that you may want to adjust some of the build options. Just take a look at build_petsc.py and modify as desired.
 
 If all goes well, ``configure`` will tell you to run a ``make`` command. Copy the command and run it. It should look like:
 ``make PETSC_DIR=<your_petsc_directory> PETSC_ARCH=complex-opt all``
 
 If you want, you can run the PETSc tests as specified in the output of ``make`` (same as above, with ``test`` in place of ``all``).
-
-**Configure options:**
-
- - ``--with-scalar-type=complex`` Use complex numbers with PETSc. **Required**
- - ``--with-petsc-arch=complex-opt`` The name of the PETSc build (we call this ``PETSC_ARCH`` later)
- - ``--with-debugging=0`` Do not include C debugging symbols, to improve PETSc performance significantly. Since the normal dynamite user won't be messing with the underlying C code, you won't need C debugging.
- - ``--download-mpich`` If you don't have an MPI implementation, then this downloads and configures ``mpich`` for PETSc. However, if you do already have MPI set up (for example, supercomputing clusters will for sure already have an implementation), remove this option and configure should find your MPI implementation.
- - ``--with-fortran-kernels=1`` You may see some speedup from using the complex number kernels written in Fortran rather than C++.
- - ``COPTFLAGS=-O3`` Optimization flags to pass to the C compiler.
- - ``CXXOPTFLAGS=-O3`` Opt. flags for C++.
- - ``FOPTFLAGS=-O3`` Opt. flags for FORTRAN.
-
- Even more optional:
-
- - ``--use-64-bit-indices`` Required to work with spin chains longer than 31.
-
- To see all possible options to ``configure``, run ``./configure --help``. You may want to pipe to ``less``; it is a big help page ;)
 
 Building SLEPc
 --------------
@@ -72,31 +61,22 @@ It may suggest running ``make install`` as well. You don't need to do this. To u
 Building dynamite
 -----------------
 
-Dynamite requires Python 3, as well as some packages you can install with pip. These are:
+Dynamite requires Python 3, as well as some packages you can install with pip. These are listed in ``requirements.txt`` in the dynamite root directory. Two of the packages, ``petsc4py`` and ``slepc4py``, are Python wrappers for PETSc and SLEPc. Before you install them, make sure ``PETSC_DIR`` and ``PETSC_ARCH`` environment variables are still set from the above exports (or re-set them). You should also set ``SLEPC_DIR`` with ``export SLEPC_DIR=<your_slepc_installation_directory>``. Then, you can install everything by just running
 
- - ``numpy``
- - ``cython``
- - ``petsc4py``
- - ``slepc4py``
+.. code:: bash
 
-These last two are Python wrappers for PETSc and SLEPc. Before you install them, make sure ``PETSC_DIR`` and ``PETSC_ARCH`` environment variables are still set from the above exports (or re-set them). Then you should also set ``SLEPC_DIR`` with ``export SLEPC_DIR=<your_slepc_installation_directory>``.
+    cd dynamite
+    pip install -r requirements.txt
 
 .. note::
     When using ``pip`` with ``sudo``, you need to pass the ``-E`` flag to ``sudo`` to preserve the environment variables (``PETSC_DIR`` etc.). For example, you would do ``sudo -E pip3 install petsc4py``.
 
 I suggest using a `virtual environment <https://docs.python.org/3/library/venv.html>`_, to keep all of the packages tidy.
 
-Now to set up the packages:
-
-``pip3 install cython petsc4py slepc4py``
-(you may want ``sudo -E`` depending on your setup, see above)
-
-Finally, get the dynamite source from GitHub and install:
+Finally, install dynamite:
 
 .. code:: bash
 
-    git clone https://github.com/GregDMeyer/dynamite.git
-    cd dynamite
     pip install ./  # you may want sudo with pip
 
 Now you should be all set to use dynamite! If you want to work on the dynamite source code, or just easily pull updates from GitHub, you might want to do ``pip install -e ./`` to keep the source files in-place.
