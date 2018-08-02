@@ -48,7 +48,6 @@ Coming Soon
    :caption: Contents:
 
    install.rst
-   Examples.ipynb
    tips.rst
    FAQ.rst
    dynamite.rst

@@ -682,7 +682,7 @@ class Operator:
         return rtn
 
     def dot(self, x, result = None):
-        '''
+        r'''
         Compute the matrix-vector product :math:`\vec{y} = A\vec{x}`
 
         Parameters

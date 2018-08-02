@@ -6,29 +6,22 @@ Single-site operators
 
 These operators apply to a single spin, identified by an index passed to their constructor. The default index is 0. It is implied that they are tensored with the identity on every other site in the spin chain. Explicitly, a single spin operator :math:`O` here has the form :math:`I_0 \otimes I_1 \otimes \ldots \otimes O_{i} \otimes \ldots \otimes I_L`, where :math:`i` is the ``index`` passed in the constructor and :math:`L` is the length of the spin chain. Note that :math:`L` doesn't have to be set explicitly when the object is constructed.
 
-.. autoclass:: dynamite.operators.Sigmax
-    :members:
+.. autofunction:: dynamite.operators.sigmax
 
-.. autoclass:: dynamite.operators.Sigmay
-    :members:
+.. autofunction:: dynamite.operators.sigmay
 
-.. autoclass:: dynamite.operators.Sigmaz
-    :members:
+.. autofunction:: dynamite.operators.sigmaz
 
-.. autoclass:: dynamite.operators.Identity
-    :members:
+.. autofunction:: dynamite.operators.identity
 
-.. autoclass:: dynamite.operators.Zero
-    :members:
+.. autofunction:: dynamite.operators.zero
 
 Sums and Products
 -----------------
 
-.. autoclass:: dynamite.operators.Sum
-    :members:
+.. autofunction:: dynamite.operators.op_sum
 
-.. autoclass:: dynamite.operators.Product
-    :members:
+.. autofunction:: dynamite.operators.op_product
 
 
 Translations
@@ -41,18 +34,16 @@ sites as well. The operator is translated by some number of sites, ranging from 
 argument ``min_i`` to ``max_i`` (inclusive). ``min_i`` defaults to 0, and ``max_i``
 defaults to a value such that the operator extends to the end of the spin chain.
 
-.. autoclass:: dynamite.operators.IndexSum
-    :members:
+.. autofunction:: dynamite.operators.index_sum
 
-.. autoclass:: dynamite.operators.IndexProduct
-    :members:
+.. autofunction:: dynamite.operators.index_product
 
 Saved Operators
 ---------------
 
-.. autoclass:: dynamite.operators.Load
-
 .. autofunction:: dynamite.operators.load_from_file
+
+.. autofunction:: dynamite.operators.from_bytes
 
 Member Functions
 ----------------
