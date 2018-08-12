@@ -2,6 +2,7 @@
 
 #include <slepcmfn.h>
 #include "bsubspace_impl.h"
+#include "shell_context.h"
 
 /* allow us to set many values at once */
 #define BLOCK_SIZE 2048
@@ -15,25 +16,6 @@ typedef enum _shell_impl {
   CPU_SHELL,
   GPU_SHELL
 } shell_impl;
-
-typedef struct _msc_t {
-  PetscInt nmasks;
-  PetscInt* masks;
-  PetscInt* mask_offsets;
-  PetscInt* signs;
-  PetscScalar* coeffs;
-} msc_t;
-
-typedef struct _shell_context {
-  PetscInt nmasks;
-  PetscInt* masks;
-  PetscInt* mask_offsets;
-  PetscInt* signs;
-  PetscReal* real_coeffs;     // we store only the real or complex part -- whichever is nonzero
-  void *left_subspace_data;
-  void *right_subspace_data;
-  PetscReal nrm;
-} shell_context;
 
 PetscErrorCode BuildMat(const msc_t *msc, subspaces_t *subspaces, shell_impl shell, Mat *A);
 

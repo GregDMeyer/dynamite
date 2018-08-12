@@ -5,6 +5,9 @@
  */
 
 #include "bpetsc_template_2.h"
+#if PETSC_HAVE_VECCUDA
+#include "bcuda_template.h"
+#endif
 
 #undef  __FUNCT__
 #define __FUNCT__ "BuildMat"
@@ -24,10 +27,12 @@ PetscErrorCode C(BuildMat,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
     ierr = C(BuildCPUShell,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
       msc, left_subspace_data, right_subspace_data, A);
   }
-  /* TODO */
-  // else if (shell == GPU_SHELL) {
-  //   ierr = BuildGPUShell(msc, left_subspace_data, right_subspace_data, A);
-  // }
+#if PETSC_HAVE_VECCUDA
+  else if (shell == GPU_SHELL) {
+    ierr = C(BuildGPUShell,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
+      msc, left_subspace_data, right_subspace_data, A);
+  }
+#endif
   else {
     SETERRQ(PETSC_COMM_SELF, PETSC_ERR_ARG_UNKNOWN_TYPE, "Invalid shell implementation type.");
   }
@@ -43,7 +48,8 @@ PetscErrorCode C(BuildPetsc,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
   Mat *A)
 {
   PetscErrorCode ierr;
-  PetscInt M, N, row_start, row_end, mask_idx, term_idx;
+  PetscInt M, N, row_start, row_end, col_start;
+  PetscInt mask_idx, term_idx, row_count;
   int mpi_size;
   PetscInt *diag_nonzeros, *offdiag_nonzeros;
 
@@ -61,6 +67,7 @@ PetscErrorCode C(BuildPetsc,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
   ierr = MatSetSizes(*A, PETSC_DECIDE, PETSC_DECIDE, M, N);CHKERRQ(ierr);
   ierr = MatSetFromOptions(*A);CHKERRQ(ierr);
 
+  /* TODO: we only should call these preallocation routines if matrix type is aij */
   /* preallocate memory */
   ierr = C(ComputeNonzeros,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))
           (M, N, msc, &diag_nonzeros, &offdiag_nonzeros,
@@ -81,12 +88,14 @@ PetscErrorCode C(BuildPetsc,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
   /* compute matrix elements */
   ierr = MatSetOption(*A, MAT_NO_OFF_PROC_ENTRIES, PETSC_TRUE);CHKERRQ(ierr);
   ierr = MatGetOwnershipRange(*A, &row_start, &row_end);CHKERRQ(ierr);
+  ierr = MatGetOwnershipRangeColumn(*A, &col_start, NULL);CHKERRQ(ierr);
 
   for (row_idx = row_start; row_idx < row_end; ++row_idx) {
 
     /* each term looks like value*|ket><bra| */
     ket = C(I2S,LEFT_SUBSPACE)(row_idx, left_subspace_data);
 
+    row_count = 0;
     for (mask_idx = 0; mask_idx < msc->nmasks; mask_idx++) {
       bra = ket ^ msc->masks[mask_idx];
 
@@ -98,10 +107,19 @@ PetscErrorCode C(BuildPetsc,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
       }
 
       col_idx = C(S2I,RIGHT_SUBSPACE)(bra, right_subspace_data);
-      ierr = MatSetValues(*A, 1, &row_idx, 1, &col_idx, &value, INSERT_VALUES);CHKERRQ(ierr);
+
+      if (col_idx != -1) {
+	row_count++;
+	ierr = MatSetValue(*A, row_idx, col_idx, value, INSERT_VALUES);CHKERRQ(ierr);
+      }
+    }
+
+    /* workaround for a bug in PETSc that triggers if there are empty rows */
+    if (row_count == 0) {
+      ierr = MatSetValue(*A, row_idx, col_start, 0, INSERT_VALUES);CHKERRQ(ierr);    
     }
   }
-
+  
   ierr = MatAssemblyBegin(*A,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
   ierr = MatAssemblyEnd(*A,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
 
@@ -154,6 +172,10 @@ PetscErrorCode C(ComputeNonzeros,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))
         (*offdiag_nonzeros)[row_idx] += 1;
       }
     }
+    /* as part of workaround for PETSc bug (see BuildPetsc), need at least one element in each row */
+    if ((*diag_nonzeros)[row_idx] == 0) {
+      (*diag_nonzeros)[row_idx] = 1;
+    }
   }
   return ierr;
 }
@@ -179,7 +201,7 @@ PetscErrorCode C(BuildCPUShell,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
   PetscSplitOwnership(PETSC_COMM_WORLD,&m,&M);
   PetscSplitOwnership(PETSC_COMM_WORLD,&n,&N);
 
-  ierr = C(BuildContext,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
+  ierr = C(BuildContext_CPU,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
     msc, left_subspace_data, right_subspace_data, &ctx);CHKERRQ(ierr);
 
   ierr = MatCreateShell(PETSC_COMM_WORLD, m, n, M, N, ctx, A);CHKERRQ(ierr);
@@ -194,11 +216,11 @@ PetscErrorCode C(BuildCPUShell,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
 }
 
 #undef  __FUNCT__
-#define __FUNCT__ "BuildContext"
+#define __FUNCT__ "BuildContext_CPU"
 /*
  * Build the shell context.
  */
-PetscErrorCode C(BuildContext,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
+PetscErrorCode C(BuildContext_CPU,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
   const msc_t *msc,
   const C(data,LEFT_SUBSPACE)* left_subspace_data,
   const C(data,RIGHT_SUBSPACE)* right_subspace_data,
@@ -311,7 +333,7 @@ PetscErrorCode C(MatMult_CPU,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, Vec x, Vec 
     ierr = VecGetSize(x, &x_size);CHKERRQ(ierr);
     ierr = VecGetLocalSize(x, &x_local_size);CHKERRQ(ierr);
     ierr = PetscMalloc1(mpi_size, &x_local_sizes);CHKERRQ(ierr);
-    MPI_Allgather(&x_local_size, 1, MPIU_INT, x_local_sizes, 1, MPIU_INT, PETSC_COMM_WORLD);
+    ierr = MPI_Allgather(&x_local_size, 1, MPIU_INT, x_local_sizes, 1, MPIU_INT, PETSC_COMM_WORLD);
 
     ierr = PetscMalloc1(BLOCK_SIZE, &(x_array[0]));CHKERRQ(ierr);
     ierr = PetscMalloc1(BLOCK_SIZE, &(x_array[1]));CHKERRQ(ierr);
@@ -344,7 +366,7 @@ PetscErrorCode C(MatMult_CPU,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, Vec x, Vec 
         }
         else {
           source_array = x_array[proc_shift%2];
-          MPI_Wait(&recv_request, MPI_STATUS_IGNORE);
+          ierr = MPI_Wait(&recv_request, MPI_STATUS_IGNORE);
         }
 
         if (proc_shift < mpi_size - 1) {
@@ -357,10 +379,10 @@ PetscErrorCode C(MatMult_CPU,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, Vec x, Vec 
           if (recv_count > 0) {
             if (proc_shift > 0) {
               /* make sure we completed the previous send operation already */
-              MPI_Wait(&send_request, MPI_STATUS_IGNORE);
+              ierr = MPI_Wait(&send_request, MPI_STATUS_IGNORE);
             }
             /* TODO: is this the right way to catch MPI errors with PETSc? */
-            MPI_Irecv(x_array[(proc_shift+1)%2], recv_count, MPIU_SCALAR,
+            ierr = MPI_Irecv(x_array[(proc_shift+1)%2], recv_count, MPIU_SCALAR,
                               (mpi_rank+1)%mpi_size, 0,
                               PETSC_COMM_WORLD, &recv_request);
           }
@@ -369,7 +391,7 @@ PetscErrorCode C(MatMult_CPU,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, Vec x, Vec 
           send_count = col_end - col_start;
           if (send_count > 0) {
             /* TODO: is this the right way to catch MPI errors with PETSc? */
-            MPI_Isend(source_array, send_count, MPIU_SCALAR,
+            ierr = MPI_Isend(source_array, send_count, MPIU_SCALAR,
                               (mpi_size+mpi_rank-1)%mpi_size, 0,
                               PETSC_COMM_WORLD, &send_request);
           }
@@ -506,7 +528,7 @@ PetscErrorCode C(MatNorm_CPU,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
     }
   }
 
-  MPIU_Allreduce(&local_max, &global_max, 1, MPIU_REAL, MPIU_MAX, PETSC_COMM_WORLD);CHKERRQ(ierr);
+  ierr = MPIU_Allreduce(&local_max, &global_max, 1, MPIU_REAL, MPIU_MAX, PETSC_COMM_WORLD);CHKERRQ(ierr);
 
   ctx->nrm = global_max;
   (*nrm) = global_max;

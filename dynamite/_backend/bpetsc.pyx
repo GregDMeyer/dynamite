@@ -25,6 +25,7 @@ cdef extern from "bsubspace_impl.h":
         _AUTO "AUTO"
 
 cdef extern from "bpetsc_impl.h":
+
     ctypedef int PetscInt
     ctypedef float PetscLogDouble
 
@@ -58,14 +59,6 @@ cdef extern from "bpetsc_impl.h":
     int PetscMallocGetMaximumUsage(PetscLogDouble* mem)
 
 include "config.pxi"
-IF USE_CUDA:
-    cdef extern from "cuda_shell.h":
-        int BuildMat_CUDAShell(PetscInt L,
-                               np.int_t nterms,
-                               PetscInt* masks,
-                               PetscInt* signs,
-                               np.complex128_t* coeffs,
-                               PetscMat *A)
 
 shell_impl_d = {
     False : NO_SHELL,
@@ -101,19 +94,10 @@ def build_mat(int L,
     subspaces.right_type = right_type
     bsubspace.set_data_pointer(right_type, right_data, &(subspaces.right_data))
 
-    # TODO: use an enum for shell types
     if shell == GPU_SHELL:
-        IF USE_CUDA:
-            if not (left_type == _FULL and right_type == _FULL):
-                raise TypeError('Subspaces not currently supported for CUDA shell matrices.')
-            ierr = BuildMat_CUDAShell(L,n,&masks[0],&signs[0],&coeffs[0],&M.mat)
-        ELSE:
+        IF not USE_CUDA:
             raise RuntimeError("dynamite was not built with CUDA shell "
                                "functionality (requires nvcc during build).")
-
-    # elif shell == CPU_SHELL:
-    #     if left_type == _AUTO or right_type == _AUTO:
-    #         raise TypeError('Shell matrices currently not supported for Auto subspace.')
 
     ierr = BuildMat(&msc, &subspaces, shell, &M.mat)
 

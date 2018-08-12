@@ -251,17 +251,21 @@ class State:
 
         from petsc4py import PETSc
 
-        # collect to process 0
-        if to_all:
-            sc, v0 = PETSc.Scatter.toAll(vec)
+        # scatter seems to be broken for CUDA vectors
+        if PETSc.COMM_WORLD.size > 1:
+            # collect to process 0
+            if to_all:
+                sc, v0 = PETSc.Scatter.toAll(vec)
+            else:
+                sc, v0 = PETSc.Scatter.toZero(vec)
+
+            sc.begin(vec, v0)
+            sc.end(vec, v0)
+
+            if not to_all and PETSc.COMM_WORLD.rank != 0:
+                return None
         else:
-            sc, v0 = PETSc.Scatter.toZero(vec)
-
-        sc.begin(vec, v0)
-        sc.end(vec, v0)
-
-        if not to_all and PETSc.COMM_WORLD.rank != 0:
-            return None
+            v0 = vec
 
         ret = np.ndarray((v0.getSize(),), dtype=np.complex128)
         ret[:] = v0[:]

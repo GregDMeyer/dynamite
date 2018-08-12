@@ -50,5 +50,7 @@ class ToNumpy(ut.TestCase):
         for i in range(PETSc.COMM_WORLD.rank):
             self.assertTrue(npvec[i] == i)
 
+# TODO: check state setting. e.g. setting an invalid state should fail (doesn't for Full subspace)
+
 if __name__ == '__main__':
     ut.main()

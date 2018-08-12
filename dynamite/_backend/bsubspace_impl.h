@@ -105,13 +105,15 @@ static inline PetscInt I2S_Parity(PetscInt idx, const data_Parity* data) {
 }
 
 static inline void S2I_Parity_array(int n, const data_Parity* data, const PetscInt* states, PetscInt* idxs) {
-  for (PetscInt i = 0; i < n; ++i) {
+  PetscInt i;
+  for (i = 0; i < n; ++i) {
     idxs[i] = S2I_Parity(states[i], data);
   }
 }
 
 static inline void I2S_Parity_array(int n, const data_Parity* data, const PetscInt* idxs, PetscInt* states) {
-  for (PetscInt i = 0; i < n; ++i) {
+  PetscInt i;
+  for (i = 0; i < n; ++i) {
     states[i] = I2S_Parity(idxs[i], data);
   }
 }
@@ -160,13 +162,15 @@ static inline PetscInt I2S_Auto(PetscInt idx, const data_Auto* data) {
 }
 
 static inline void S2I_Auto_array(int n, const data_Auto* data, const PetscInt* states, PetscInt* idxs) {
-  for (PetscInt i = 0; i < n; ++i) {
+  PetscInt i;
+  for (i = 0; i < n; ++i) {
     idxs[i] = S2I_Auto(states[i], data);
   }
 }
 
 static inline void I2S_Auto_array(int n, const data_Auto* data, const PetscInt* idxs, PetscInt* states) {
-  for (PetscInt i = 0; i < n; ++i) {
+  PetscInt i;
+  for (i = 0; i < n; ++i) {
     states[i] = I2S_Auto(idxs[i], data);
   }
 }

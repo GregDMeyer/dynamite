@@ -34,7 +34,7 @@ PetscErrorCode C(BuildCPUShell,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
 /*
  * Build the shell context.
  */
-PetscErrorCode C(BuildContext,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
+PetscErrorCode C(BuildContext_CPU,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
   const msc_t *msc,
   const C(data,LEFT_SUBSPACE)* left_subspace_data,
   const C(data,RIGHT_SUBSPACE)* right_subspace_data,

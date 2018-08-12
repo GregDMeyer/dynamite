@@ -9,13 +9,13 @@ def get_build_version():
 def get_build_branch():
     return DNM_BRANCH
 
-def have_gpu_shell():
-    return bool(USE_CUDA)
-
 cdef extern from "petsc.h":
     ctypedef int PetscInt
     ctypedef int PetscBool
     int PetscInitialized(PetscBool *isInitialized)
+
+def have_gpu_shell():
+    return bool(USE_CUDA)
 
 if sizeof(PetscInt) == 4:
     dnm_int_t = np.int32

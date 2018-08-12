@@ -23,11 +23,13 @@ class MPITestCase(ut.TestCase):
         config.initialize()
 
         from petsc4py import PETSc
-        CW = PETSc.COMM_WORLD.tompi4py()
 
-        for i in range(CW.size):
-            remote = CW.bcast(success, root = i)
-            success = success and remote
+        # workaround since tompi4py() seems to break in some cases w/ GPU
+        if PETSc.COMM_WORLD.size > 1:
+            CW = PETSc.COMM_WORLD.tompi4py()
+            for i in range(CW.size):
+                remote = CW.bcast(success, root = i)
+                success = success and remote
 
         return success
 
@@ -72,20 +74,22 @@ class FullSpace(MPITestCase):
             A dictionary, where the keys are the indices of the nonzero elements
             and the values are the nonzero values
         '''
+        # first check that the state's norm is right
+        correct_norm = sum(np.abs(v)**2 for v in nonzeros.values())
+        self.assertEqual(state.vec.norm(), correct_norm)
+
         istart, iend = state.vec.getOwnershipRange()
-        for i in range(state.subspace.get_dimension()):
-            if istart <= i < iend:
-                if i in nonzeros:
-                    self.assertEqual(state.vec[i], nonzeros[i], msg = 'idx: %d' % i)
-                else:
-                    self.assertEqual(state.vec[i], 0, msg = 'idx: %d' % i)
+        for idx, val in nonzeros.items():
+            if istart <= idx < iend:
+                self.assertEqual(state.vec[idx], val, msg = 'idx: %d' % idx)
             else:
+                # we have to do this for MPI
                 self.assertEqual(0, 0)
 
     def test_identity(self):
-        s = State(state = 10)
+        s = State(state = 3)
         r = identity() * s
-        correct = {10 : 1}
+        correct = {3 : 1}
         self.check_nonzeros(r, correct)
 
     def test_spinflip(self):
@@ -100,18 +104,26 @@ class FullHamiltonians(MPITestCase):
     def check_hamiltonian(self, H_name):
         H = getattr(hamiltonians, H_name)()
         bra, ket = H.create_states()
-        ket.set_random(seed = 0)
 
-        ket_np = ket.to_numpy()
+        # ket.set_product(0)
+        ket.set_random(seed = 0)
+        #ket.vec.set(1)
 
         H.dot(ket, bra)
+        self.assertLess(1E-3, bra.vec.norm(), msg = 'petsc vec norm incorrect')
+
+        ket_np = ket.to_numpy()
         bra_check = bra.to_numpy()
 
         if ket_np is not None:
+
+            self.assertNotEqual(np.linalg.norm(bra_check), 0, msg = 'numpy vec zero')
+
             H_np = H.to_numpy()
             bra_np = H_np.dot(ket_np)
             inner_prod = bra_check.dot(bra_np.conj())
-            inner_prod /= np.linalg.norm(bra_check) * np.linalg.norm(bra_np)
+            if inner_prod != 0:
+                inner_prod /= np.linalg.norm(bra_check) * np.linalg.norm(bra_np)
         else:
             inner_prod = 1
 
@@ -144,43 +156,73 @@ class Subspaces(MPITestCase):
 
         H.left_subspace = Full()
         H.right_subspace = Full()
-        y_f2f = H * x
-        y_f2f = to_space * y_f2f
+        correct_full = H * x
+        correct_sub = to_space * correct_full
 
-        H.left_subspace = check_subspace
-        y_f2s = H * x
+        with self.subTest():
+            self.check_f2s(H, x, check_subspace, correct_sub)
+        
+        with self.subTest():
+            self.check_s2f(H, x, check_subspace, correct_sub)
+        
+        with self.subTest():
+            self.check_s2s(H, x, check_subspace, correct_sub)
 
-        H.right_subspace = check_subspace
-        x_s = to_space * x
-        y_s2s = H * x_s
+    def compare_vecs(self, H, correct, check):
 
-        H.left_subspace = Full()
-        y_s2f = H * x_s
-        y_s2f = to_space * y_s2f
-
-        istart, iend = y_f2f.vec.getOwnershipRange()
-        local_f2f = y_f2f.vec[istart:iend]
-        local_f2s = y_f2s.vec[istart:iend]
-        local_s2s = y_s2s.vec[istart:iend]
-        local_s2f = y_s2f.vec[istart:iend]
+        # compare the local portions of the vectors
+        istart, iend = correct.vec.getOwnershipRange()
+        correct = correct.vec[istart:iend]
+        check = check.vec[istart:iend]
 
         # this is the amount of machine rounding error we can accumulate
-        eps = H.nnz * np.finfo(local_f2f.dtype).eps
+        eps = H.nnz * np.finfo(correct.dtype).eps
 
-        diff = np.abs(local_f2f-local_f2s)
+        diff = np.abs(correct-check)
         max_idx = np.argmax(diff)
-        self.assertTrue(np.allclose(local_f2f, local_f2s, rtol=0, atol=eps),
-                        msg = '%e at %d' % (diff[max_idx], max_idx))
+        self.assertTrue(np.allclose(correct, check, rtol=0, atol=eps),
+                        msg = '\ncorrect: %e\ncheck: %e\nat %d' % (np.abs(correct[max_idx]), np.abs(check[max_idx]), max_idx))
 
-        diff = np.abs(local_f2f-local_s2s)
-        max_idx = np.argmax(diff)
-        self.assertTrue(np.allclose(local_f2f, local_s2s, rtol=0, atol=eps),
-                        msg = '%e at %d' % (diff[max_idx], max_idx))
+    def check_f2s(self, H, x, check_subspace, correct):
+        '''
+        check multiplication from full to subspace
+        '''
+        H.right_subspace = Full()
+        H.left_subspace = check_subspace
+        result = H * x
 
-        diff = np.abs(local_f2f-local_s2f)
-        max_idx = np.argmax(diff)
-        self.assertTrue(np.allclose(local_f2f, local_s2f, rtol=0, atol=eps),
-                        msg = '%e at %d' % (diff[max_idx], max_idx))
+        self.compare_vecs(H, correct, result)
+
+    def check_s2f(self, H, x, check_subspace, correct):
+        '''
+        check multiplication from subspace to full
+        '''
+        H.right_subspace = check_subspace
+        H.left_subspace = Full()
+
+        to_space = identity()
+        to_space.left_subspace = check_subspace
+
+        x_sub = to_space * x
+        result = H * x_sub
+        result_sub = to_space * result
+
+        self.compare_vecs(H, correct, result_sub)
+
+    def check_s2s(self, H, x, check_subspace, correct):
+        '''
+        check multiplication from subspace to subspace
+        '''
+        H.right_subspace = check_subspace
+        H.left_subspace = check_subspace
+
+        to_space = identity()
+        to_space.left_subspace = check_subspace
+
+        x_sub = to_space * x
+        result = H * x_sub
+
+        self.compare_vecs(H, correct, result)
 
     def test_parity_XX_even(self):
         H = index_sum(sigmax(0)*sigmax(1))
@@ -233,16 +275,22 @@ class Subspaces(MPITestCase):
                 sp = Auto(H, (1 << (H.L//2))-space)
 
                 k = State(subspace = sp, state = 'random', seed = 0)
-                I = identity()
-                I.right_subspace = sp
-                ket = I*k
-                # TODO: need to go back to full space!
+                
+                from_space = identity()
+                from_space.right_subspace = sp
+                ket = from_space*k
 
                 self.compare_to_full(H, ket, sp)
+
+    # TODO: write tests for multiplication from one subspace to a different one
 
 if __name__ == '__main__':
     from dynamite import config
     config.L = 10
     config.shell = False
     #config.initialize(['-start_in_debugger', 'noxterm'])
+
     ut.main()
+
+    # import cProfile
+    # cProfile.run('ut.main()', 'out.prof')
