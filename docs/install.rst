@@ -22,10 +22,9 @@ To build PETSc in your working directory, as per the `download page <https://www
 
     git clone -b maint https://bitbucket.org/petsc/petsc petsc
     cd petsc
-    cp ../dynamite/build_petsc.py .
-    ./build_petsc.py
+    python2 <dynamite directory>/petsc_config/complex-opt.py
 
-Note that you may want to adjust some of the build options. Just take a look at build_petsc.py and modify as desired.
+Note that you may want to adjust some of the build options. Just take a look at the script and modify as desired. There are also a couple other scripts in that directory for debug builds (if you will be modifying dynamite) and CUDA support.
 
 If all goes well, ``configure`` will tell you to run a ``make`` command. Copy the command and run it. It should look like:
 ``make PETSC_DIR=<your_petsc_directory> PETSC_ARCH=complex-opt all``
