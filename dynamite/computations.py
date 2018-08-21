@@ -58,15 +58,14 @@ def evolve(H, state, t, result=None, **kwargs):
     config.initialize()
     from slepc4py import SLEPc
 
-    if H.right_subspace != state.subspace:
+    if (state.subspace, state.subspace) not in H.get_subspace_list():
         raise ValueError('Hamiltonian and state are defined on different '
                          'subspaces.')
 
     if result is None:
-        result = State(L=H.L, subspace=H.left_subspace)
-    elif H.left_subspace != result.subspace:
-        raise ValueError('Hamiltonian and result state are defined on different '
-                         'subspaces.')
+        result = State(L=H.L, subspace=state.subspace)
+    elif state.subspace != result.subspace:
+        raise ValueError('input and result states are on different subspaces.')
 
     mfn = SLEPc.MFN().create()
     f = mfn.getFN()
@@ -83,13 +82,13 @@ def evolve(H, state, t, result=None, **kwargs):
         mfn.setTolerances(kwargs['tol'])
 
     mfn.setFromOptions()
-    mfn.setOperator(H.get_mat())
+    mfn.setOperator(H.get_mat(subspaces=(state.subspace, state.subspace)))
 
     mfn.solve(state.vec,result.vec)
 
     return result
 
-def eigsolve(H, getvecs=False, nev=1, which='smallest', target=None, tol=None):
+def eigsolve(H, getvecs=False, nev=1, which='smallest', target=None, tol=None, subspace=None):
     r"""
     Solve for a subset of the eigenpairs of the Hamiltonian.
 
@@ -146,6 +145,11 @@ def eigsolve(H, getvecs=False, nev=1, which='smallest', target=None, tol=None):
     tol : float
         The tolerance for the computation.
 
+    subspace : dynamite.subspaces.Subspace, optional
+        The subspace on which to solve for eigenvalues. If not given, defaults
+        to the most recent subspace set with Operator.add_subspace, or config.subspace
+        if no subspaces have been added.
+
     Returns
     -------
     numpy.array or tuple(numpy.array, list(dynamite.states.State))
@@ -153,7 +157,10 @@ def eigsolve(H, getvecs=False, nev=1, which='smallest', target=None, tol=None):
         and a list of the corresponding eigenvectors.
     """
 
-    # TODO: require that left subspace and right subspace are the same
+    if subspace is None:
+        subspace = H.subspace
+    elif (subspace, subspace) not in H.get_subspace_list():
+        raise ValueError('Requested subspace has not been added to operator.')
 
     config.initialize()
     from slepc4py import SLEPc
@@ -175,11 +182,11 @@ def eigsolve(H, getvecs=False, nev=1, which='smallest', target=None, tol=None):
 
         # fix for "bug" discussed here:
         # https://www.mail-archive.com/petsc-users@mcs.anl.gov/msg22867.html
-        eps.setOperators(H.get_mat(diag_entries=True))
+        eps.setOperators(H.get_mat(subspaces=(subspace, subspace), diag_entries=True))
     else:
         if which=='target':
             raise ValueError("Must specify target when setting which='target'")
-        eps.setOperators(H.get_mat())
+        eps.setOperators(H.get_mat(subspaces=(subspace, subspace)))
 
     eps.setDimensions(nev)
 

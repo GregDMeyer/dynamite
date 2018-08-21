@@ -432,9 +432,11 @@ class Properties(ut.TestCase):
         o.L = 6
         self.assertEqual(o.dim, (64, 64))
 
+        from dynamite.subspaces import Full
+
         subspace = Mock()
         subspace.get_dimension = MagicMock(return_value = 7)
-        o._left_subspace = subspace
+        o._subspaces.append((subspace, Full()))
         self.assertEqual(o.dim, (7, 64))
 
         o.L = 5
@@ -442,7 +444,7 @@ class Properties(ut.TestCase):
         # this should have set the subspace dimension too
         self.assertEqual(o.left_subspace.L, 5)
 
-        o._right_subspace = subspace
+        o._subspaces[1] = (subspace, subspace)
         self.assertEqual(o.dim, (7, 7))
 
     def test_nnz(self):
@@ -454,9 +456,7 @@ class Properties(ut.TestCase):
         o.L = 4
         self.assertEqual(o.density, 0.1875)
 
-        subspace = Mock()
-        subspace.get_dimension = MagicMock(return_value = 8)
-        o._right_subspace = subspace
+        o.right_subspace.get_dimension = MagicMock(return_value = 8)
 
         self.assertEqual(o.density, 0.375)
 
@@ -475,12 +475,12 @@ class Properties(ut.TestCase):
 
     def test_right_subspace(self):
 
-        from dynamite.subspace import Subspace
+        from dynamite.subspaces import Subspace, Full
         subspace = Mock(spec=Subspace)
 
         o = sigmaz()
         o.L = 5
-        o.right_subspace = subspace
+        o.add_subspace(Full(), subspace)
         self.assertEqual(o.right_subspace.L, 5)
         o.L = 6
         self.assertEqual(o.right_subspace.L, 6)
@@ -490,12 +490,12 @@ class Properties(ut.TestCase):
 
     def test_left_subspace(self):
 
-        from dynamite.subspace import Subspace
+        from dynamite.subspaces import Subspace, Full
         subspace = Mock(spec=Subspace)
 
         o = sigmaz()
         o.L = 5
-        o.left_subspace = subspace
+        o.add_subspace(subspace, Full())
         self.assertEqual(o.left_subspace.L, 5)
         o.L = 6
         self.assertEqual(o.left_subspace.L, 6)
@@ -505,12 +505,12 @@ class Properties(ut.TestCase):
 
     def test_subspace(self):
 
-        from dynamite.subspace import Subspace
+        from dynamite.subspaces import Subspace
         subspace = Mock(spec=Subspace)
 
         o = sigmaz()
         o.L = 5
-        o.subspace = subspace
+        o.add_subspace(subspace)
 
         self.assertIs(o.left_subspace, subspace)
         self.assertIs(o.right_subspace, subspace)

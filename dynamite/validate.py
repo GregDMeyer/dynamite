@@ -12,7 +12,7 @@ def L(x):
     return x
 
 def subspace(s):
-    from .subspace import Subspace
+    from .subspaces import Subspace
     if not isinstance(s,Subspace):
         raise ValueError('subspace can only be set to objects of Subspace type, or None')
     return s

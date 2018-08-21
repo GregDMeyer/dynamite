@@ -12,6 +12,8 @@ class RandomSeed(ut.TestCase):
         Make sure that different processors get the same random seed.
         '''
 
+        from dynamite import config
+        config.initialize()
         from petsc4py import PETSc
         comm = PETSc.COMM_WORLD.tompi4py()
         seed = State.generate_time_seed()

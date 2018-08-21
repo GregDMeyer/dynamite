@@ -9,7 +9,7 @@ These tests should NOT require MPI.
 
 import unittest as ut
 import numpy as np
-from dynamite.subspace import Full, Parity
+from dynamite.subspaces import Full, Parity
 from dynamite._backend.bsubspace import compute_rcm
 from dynamite._backend.bbuild import dnm_int_t
 
@@ -189,7 +189,64 @@ class TestRCM(ut.TestCase):
             self.assertEqual(state_rmap[state_map[i]], i)
 
 class TestAuto(ut.TestCase):
+    # TODO
     pass
+
+class Checksum(ut.TestCase):
+
+    def test_same_full(self):
+        space = Full()
+        space.L = 10
+        chksum1 = space.get_checksum()
+        chksum2 = space.copy().get_checksum()
+        self.assertEqual(chksum1, chksum2)
+
+    def test_diff_full(self):
+        space = Full()
+        space.L = 10
+        chksum1 = space.get_checksum()
+
+        space.L = 11
+        chksum2 = space.get_checksum()
+
+        self.assertNotEqual(chksum1, chksum2)
+
+    def test_same_full_large(self):
+        space = Full()
+        space.L = 20
+        chksum1 = space.get_checksum()
+        chksum2 = space.copy().get_checksum()
+        self.assertEqual(chksum1, chksum2)
+
+    def test_diff_full_large(self):
+        space = Full()
+        space.L = 20
+        chksum1 = space.get_checksum()
+
+        space.L = 21
+        chksum2 = space.get_checksum()
+
+        self.assertNotEqual(chksum1, chksum2)
+
+    def test_same_parity(self):
+        space = Parity('even')
+        space.L = 10
+        chksum1 = space.get_checksum()
+        chksum2 = space.get_checksum()
+        self.assertEqual(chksum1, chksum2)
+
+    def test_diff_parity(self):
+        space0 = Parity('even')
+        space1 = Parity('odd')
+        space0.L = 10
+        space1.L = 10
+
+        chksum0 = space0.get_checksum()
+        chksum1 = space1.get_checksum()
+
+        self.assertNotEqual(chksum0, chksum1)
+
+    # TODO: Auto tests?
 
 if __name__ == '__main__':
     ut.main()

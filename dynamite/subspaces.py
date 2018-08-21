@@ -7,11 +7,10 @@ one implementation of each of the functions.
 
 import numpy as np
 from copy import deepcopy
+from zlib import crc32
 
 from . import validate, info
 from ._backend import bsubspace
-
-# TODO: allow automatically choosing subspace for operators
 
 def class_to_enum(subspace_type):
     '''
@@ -32,6 +31,7 @@ class Subspace:
 
     def __init__(self):
         self._L = None
+        self._chksum = None
 
     def __eq__(self, s):
         '''
@@ -44,8 +44,7 @@ class Subspace:
         if self.get_dimension() != s.get_dimension():
             return False
 
-        idxs = np.arange(self.get_dimension())
-        return np.array_equal(self.idx_to_state(idxs), s.idx_to_state(idxs))
+        return self.get_checksum() == s.get_checksum()
 
     @property
     def L(self):
@@ -63,6 +62,10 @@ class Subspace:
         # check that this value of L is compatible with the subspace
         value = validate.L(value)
         value = self.check_L(value)
+
+        if value != self._L:
+            self._chksum = None
+
         self._L = value
 
     def get_dimension(self):
@@ -95,6 +98,25 @@ class Subspace:
 
     def copy(self):
         return deepcopy(self)
+
+    def get_checksum(self):
+        '''
+        Get a checksum of the state mapping for this subspace. This allows subspaces to
+        be compared quickly.
+        '''
+        if self._chksum is None:
+            BLOCK = 2**14
+            chksum = 0
+            for start in range(0, self.get_dimension(), BLOCK):
+                stop = min(start+BLOCK, self.get_dimension())
+                smap = self.idx_to_state(np.arange(start, stop))
+                chksum = crc32(smap, chksum)
+            self._chksum = chksum
+
+        return self._chksum
+
+    def __hash__(self):
+        return self.get_checksum()
 
     def get_cdata(self):
         '''
@@ -251,7 +273,7 @@ class Auto(Subspace):
 
     def __init__(self, H, state, size_guess=None):
         # TODO: allow string representation for state
-        
+
         Subspace.__init__(self)
 
         self._L = H.get_length()

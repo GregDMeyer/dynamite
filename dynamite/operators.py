@@ -4,11 +4,10 @@ defines their built-in behavior and operations.
 """
 
 import numpy as np
-from itertools import combinations
 
 from . import config, validate, info, msc_tools
 from .computations import evolve, eigsolve
-from .subspace import class_to_enum
+from .subspaces import class_to_enum, Full
 from .states import State
 
 class Operator:
@@ -23,13 +22,14 @@ class Operator:
 
         self._L = config.L
         self._max_spin_idx = None
-        self._mat = None
+        self._mats = {}
         self._msc = None
         self._is_reduced = False
-        self._has_diag_entries = False
         self._shell = config.shell
-        self._left_subspace = config.subspace
-        self._right_subspace = config.subspace
+
+        self._subspaces = [(Full(), Full())]
+        if config.subspace is not None:
+            self.add_subspace(config.subspace, config.subspace)
 
         self._tex = r'\[\text{operator}\]'
         self._string = '[operator]'
@@ -51,24 +51,14 @@ class Operator:
         rtn.is_reduced = self.is_reduced
         rtn.shell = self.shell
 
-        if self.left_subspace is self.right_subspace:
-            rtn.subspace = self.subspace.copy()
-        else:
-            rtn.left_subspace = self.left_subspace.copy()
-            rtn.right_subspace = self.right_subspace.copy()
+        for left, right in self.get_subspace_list():
+            rtn.add_subspace(left, right)
 
         rtn.tex = self.tex
         rtn.string = self.string
         rtn.brackets = self.brackets
 
         return rtn
-
-    def __del__(self):
-        # petsc4py will destroy the matrix object by itself,
-        # but for shell matrices the context will not be automatically
-        # freed! therefore we need to explicitly call this on object
-        # deletion.
-        self.destroy_mat()
 
     ### computations
 
@@ -154,6 +144,9 @@ class Operator:
             raise ValueError('Cannot set L smaller than one plus the largest spin index'
                              'on which the operator has support (max_spin_idx = %d)' %
                              (self.max_spin_idx))
+        for left, right in self.get_subspace_list():
+            left.L = L
+            right.L = L
         self._L = L
 
     def get_length(self):
@@ -222,56 +215,72 @@ class Operator:
     @property
     def left_subspace(self):
         """
-        The subspace of "bra" states--in other words, states that
-        could be multiplied on the left against the matrix.
+        Get the default left subspace for this operator. This is the subspace most recently
+        added with :meth:`Operator.add_subspace`, or config.subspace if
+        :meth:`Operator.add_subspace` has not been called.
         """
-        # always make sure that the subspace associated with this operator
-        # has the correct dimensions
-        self._left_subspace.L = self.get_length()
-        return self._left_subspace
+        space = self.get_subspace_list()[-1][0]
+        space.L = self.get_length()
+        return space
 
     @property
     def right_subspace(self):
         """
-        The subspace of "ket" states--those that can be multiplied
-        on the right against the matrix.
+        Get the default right subspace for this operator. This is the subspace most recently
+        added with :meth:`Operator.add_subspace`, or config.subspace if
+        :meth:`Operator.add_subspace` has not been called.
         """
-        self._right_subspace.L = self.get_length()
-        return self._right_subspace
+        space = self.get_subspace_list()[-1][1]
+        space.L = self.get_length()
+        return space
 
     @property
     def subspace(self):
         """
-        When the left and right subspaces are the same, this property
-        gets or sets both at the same time. If they are different, it
-        raises an error.
+        Get the default subspace for this operator. This is the subspace most recently
+        added with :meth:`Operator.add_subspace`, or config.subspace if
+        :meth:`Operator.add_subspace` has not been called.
         """
-        if self.left_subspace is not self.right_subspace:
-            raise ValueError('Left subspace and right subspace not the same, '
-                             'use left_subspace and right_subspace to access each.')
-
+        if self.left_subspace != self.right_subspace:
+            raise ValueError("Left and right subspaces are different for this operator. "
+                             "use Operator.left_subspace and Operator.right_subspace to "
+                             "access them individually.")
         return self.left_subspace
 
-    @left_subspace.setter
-    def left_subspace(self, s):
-        validate.subspace(s)
-        s.L = self.get_length()
-        if s != self.left_subspace:
-            self.destroy_mat()
-        self._left_subspace = s
+    def add_subspace(self, left, right=None):
+        '''
+        Add a pair of subspaces that this operator is compatible with.
 
-    @right_subspace.setter
-    def right_subspace(self, s):
-        validate.subspace(s)
-        s.L = self.get_length()
-        if s != self.right_subspace:
-            self.destroy_mat()
-        self._right_subspace = s
+        Parameters
+        ----------
 
-    @subspace.setter
-    def subspace(self, s):
-        self.left_subspace = s
-        self.right_subspace = s
+        left : dynamite.subspaces.Subspace
+            A subspace the operator can map to (or multiply from the left)
+
+        right : dynamite.subspaces.Subspace, optional
+            A subspace the operator can map from (or multiply to the right). If omitted,
+            the left subspace is reused for the right.
+        '''
+        if right is None:
+            right = left
+
+        left = validate.subspace(left)
+        right = validate.subspace(right)
+
+        left.L = self.get_length()
+        right.L = self.get_length()
+
+        if (left, right) not in self.get_subspace_list():
+            self.get_subspace_list().append((left, right))
+
+    def get_subspace_list(self):
+        '''
+        Return a list of the subspaces that have been registered for this operator.
+        '''
+        for left, right in self._subspaces:
+            left.L = self.get_length()
+            right.L = self.get_length()
+        return self._subspaces
 
     ### text representations
 
@@ -433,27 +442,37 @@ class Operator:
 
     ### interface with PETSc
 
-    def get_mat(self, diag_entries=False):
+    def get_mat(self, subspaces=None, diag_entries=False):
         """
         Get the PETSc matrix corresponding to this operator, building it if necessary.
 
         Parameters
         ----------
-        diag_entries : bool
+        subspaces : tuple(Subspace, Subspace), optional
+            The subspace pair to get the matrix for. If the matrix is already built for this
+            pair, it will be reused. If this option is omitted, the last subspace added with
+            :meth:`Operator.add_subspace` will be used, or the Full space by default.
+
+        diag_entries : bool, optional
             Ensure that the sparse matrix has all diagonal elements filled,
             even if they are zero. Some PETSc functions fail if the
-            diagonal elements do not exist.
+            diagonal elements do not exist. Currently a dummy argument; diagonal
+            entries are always included.
 
         Returns
         -------
         petsc4py.PETSc.Mat
             The PETSc matrix corresponding to the operator.
         """
-        if self._mat is None or (diag_entries and not self._has_diag_entries):
-            self.build_mat(diag_entries=diag_entries)
-        return self._mat
 
-    def build_mat(self, diag_entries=False):
+        if subspaces is None:
+            subspaces = (self.left_subspace, self.right_subspace)
+
+        if subspaces not in self._mats:
+            self.build_mat(subspaces, diag_entries=diag_entries)
+        return self._mats[subspaces]
+
+    def build_mat(self, subspaces, diag_entries=False):
         """
         Build the PETSc matrix, destroying any matrix that has already been built, and
         store it internally. This function does not return the matrix--see
@@ -462,20 +481,20 @@ class Operator:
         needs to be built or rebuilt.
         """
 
+        if subspaces not in self.get_subspace_list():
+            raise ValueError('Attempted to build matrix for a subspace that has not '
+                             'been added to the operator.')
+
         config.initialize()
         from ._backend import bpetsc
 
-        if self.get_length() > self.max_spin_idx:
-            info.write(1, 'Trivial identity operators at end of chain--length L could be smaller.')
-
-        self.destroy_mat()
         self.reduce_msc()
         term_array = self.msc
 
-        self._has_diag_entries = term_array[0]['masks'] == 0
-        if diag_entries and not self._has_diag_entries:
+        # TODO: keep track of diag_entries
+        diag_entries = True
+        if term_array[0]['masks'] != 0:
             term_array = np.hstack([np.array([(0,0,0)], dtype=term_array.dtype), term_array])
-            self._has_diag_entries = True
 
         masks, indices = np.unique(term_array['masks'], return_index=True)
 
@@ -484,27 +503,41 @@ class Operator:
         mask_offsets[:-1] = indices
         mask_offsets[-1]  = term_array.shape[0]
 
-        self._mat = bpetsc.build_mat(L = self.get_length(),
-                                     masks = np.ascontiguousarray(masks),
-                                     mask_offsets = np.ascontiguousarray(mask_offsets),
-                                     signs = np.ascontiguousarray(term_array['signs']),
-                                     coeffs = np.ascontiguousarray(term_array['coeffs']),
-                                     left_type = class_to_enum(type(self.left_subspace)),
-                                     left_data = self.left_subspace.get_cdata(),
-                                     right_type = class_to_enum(type(self.right_subspace)),
-                                     right_data = self.right_subspace.get_cdata(),
-                                     shell = bpetsc.shell_impl_d[self.shell])
+        mat = bpetsc.build_mat(
+            L = self.get_length(),
+            masks = np.ascontiguousarray(masks),
+            mask_offsets = np.ascontiguousarray(mask_offsets),
+            signs = np.ascontiguousarray(term_array['signs']),
+            coeffs = np.ascontiguousarray(term_array['coeffs']),
+            left_type = class_to_enum(type(subspaces[0])),
+            left_data = subspaces[0].get_cdata(),
+            right_type = class_to_enum(type(subspaces[1])),
+            right_data = subspaces[1].get_cdata(),
+            shell = bpetsc.shell_impl_d[self.shell]
+        )
 
-    def destroy_mat(self):
+        self._mats[subspaces] = mat
+
+    def destroy_mat(self, subspaces=None):
         """
         Destroy the PETSc matrix, freeing the corresponding memory. If the PETSc
         matrix does not exist (has not been built or has already been destroyed),
         the function has no effect.
+
+        Parameters
+        ----------
+        subspaces : tuple(Subspace, Subspace), optional
+            Destroy only the matrix for a particular pair of subspaces.
         """
-        if self._mat is None:
-            return
-        self._mat.destroy()
-        self._mat = None
+        if subspaces is not None:
+            to_destroy = [subspaces]
+        else:
+            to_destroy = list(self._mats.keys())
+
+        for k in to_destroy:
+            mat = self._mats.pop(k, None)
+            if mat is not None:
+                mat.destroy()
 
     def create_states(self):
         '''
@@ -579,12 +612,17 @@ class Operator:
 
     ### interface to numpy
 
-    def to_numpy(self, sparse = True):
+    def to_numpy(self, subspaces=None, sparse=True):
         '''
         Get a SciPy sparse matrix or dense numpy array representing the operator.
 
         Parameters
         ----------
+        subspaces : tuple(Subspace, Subspace), optional
+            The subspaces for which to get the matrix. If this option is omitted,
+            the last subspace added with :meth:`Operator.add_subspace` will be used,
+            or the Full space by default.
+
         sparse : bool, optional
             Whether to return a sparse matrix or a dense array.
 
@@ -594,33 +632,44 @@ class Operator:
             The array
         '''
 
+        if subspaces is None:
+            subspaces = (self.left_subspace, self.right_subspace)
+
         ary = msc_tools.msc_to_numpy(self.msc,
-                                     (self.left_subspace.get_dimension(),
-                                      self.right_subspace.get_dimension()),
-                                     self.left_subspace.idx_to_state,
-                                     self.right_subspace.state_to_idx,
+                                     (subspaces[0].get_dimension(),
+                                      subspaces[1].get_dimension()),
+                                     subspaces[0].idx_to_state,
+                                     subspaces[1].state_to_idx,
                                      sparse)
 
         return ary
 
-    def spy(self, max_size=1024):
+    def spy(self, subspaces=None, max_size=1024):
         '''
         Use matplotlib to show the nonzero structure of the matrix.
 
         Parameters
         ----------
-        max_size : int
+        subspaces : tuple(Subspace, Subspace), optional
+            The pair of subspaces for which to plot the matrix. Defaults to the most
+            recent added with the Operator.add_subspace method, or otherwise
+            config.subspace.
+
+        max_size : int, optional
             The maximum matrix dimension for which this function can be called.
             Calling it for too large a matrix will not be informative and probably run
             out of memory, so this is a small safeguard.
         '''
+        # TODO: should subspaces really be passed as an argument like that? or should we somehow
+        # reference subspaces from the list, like with an index?
+
         if any(dim > max_size for dim in self.dim):
             raise ValueError('Matrix too big to spy. Either build a smaller operator, or adjust '
                              'the maximum spy size with the argument "max_size"')
 
         from matplotlib import pyplot as plt
         plt.figure()
-        normalized = np.array((self.to_numpy() != 0).toarray(), dtype = np.float)
+        normalized = np.array((self.to_numpy(subspaces=subspaces) != 0).toarray(), dtype = np.float)
         transformed = np.log(normalized + 1E-9)
         plt.imshow(transformed, cmap='Greys')
         plt.show()
@@ -699,19 +748,28 @@ class Operator:
         dynamite.states.State
             The result
         '''
-        if self.right_subspace != x.subspace:
-            # TODO: just set the matrix subspace based on the vector's space?
-            # TODO: this is inefficient!
-            raise ValueError('Subspaces of matrix and input vector do not match.')
+        right_subspace = x.subspace
+        right_match = [(left, right) for left, right in self.get_subspace_list()
+                       if right == right_subspace]
+        if not right_match:
+            raise ValueError('No operator subspace found that matches input vector subspace. '
+                             'Try adding the subspace with the Operator.add_subspace method.')
 
         if result is None:
-            result = State(L = self.left_subspace.L,
-                           subspace = self.left_subspace)
+            if len(right_match) != 1:
+                raise ValueError('Ambiguous subspace for result vector. Pass a state '
+                                 'with the desired subspace as the "result" option to '
+                                 'Operator.dot.')
+            left_subspace = right_match[0][0]
+            result = State(L=left_subspace.L,
+                           subspace=left_subspace)
+        else:
+            left_subspace = result.subspace
 
-        if self.left_subspace != result.subspace:
+        if (left_subspace, right_subspace) not in right_match:
             raise ValueError('Subspaces of matrix and result vector do not match.')
 
-        self.get_mat().mult(x.vec, result.vec)
+        self.get_mat(subspaces=(left_subspace, right_subspace)).mult(x.vec, result.vec)
         return result
 
     def _vec_mul(self, x):

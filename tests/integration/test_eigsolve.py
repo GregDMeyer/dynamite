@@ -4,14 +4,23 @@ import itertools
 import numpy as np
 import hamiltonians
 
-from dynamite.operators import index_sum, sigmaz, sigmax
+from dynamite.operators import index_sum, sigmax, identity
 from dynamite.states import State
+from dynamite.subspaces import Full, Parity
 
 class Checker(ut.TestCase):
 
     def is_close(self, x, y, rtol = 1E-10, atol = 1E-10):
         self.assertTrue(np.isclose(x, y, rtol = rtol, atol = atol),
                         msg = '\n%s\n%s' % (str(x), str(y)))
+
+    def check_all(self, H, evals, evecs, tol = 1E-15):
+        for val, vec in zip(evals, evecs):
+            self.check_is_evec(H, vec, val, tol)
+
+        # check that eigenvectors are orthogonal
+        for ev1, ev2 in itertools.combinations(evecs, 2):
+            self.assertLess(np.abs(ev1.dot(ev2)), tol)
 
     def check_is_evec(self, H, vec, val, tol = 1E-10):
         '''
@@ -77,14 +86,6 @@ class Analytic(Checker):
 
 class Hamiltonians(Checker):
 
-    def check_all(self, H, evals, evecs, tol = 1E-15):
-        for val, vec in zip(evals, evecs):
-            self.check_is_evec(H, vec, val, tol)
-
-        # check that eigenvectors are orthogonal
-        for ev1, ev2 in itertools.combinations(evecs, 2):
-            self.assertLess(np.abs(ev1.dot(ev2)), tol)
-
     def test_all(self):
         for H_name in hamiltonians.__all__:
             with self.subTest(H = H_name):
@@ -93,6 +94,25 @@ class Hamiltonians(Checker):
                 with self.subTest(which = 'smallest'):
                     evals, evecs = H.eigsolve(nev = 5, getvecs = True, tol = 1E-12)
                     self.check_all(H, evals, evecs, tol = 1E-10)
+
+class ParityTests(Checker):
+
+    def test_exceptions(self):
+        H = identity()
+        s = Parity('even')
+        s.L = H.L
+        # TODO: automatically set L somehow?
+
+        H.eigsolve()
+        with self.assertRaises(ValueError):
+            H.eigsolve(subspace=s)
+
+        H.add_subspace(s)
+
+        H.eigsolve()
+        H.eigsolve(subspace=s)
+
+    # TODO: actually check results
 
 if __name__ == '__main__':
     from dynamite import config

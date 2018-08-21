@@ -6,7 +6,7 @@ import unittest as ut
 import numpy as np
 import hamiltonians
 from dynamite.operators import identity, sigmax, sigmay, index_sum, index_product
-from dynamite.subspace import Full, Parity, Auto
+from dynamite.subspaces import Full, Parity, Auto
 from dynamite.states import State
 
 def generate_hamiltonian_tests(cls):
@@ -152,19 +152,19 @@ class Subspaces(MPITestCase):
         self.assertTrue(isinstance(x.subspace, Full))
 
         to_space = identity()
-        to_space.left_subspace = check_subspace
+        to_space.add_subspace(check_subspace, Full())
 
-        H.left_subspace = Full()
-        H.right_subspace = Full()
-        correct_full = H * x
-        correct_sub = to_space * correct_full
+        correct_full = State(subspace=Full())
+        correct_sub = State(subspace=check_subspace)
+        H.dot(x, correct_full)
+        to_space.dot(correct_full, correct_sub)
 
         with self.subTest():
             self.check_f2s(H, x, check_subspace, correct_sub)
-        
+
         with self.subTest():
             self.check_s2f(H, x, check_subspace, correct_sub)
-        
+
         with self.subTest():
             self.check_s2s(H, x, check_subspace, correct_sub)
 
@@ -187,9 +187,9 @@ class Subspaces(MPITestCase):
         '''
         check multiplication from full to subspace
         '''
-        H.right_subspace = Full()
-        H.left_subspace = check_subspace
-        result = H * x
+        H.add_subspace(check_subspace, Full())
+        result = State(subspace=check_subspace)
+        H.dot(x, result)
 
         self.compare_vecs(H, correct, result)
 
@@ -197,30 +197,32 @@ class Subspaces(MPITestCase):
         '''
         check multiplication from subspace to full
         '''
-        H.right_subspace = check_subspace
-        H.left_subspace = Full()
-
+        H.add_subspace(Full(), check_subspace)
         to_space = identity()
-        to_space.left_subspace = check_subspace
+        to_space.add_subspace(check_subspace, Full())
 
-        x_sub = to_space * x
-        result = H * x_sub
-        result_sub = to_space * result
+        sub_state = State(subspace=check_subspace)
+        full_state = State(subspace=Full())
 
-        self.compare_vecs(H, correct, result_sub)
+        to_space.dot(x, sub_state)
+        H.dot(sub_state, full_state)
+        to_space.dot(full_state, sub_state)
+
+        self.compare_vecs(H, correct, sub_state)
 
     def check_s2s(self, H, x, check_subspace, correct):
         '''
         check multiplication from subspace to subspace
         '''
-        H.right_subspace = check_subspace
-        H.left_subspace = check_subspace
-
+        H.add_subspace(check_subspace)
         to_space = identity()
-        to_space.left_subspace = check_subspace
+        to_space.add_subspace(check_subspace, Full())
 
-        x_sub = to_space * x
-        result = H * x_sub
+        x_sub = State(subspace=check_subspace)
+        result = State(subspace=check_subspace)
+
+        to_space.dot(x, x_sub)
+        H.dot(x_sub, result)
 
         self.compare_vecs(H, correct, result)
 
@@ -248,26 +250,6 @@ class Subspaces(MPITestCase):
         sp = Parity('odd')
         self.compare_to_full(H, x, sp)
 
-    def test_multiply_repeat(self):
-        '''
-        This sequence of events triggered a bug caused by needed data being
-        garbage collected. This test ensures that the bug is fixed.
-        '''
-        for space in [1, 2]:
-            with self.subTest(space = space):
-                H = hamiltonians.ising()
-                sp = Auto(H, (1 << (H.L//2))-space)
-                x = State(state = 'random', seed = 0)
-
-                to_space = identity()
-                to_space.left_subspace = sp
-                x = to_space*x
-
-                from_space = identity()
-                from_space.right_subspace = sp
-                x = from_space*x
-                to_space*x
-
     def check_hamiltonian(self, H_name):
         for space in [1, 2]:
             with self.subTest(space = space):
@@ -275,10 +257,11 @@ class Subspaces(MPITestCase):
                 sp = Auto(H, (1 << (H.L//2))-space)
 
                 k = State(subspace = sp, state = 'random', seed = 0)
-                
+
                 from_space = identity()
-                from_space.right_subspace = sp
-                ket = from_space*k
+                from_space.add_subspace(Full(), sp)
+                ket = State(subspace=Full())
+                from_space.dot(k, ket)
 
                 self.compare_to_full(H, ket, sp)
 

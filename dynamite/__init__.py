@@ -145,9 +145,6 @@ class _Config:
         The subspace to use for all operators and states. Can also be set for individual
         operators and states--see :meth:`dynamite.operators.Operator.subspace` for details.
         """
-        if self._subspace is None:
-            from . import subspace
-            self._subspace = subspace.Full()
         return self._subspace
 
     @subspace.setter

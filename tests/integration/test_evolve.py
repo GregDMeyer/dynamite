@@ -5,7 +5,9 @@ from scipy.sparse import linalg
 import hamiltonians
 
 from dynamite import config
-from dynamite.operators import sigmax, index_product
+from dynamite.operators import sigmax, index_product, identity
+from dynamite.states import State
+from dynamite.subspaces import Full, Parity
 
 class Analytic(ut.TestCase):
     '''
@@ -23,28 +25,35 @@ class Analytic(ut.TestCase):
         H.evolve(ket, t = np.pi/2, result = bra)
         self.assertLess(np.abs(1 - np.abs(bra.dot(bra_check))), 1E-9)
 
-class Hamiltonians(ut.TestCase):
+class EvolveChecker(ut.TestCase):
+    def evolve_check(self, H, t):
+        bra, ket = H.create_states()
+        ket.set_random(seed = 0)
 
-    def evolve_all(self, t, skip=set()):
+        H_np = H.to_numpy()
+        ket_np = ket.to_numpy()
+
+        H.evolve(ket, t=t, result=bra)
+        self.assertLess(np.abs(1 - bra.norm()), 1E-9)
+        bra_check = bra.to_numpy()
+
+        if ket_np is not None:
+            bra_np = linalg.expm_multiply(-1j*t*H_np, ket_np)
+            self.assertLess(np.abs(1 - bra_check.dot(bra_np.conj())), 1E-9)
+
+class Hamiltonians(EvolveChecker):
+
+    def evolve_all(self, t, skip=None):
+        if skip is None:
+            skip = set()
+
         for H_name in hamiltonians.__all__:
             if H_name in skip:
                 continue
 
             with self.subTest(H = H_name):
                 H = getattr(hamiltonians, H_name)()
-                bra, ket = H.create_states()
-                ket.set_random(seed = 0)
-
-                H_np = H.to_numpy()
-                ket_np = ket.to_numpy()
-
-                H.evolve(ket, t=t, result=bra)
-                self.assertLess(np.abs(1 - bra.norm()), 1E-9)
-                bra_check = bra.to_numpy()
-
-                if ket_np is not None:
-                    bra_np = linalg.expm_multiply(-1j*t*H_np, ket_np)
-                    self.assertLess(np.abs(1 - bra_check.dot(bra_np.conj())), 1E-9)
+                self.evolve_check(H, t)
 
     def test_zero(self):
         self.evolve_all(0.0)
@@ -58,6 +67,23 @@ class Hamiltonians(ut.TestCase):
         config.L = max(4, config.L - 4)
         self.evolve_all(50.0, skip={'syk'})
         config.L = old_L
+
+class ParityTests(EvolveChecker):
+
+    def test_exceptions(self):
+        H = identity()
+        full_state = State(state=0)
+        sub_state = State(state=0, subspace=Parity('even'))
+
+        H.evolve(full_state, t=1.0)
+        with self.assertRaises(ValueError):
+            H.evolve(sub_state, t=1.0)
+
+        H.add_subspace(Parity('even'))
+        H.evolve(sub_state, t=1.0)
+        H.evolve(full_state, t=1.0)
+
+    # TODO: actually check output
 
 if __name__ == '__main__':
     config.L = 10

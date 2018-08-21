@@ -1,5 +1,5 @@
 
-from . import config, validate
+from . import config, validate, subspaces
 
 import numpy as np
 from os import urandom
@@ -43,7 +43,10 @@ class State:
         self.L = validate.L(L)
 
         if subspace is None:
-            subspace = config.subspace
+            if config.subspace is not None:
+                subspace = config.subspace
+            else:
+                subspace = subspaces.Full()
 
         self._subspace = validate.subspace(subspace)
         self._subspace.L = self.L

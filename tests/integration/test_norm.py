@@ -6,7 +6,7 @@ import unittest as ut
 import numpy as np
 import hamiltonians
 from dynamite import config
-from dynamite.subspace import Full, Parity, Auto
+from dynamite.subspaces import Full, Parity, Auto
 from dynamite._backend.bbuild import have_gpu_shell
 
 class Hamiltonians(ut.TestCase):
