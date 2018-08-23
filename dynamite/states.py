@@ -87,11 +87,10 @@ class State:
         return self._vec
 
     @classmethod
-    def _str_to_idx(cls, s, state_to_idx, L):
+    def str_to_state(cls, s, L):
         '''
-        Convert a string (either a bitstring of type int or a Python string) to
-        a state index. If an int, the binary representation represents the spin
-        configuration (0=↓, 1=↑) of a product state. If a Python string, the characters
+        Convert a string to an integer whose bitwise representation is the spin
+        configuration (0=↓, 1=↑) of a product state. The characters
         'D' and 'U' represent down and up spins, like ``"DUDDU...UDU"`` (D=↓, U=↑).
 
         .. note::
@@ -101,11 +100,7 @@ class State:
         Parameters
         ----------
         s : int or string
-            The state
-
-        state_to_idx : function(int)
-            A function that converts an integer representing a state to the index of
-            the corresponding basis state in the Hilbert space.
+            The state. If an integer is passed, the same integer is returned.
 
         L : int
             The length of the spin chain
@@ -113,7 +108,7 @@ class State:
         Returns
         -------
         int
-            The index in the Hilbert space
+            The state
         '''
 
         if isinstance(s, str):
@@ -134,7 +129,7 @@ class State:
         else:
             raise TypeError('State must be an int or str.')
 
-        return state_to_idx(state)
+        return state
 
     def set_product(self, s):
         """
@@ -155,7 +150,7 @@ class State:
             A representation of the state.
         """
 
-        idx = self._str_to_idx(s, self.subspace.state_to_idx, self.L)
+        idx = self.subspace.state_to_idx(self.str_to_state(s, self.L))
         if idx == -1:
             raise ValueError('Provided initial state not in requested subspace.')
 

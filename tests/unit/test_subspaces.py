@@ -9,7 +9,7 @@ These tests should NOT require MPI.
 
 import unittest as ut
 import numpy as np
-from dynamite.subspaces import Full, Parity
+from dynamite.subspaces import Full, Parity, Auto
 from dynamite._backend.bsubspace import compute_rcm
 from dynamite._backend.bbuild import dnm_int_t
 
@@ -189,8 +189,21 @@ class TestRCM(ut.TestCase):
             self.assertEqual(state_rmap[state_map[i]], i)
 
 class TestAuto(ut.TestCase):
-    # TODO
-    pass
+
+    def test_string_int_state(self):
+        from dynamite.operators import sigmax, sigmay, index_sum
+        H = index_sum(sigmax(0)*sigmax(1) + sigmay(0)*sigmay(1), size=8)
+        sp1 = Auto(H,     'UUDDDDDD')
+        sp2 = Auto(H, int('00000011',2))
+        sp3 = Auto(H, int('11000000',2))
+
+        self.assertEqual(sp1.state, sp2.state)
+        self.assertNotEqual(sp1.state, sp3.state)
+        self.assertNotEqual(sp2.state, sp3.state)
+
+        self.assertEqual(sp1, sp2)
+        self.assertNotEqual(sp1, sp3)
+        self.assertNotEqual(sp2, sp3)
 
 class Checksum(ut.TestCase):
 

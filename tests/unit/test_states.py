@@ -23,21 +23,20 @@ class StrToIdx(ut.TestCase):
     ]
 
     fail_cases = [
-        ('UUFDDD', 6, lambda x: x),     # bad character
-        ('UDDUD',  6, lambda x: x),     # wrong size
-        ('UDDUD',  6, lambda x: np.nan) # not in subspace
+        ('UUFDDD', 6),     # bad character
+        ('UDDUD',  6),     # wrong size
     ]
 
     def test_good(self):
         state_to_idx = lambda x: x+100
         for s, L, c in self.test_cases:
             with self.subTest(s = s):
-                self.assertEqual(State._str_to_idx(s, state_to_idx, L), c)
+                self.assertEqual(state_to_idx(State.str_to_state(s, L)), c)
 
     def test_fail(self):
-        for s, L, s2i in self.fail_cases:
+        for s, L in self.fail_cases:
             with self.assertRaises(ValueError):
-                State._str_to_idx(s, L, s2i)
+                State.str_to_state(s, L)
 
 class SetValues(ut.TestCase):
 

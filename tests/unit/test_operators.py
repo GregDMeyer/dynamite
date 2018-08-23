@@ -12,6 +12,8 @@ import numpy as np
 from dynamite.operators import Operator, sigmax, sigmay, sigmaz, identity, zero
 from dynamite import msc_tools
 
+# TODO: add test: get_length on identity should fail without explicit L
+
 class Fundamental(ut.TestCase):
 
     def check_same(self, dnm, npy):

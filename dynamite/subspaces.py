@@ -9,7 +9,7 @@ import numpy as np
 from copy import deepcopy
 from zlib import crc32
 
-from . import validate, info
+from . import validate, info, states
 from ._backend import bsubspace
 
 def class_to_enum(subspace_type):
@@ -262,9 +262,10 @@ class Auto(Subspace):
     H : dynamite.operators.Operator
         The operator for which this custom subspace will be defined.
 
-    state : int
+    state : int or string
         An integer whose binary representation corresponds to the spin configuration of the "start"
-        state mentioned above.
+        state mentioned above, or string representing the same. See
+        :meth:`dynamite.states.State.str_to_state` for more information.
 
     size_guess : int
         A guess for the dimension of the subspace. By default, memory is allocated for the full
@@ -272,11 +273,12 @@ class Auto(Subspace):
     '''
 
     def __init__(self, H, state, size_guess=None):
-        # TODO: allow string representation for state
 
         Subspace.__init__(self)
 
         self._L = H.get_length()
+
+        self.state = states.State.str_to_state(state, self.L)
 
         if size_guess is None:
             size_guess = 2**H.get_length()
@@ -291,7 +293,7 @@ class Auto(Subspace):
         H.reduce_msc()
 
         dim = bsubspace.compute_rcm(H.msc['masks'], H.msc['signs'], H.msc['coeffs'],
-                                    self.state_map, self.state_rmap, state, H.get_length())
+                                    self.state_map, self.state_rmap, self.state, H.get_length())
 
         self.state_map = self.state_map[:dim]
 
