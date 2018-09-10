@@ -5,9 +5,9 @@ defines their built-in behavior and operations.
 
 import numpy as np
 
-from . import config, validate, info, msc_tools
+from . import config, validate, msc_tools
 from .computations import evolve, eigsolve
-from .subspaces import class_to_enum, Full
+from .subspaces import Full
 from .states import State
 
 class Operator:
@@ -509,9 +509,9 @@ class Operator:
             mask_offsets = np.ascontiguousarray(mask_offsets),
             signs = np.ascontiguousarray(term_array['signs']),
             coeffs = np.ascontiguousarray(term_array['coeffs']),
-            left_type = class_to_enum(type(subspaces[0])),
+            left_type = subspaces[0].to_enum(),
             left_data = subspaces[0].get_cdata(),
-            right_type = class_to_enum(type(subspaces[1])),
+            right_type = subspaces[1].to_enum(),
             right_data = subspaces[1].get_cdata(),
             shell = bpetsc.shell_impl_d[self.shell]
         )

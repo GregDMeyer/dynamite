@@ -5,7 +5,7 @@ from petsc4py.PETSc cimport Vec,  PetscVec
 from petsc4py.PETSc cimport Mat,  PetscMat
 from petsc4py.PETSc cimport Scatter, PetscScatter
 
-from petsc4py.PETSc import Error
+from petsc4py.PETSc import Error, COMM_WORLD
 
 import numpy as np
 cimport numpy as np
@@ -46,11 +46,15 @@ cdef extern from "bpetsc_impl.h":
                  shell_impl shell,
                  PetscMat *A)
 
-    int ReducedDensityMatrix(PetscInt L,
-                             PetscVec x,
-                             PetscInt cut_size,
-                             bint fillall,
-                             np.complex128_t* m)
+    int ReducedDensityMatrix(
+        PetscVec vec,
+        int sub_type,
+        void* sub_data_p,
+        int keep_size,
+        int* keep,
+        bint triang,
+        PetscInt rtn_dim,
+        np.complex128_t* rtn_array)
 
     int PetscMemoryGetCurrentUsage(PetscLogDouble* mem)
     int PetscMallocGetCurrentUsage(PetscLogDouble* mem)
@@ -179,37 +183,22 @@ def get_cur_memory_usage(which='all'):
         raise Error(ierr)
     return mem
 
-@cython.boundscheck(False)
-@cython.wraparound(False)
-def reduced_density_matrix(Vec v,int cut_size,bint fillall=True):
+def reduced_density_matrix(Vec v, subspace_type sub_type, sub_data, int [:] keep, bint triang=True):
 
-    # cut_size: number of spins to include in reduced system
-    # currently, those will be spins 0 to cut_size-1
-    cdef int red_size,ierr,L
-    cdef np.ndarray[np.complex128_t,ndim=2] reduced
-    cdef Vec v0
-    cdef Scatter sc
+    if COMM_WORLD.rank == 0:
+        rtn_np = np.zeros((2**keep.size, 2**keep.size), dtype=np.complex128, order='C')
+    else:
+        # dummy array for the other processes
+        rtn_np = np.array([[-1]], dtype=np.complex128)
 
-    # collect to process 0
-    sc,v0 = Scatter.toZero(v)
-    sc.begin(v,v0)
-    sc.end(v,v0)
+    cdef np.complex128_t [:,:] rtn = rtn_np
+    cdef int ierr
+    cdef void* sub_data_p
 
-    # this function will always return None
-    # on all processes other than 0
-    if v0.getSize() == 0:
-        return None
+    bsubspace.set_data_pointer(sub_type, sub_data, &sub_data_p)
 
-    # get L from the vector's size
-    L = v0.getSize().bit_length() - 1
-
-    red_size = 2**cut_size
-    reduced = np.zeros((red_size,red_size),dtype=np.complex128,order='C')
-
-    # note: eigvalsh only uses one triangle of the matrix, so allow
-    # to only fill half of it
-    ierr = ReducedDensityMatrix(L,v0.vec,cut_size,fillall,&reduced[0,0])
+    ierr = ReducedDensityMatrix(v.vec, sub_type, sub_data_p, keep.size, &keep[0], triang, rtn.shape[0], &rtn[0,0])
     if ierr != 0:
         raise Error(ierr)
 
-    return reduced
+    return rtn_np

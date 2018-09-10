@@ -122,6 +122,7 @@ static inline void I2S_Parity_array(int n, const data_Parity* data, const PetscI
 
 typedef struct _data_Auto
 {
+  PetscInt L;
   PetscInt dim;
   PetscInt rdim;
   PetscInt* state_map;

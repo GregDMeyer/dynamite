@@ -1,6 +1,7 @@
 
 from . import config
 from .states import State
+from .msc_tools import dnm_int_t
 
 import numpy as np
 
@@ -218,16 +219,14 @@ def eigsolve(H, getvecs=False, nev=1, which='smallest', target=None, tol=None, s
     else:
         return evals
 
-def reduced_density_matrix(state,cut_size,fillall=True):
+def reduced_density_matrix(state, keep):
     """
     Compute the reduced density matrix of a state vector by
-    tracing out some set of spins. Currently only supports
-    tracing out a certain number of spins, but not specifying
-    which will be removed. (Spins with indices 0 to cut_size-1
-    are traced out in the current implementation).
+    tracing out some set of spins. The spins to be kept (not traced out)
+    are specified in the ``keep`` array.
 
     The density matrix is returned on process 0, the function
-    returns ``None`` on all other processes.
+    returns a 1x1 matrix containing the value -1 on all other processes.
 
     Parameters
     ----------
@@ -235,15 +234,10 @@ def reduced_density_matrix(state,cut_size,fillall=True):
     state : dynamite.states.State
         A dynamite State object.
 
-    cut_size : int
-        The number of spins to keep. So, for ``cut_size``:math:`=n`,
-        :math:`L-n` spins will be traced out, resulting in a density
-        matrix of dimension :math:`2^n {\\times} 2^n`.
-
-    fillall : bool,optional
-        Whether to fill the whole matrix. Since it will be Hermitian,
-        only the lower triangle is necessary to describe the whole matrix.
-        If this option is set to true, only the lower triangle will be filled.
+    keep : array-like
+        A list of spin indices to keep. Must be sorted. Note that the returned matrix
+        will have dimension :math:`2^{\mathrm{len(keep)}}`, so too long a list will generate
+        a huge matrix.
 
     Returns
     -------
@@ -254,12 +248,30 @@ def reduced_density_matrix(state,cut_size,fillall=True):
     config.initialize()
     from ._backend import bpetsc
 
-    if cut_size != int(cut_size) or not 0 <= cut_size <= state.L:
-        raise ValueError('cut_size must be an integer between 0 and L, inclusive.')
+    keep = np.array(keep, dtype=dnm_int_t)
 
-    return bpetsc.reduced_density_matrix(state.vec, cut_size, fillall=fillall)
+    if keep.size == 0:
+        return np.array([[1]], dtype=np.complex128)
 
-def entanglement_entropy(state,cut_size):
+    for n in range(1, keep.size):
+        if keep[n] <= keep[n-1]:
+            raise ValueError('keep array must be strictly increasing')
+
+    if any(idx < 0 for idx in keep):
+        raise ValueError('spin index less than zero. keep: %s' % str(keep))
+
+    if any(idx > state.L for idx in keep):
+        raise ValueError('spin index greater than spin chain length minus one. keep: %s'
+                         % str(keep))
+
+    dm = bpetsc.reduced_density_matrix(
+        state.vec, state.subspace.to_enum(),
+        state.subspace.get_cdata(), keep
+    )
+
+    return dm
+
+def entanglement_entropy(state, keep):
     """
     Compute the entanglement of a state across some cut on the
     spin chain. To be precise, this is the bipartite entropy of
@@ -267,37 +279,150 @@ def entanglement_entropy(state,cut_size):
 
     Currently, this quantity is computed entirely on process 0.
     As a result, the function returns ``-1`` on all other processes.
-    Ideally, at some point a parallelized dense matrix solver will
-    be used in this computation.
 
     Parameters
     ----------
-
     state : dynamite.states.State
         A dynamite State object.
 
-    cut_size : int
-        The number of spins on one side of the cut. To be precise,
-        the cut will be made between the spins at index ``cut_size-1``
-        and ``cut_size``.
+    keep : array-like
+        A list of spin indices to keep. See :meth:`reduced_density_matrix` for
+        details.
 
     Returns
     -------
-
     float
         The entanglement entropy
     """
 
-    reduced = reduced_density_matrix(state, cut_size, fillall=False)
+    reduced = reduced_density_matrix(state, keep)
 
     # currently everything computed on process 0
-    if reduced is None:
+    if reduced[0,0] == -1:
         return -1
 
-    w = np.linalg.eigvalsh(reduced)
-    EE = -np.sum(w * np.log(w, where=w>0))
+    rtn = dm_entanglement_entropy(reduced)
+    return rtn
 
-    return EE
+def dm_entanglement_entropy(dm):
+    '''
+    Compute the Von Neumann entropy of a density matrix.
+
+    Parameters
+    ----------
+    dm : np.array
+        A density matrix
+
+    Returns
+    -------
+    float
+        The Von Neumann entropy
+    '''
+    w = np.linalg.eigvalsh(dm)
+    rtn = -np.sum(w * np.log(w, where=w>0))
+    return rtn
+
+def renyi_entropy(state, keep, alpha, method='eigsolve'):
+    r"""
+    Compute the Renyi entropy of the density matrix that results from tracing out
+    some spins. The Renyi entropy is
+
+    .. math::
+
+        H_{\alpha} = \frac{1}{1 - \alpha} \log \mathrm{Tr} \left[ \rho ^ \alpha \right]
+
+    Arbitrary non-negative values of ``alpha`` are allowed; in the special cases
+    of :math:`\alpha \in \{ 0, 1 \}` the function is computed in the limit.
+
+    Currently, this quantity is computed entirely on process 0.
+    As a result, the function returns ``-1`` on all other processes.
+
+    Parameters
+    ----------
+    state : dynamite.states.State
+        A dynamite State object.
+
+    keep : array-like
+        A list of spin indices to keep. See :meth:`reduced_density_matrix` for
+        details.
+
+    alpha : float, int, or str
+        The value of :math:`\alpha` from the definition of Renyi entropy.
+
+    method : str, optional
+        Whether to compute the Renyi entropy by solving for eigenvalues, or computing
+        a matrix power and doing a trace. One or the other may be faster depending on the
+        specific problem. Options: ``eigsolve`` or ``matrix_power``.
+
+    Returns
+    -------
+    float
+        The Renyi entropy
+    """
+
+    reduced = reduced_density_matrix(state, keep)
+
+    # currently everything computed on process 0
+    if reduced[0,0] == -1:
+        return -1
+
+    rtn = dm_renyi_entropy(reduced, alpha, method)
+    return rtn
+
+def dm_renyi_entropy(dm, alpha, method='eigsolve'):
+    '''
+    Compute the Renyi entropy of a density matrix. See :meth:`renyi_entropy`
+    for details.
+
+    Parameters
+    ----------
+    dm : np.array
+        A density matrix
+
+    alpha : int, float, or str
+        The value of alpha in the definition of Renyi entropy.
+
+    method : str
+        Whether to compute the Renyi entropy by solving for eigenvalues, or computing
+        a matrix power and doing a trace. One or the other may be faster depending on the
+        specific problem. Options: ``eigsolve`` or ``matrix_power``.
+
+    Returns
+    -------
+    float
+        The Renyi entropy
+    '''
+
+    # special cases
+    if alpha == 0: # H_0 = log|X|
+        eps = 1E-10
+        eigs = np.linalg.eigvalsh(dm)
+        support = np.sum(eigs > eps)
+        return np.log(support)
+
+    elif alpha == 1: # H_1 = Von Neumann entropy
+        return dm_entanglement_entropy(dm)
+
+    elif alpha == 'inf':
+        eigs = np.linalg.eigvalsh(dm)
+        return -np.log(np.max(eigs))
+
+    # compute the trace of rho**alpha
+    if method == 'matrix_power':
+        if alpha == int(alpha):
+            powered = np.linalg.matrix_power(dm, int(alpha))
+        else:
+            raise TypeError('alpha must be an integer for matrix_power method.')
+        trace = np.trace(powered).real
+
+    elif method == 'eigsolve':
+        w = np.linalg.eigvalsh(dm)
+        trace = np.sum(w**alpha)
+
+    else:
+        raise ValueError('Valid methods are "eigsolve" and "matrix_power"')
+
+    return 1/(1-alpha) * np.log(trace)
 
 def get_tstep(ncv,nrm,tol=1E-7):
     """

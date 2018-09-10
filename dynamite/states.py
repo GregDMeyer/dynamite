@@ -123,11 +123,8 @@ class State:
                 if c == 'U':
                     state += 1<<i
 
-        elif isinstance(s, int):
-            state = s
-
         else:
-            raise TypeError('State must be an int or str.')
+            state = int(s)
 
         return state
 

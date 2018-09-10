@@ -19,6 +19,7 @@ cdef extern from "bsubspace_impl.h":
         int space
 
     ctypedef struct data_Auto:
+        int L
         int dim
         int rdim
         int* state_map
@@ -68,7 +69,8 @@ cdef class CParity:
 cdef class CAuto:
     cdef data_Auto data[1]
 
-    def __init__(self, PetscInt [:] state_map, PetscInt [:] state_rmap):
+    def __init__(self, PetscInt L, PetscInt [:] state_map, PetscInt [:] state_rmap):
+        self.data[0].L = L
         self.data[0].dim = state_map.size
         self.data[0].rdim = state_rmap.size
         self.data[0].state_map = &state_map[0]

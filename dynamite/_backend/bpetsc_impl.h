@@ -28,4 +28,13 @@ PetscErrorCode BuildContext(const msc_t *msc,
                             shell_context **ctx_p);
 PetscErrorCode DestroyContext(Mat A);
 
-PetscErrorCode ReducedDensityMatrix(PetscInt L,Vec x,PetscInt cut_size,PetscBool fillall,PetscScalar* m);
+PetscErrorCode ReducedDensityMatrix(
+  Vec vec,
+  PetscInt sub_type,
+  void* sub_data_p,
+  PetscInt keep_size,
+  PetscInt* keep,
+  PetscBool triang,
+  PetscInt rtn_dim,
+  PetscScalar* rtn
+);

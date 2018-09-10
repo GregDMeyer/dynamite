@@ -12,18 +12,6 @@ from zlib import crc32
 from . import validate, info, states
 from ._backend import bsubspace
 
-def class_to_enum(subspace_type):
-    '''
-    Convert the class types used in the Python frontend to the enum values
-    used in the C backend.
-    '''
-    to_enum = {
-        Full   : bsubspace.SubspaceType.FULL,
-        Parity : bsubspace.SubspaceType.PARITY,
-        Auto   : bsubspace.SubspaceType.AUTO,
-    }
-    return to_enum[subspace_type]
-
 class Subspace:
     '''
     Base subspace class.
@@ -124,6 +112,13 @@ class Subspace:
         '''
         raise NotImplementedError()
 
+    def to_enum(self):
+        '''
+        Convert the class types used in the Python frontend to the enum values
+        used in the C backend.
+        '''
+        raise NotImplementedError()
+
 class Full(Subspace):
 
     def __init__(self):
@@ -172,6 +167,13 @@ class Full(Subspace):
     @classmethod
     def _get_cdata(cls, L):
         return bsubspace.CFull(L)
+
+    def to_enum(self):
+        '''
+        Convert the class types used in the Python frontend to the enum values
+        used in the C backend.
+        '''
+        return bsubspace.SubspaceType.FULL
 
 class Parity(Subspace):
     '''
@@ -244,6 +246,13 @@ class Parity(Subspace):
     @classmethod
     def _get_cdata(cls, L, space):
         return bsubspace.CParity(L, space)
+
+    def to_enum(self):
+        '''
+        Convert the class types used in the Python frontend to the enum values
+        used in the C backend.
+        '''
+        return bsubspace.SubspaceType.PARITY
 
 class Auto(Subspace):
     '''
@@ -328,5 +337,15 @@ class Auto(Subspace):
         Returns an object containing the subspace data accessible by the C backend.
         '''
         info.write(2, 'Getting C subspace data for Auto subspace.')
-        return bsubspace.CAuto(np.ascontiguousarray(self.state_map),
-                               np.ascontiguousarray(self.state_rmap))
+        return bsubspace.CAuto(
+            self.L,
+            np.ascontiguousarray(self.state_map),
+            np.ascontiguousarray(self.state_rmap)
+        )
+
+    def to_enum(self):
+        '''
+        Convert the class types used in the Python frontend to the enum values
+        used in the C backend.
+        '''
+        return bsubspace.SubspaceType.AUTO
