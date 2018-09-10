@@ -29,7 +29,7 @@ class Operator:
 
         self._subspaces = [(Full(), Full())]
         if config.subspace is not None:
-            self.add_subspace(config.subspace, config.subspace)
+            self.subspace = config.subspace
 
         self._tex = r'\[\text{operator}\]'
         self._string = '[operator]'
@@ -246,6 +246,10 @@ class Operator:
                              "use Operator.left_subspace and Operator.right_subspace to "
                              "access them individually.")
         return self.left_subspace
+
+    @subspace.setter
+    def subspace(self, value):
+        self.add_subspace(value, value)
 
     def add_subspace(self, left, right=None):
         '''
@@ -464,15 +468,15 @@ class Operator:
         petsc4py.PETSc.Mat
             The PETSc matrix corresponding to the operator.
         """
-
         if subspaces is None:
             subspaces = (self.left_subspace, self.right_subspace)
 
         if subspaces not in self._mats:
             self.build_mat(subspaces, diag_entries=diag_entries)
+            
         return self._mats[subspaces]
 
-    def build_mat(self, subspaces, diag_entries=False):
+    def build_mat(self, subspaces=None, diag_entries=False):
         """
         Build the PETSc matrix, destroying any matrix that has already been built, and
         store it internally. This function does not return the matrix--see
@@ -480,6 +484,9 @@ class Operator:
         by the end user, since it is called automatically whenever the underlying matrix
         needs to be built or rebuilt.
         """
+
+        if subspaces is None:
+            subspaces = (self.left_subspace, self.right_subspace)
 
         if subspaces not in self.get_subspace_list():
             raise ValueError('Attempted to build matrix for a subspace that has not '

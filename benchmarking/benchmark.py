@@ -7,184 +7,226 @@ from itertools import combinations
 from dynamite import config
 from dynamite.states import State
 from dynamite.operators import sigmax, sigmay, sigmaz
-from dynamite.operators import op_sum, op_product, index_sum, load_from_file
-from dynamite.tools import track_memory, get_max_memory_usage
+from dynamite.operators import op_sum, op_product, index_sum
 from dynamite.extras import majorana
-from dynamite.subspace import Parity
+from dynamite.subspaces import Full, Parity, Auto
+from dynamite.tools import track_memory, get_max_memory_usage
+from dynamite.computations import reduced_density_matrix
 
-parser = ap.ArgumentParser(description='Benchmarking test for dynamite.')
+# TODO: write tests for the benchmarks
 
-parser.add_argument('-L', type=int, required=True,
-                    help='Size of the spin chain.')
+# this decorator keeps track of and times function calls
+def log_call(function, stat_dict):
+    fn_name = function.__name__
 
-parser.add_argument('-H', choices=['MBL','long_range','SYK','ising','XX','Load'],
-                    default='MBL', required=True, help='Hamiltonian to use')
-parser.add_argument('--file', help='The file from which to load the operator.')
+    def rtn(*args, **kwargs):
+        if __debug__:
+            Print('beginning', fn_name)
 
-parser.add_argument('-w', type=int, default=1,
-                    help='Magnitude of the disorder for MBL Hamiltonian.')
+        tick = default_timer()
+        rtn_val = function(*args, **kwargs)
+        tock = default_timer()
 
-parser.add_argument('--shell', type=str, default=False,
-                    help='Make a shell matrix instead of a regular matrix.')
-parser.add_argument('--slepc_args', type=str, default='',
-                    help='Arguments to pass to SLEPc.')
-parser.add_argument('--parity', type=int, choices=[0,1], default=-1,
-                    help='Work in a parity subspace.')
+        if __debug__:
+            Print('completed', fn_name)
 
-parser.add_argument('--evolve', action='store_true',
-                    help='Request that the Hamiltonian evolves a state.')
-parser.add_argument('--init_state', type=int, default=0,
-                    help='The initial state for the evolution.')
-parser.add_argument('-t', type=float, default=1.0,
-                    help='The time to evolve for.')
+        stat_dict[fn_name] = tock-tick
 
-parser.add_argument('--mult', action='store_true',
-                    help='Simply multiply the Hamiltonian by a vector.')
-parser.add_argument('--mult_count', type=int, default=1,
-                    help='Number of times to repeat the multiplication.')
+        return rtn_val
 
-parser.add_argument('--norm', action='store_true',
-                    help='Compute the norm of the matrix.')
+    return rtn
 
-parser.add_argument('--eigsolve', action='store_true',
-                    help='Request to solve for eigenvalues of the Hamiltonian.')
-parser.add_argument('--nev', type=int ,default=1,
-                    help='The number of eigenpairs to solve for.')
-parser.add_argument('--target', type=int,
-                    help='The target for a shift-invert eigensolve.')
+def parse_args(argv=None):
 
-args = parser.parse_args()
-slepc_args = args.slepc_args.split(' ')
-config.initialize(slepc_args)
+    parser = ap.ArgumentParser(description='Benchmarking test for dynamite.')
 
-from petsc4py.PETSc import Sys, NormType
-Print = Sys.Print
+    parser.add_argument('-L', type=int, required=True,
+                        help='Size of the spin chain.')
 
-stats = {}
+    parser.add_argument('-H', choices=['MBL','long_range','SYK','ising','XX'],
+                        help='Hamiltonian to use')
 
-# stats = {
-#     'MSC_build_time':None,
-#     'mat_build_time':None,
-#     'mult_time':None,
-#     'evolve_time':None,
-#     'eigsolve_time':None,
-#     'MaxRSS':None,
-# }
+    parser.add_argument('--shell', type=str, default=False,
+                        help='Make a shell matrix instead of a regular matrix.')
+    parser.add_argument('--slepc_args', type=str, default='',
+                        help='Arguments to pass to SLEPc.')
+    parser.add_argument('--track_memory', action='store_true',
+                        help='Whether to compute max memory usage')
 
-#track_memory()
-mem_type = 'all'
+    parser.add_argument('--subspace', choices=['full', 'parity', 'auto'], default='full',
+                        help='Which subspace to use.')
+    parser.add_argument('--which_space', type=str,
+                        help='The particular subspace to use. For parity, options are "even" '
+                        'and "odd", for auto supply a starting state like UUUUDDDD.')
 
-config.L = args.L
+    parser.add_argument('--evolve', action='store_true',
+                        help='Request that the Hamiltonian evolves a state.')
+    parser.add_argument('-t', type=float, default=1.0,
+                        help='The time to evolve for.')
 
-if __debug__:
-    Print('begin building dynamite operator')
-else:
-    Print('---ARGUMENTS---')
-    for k,v in vars(args).items():
-        Print(str(k)+','+str(v))
+    parser.add_argument('--mult', action='store_true',
+                        help='Simply multiply the Hamiltonian by a vector.')
+    parser.add_argument('--mult_count', type=int, default=1,
+                        help='Number of times to repeat the multiplication.')
 
-start = default_timer()
+    parser.add_argument('--norm', action='store_true',
+                        help='Compute the norm of the matrix.')
 
-if args.H == 'MBL':
-    # dipolar interaction
-    H = index_sum(op_sum(s(0)*s(1) for s in (sigmax, sigmay, sigmaz)))
-    # quenched disorder in z direction
-    seed(0)
-    for i in range(args.L):
-        H += uniform(-args.w,args.w) * sigmaz(i)
+    parser.add_argument('--eigsolve', action='store_true',
+                        help='Request to solve for eigenvalues of the Hamiltonian.')
+    parser.add_argument('--nev', type=int ,default=1,
+                        help='The number of eigenpairs to solve for.')
+    parser.add_argument('--target', type=float,
+                        help='The target for a shift-invert eigensolve.')
 
-elif args.H == 'long_range':
-    # long-range ZZ interaction
-    H = op_sum(index_sum(sigmaz(0)*sigmaz(i)) for i in range(1, args.L))
-    # nearest neighbor XX
-    H += 0.5 * index_sum(sigmax(0)*sigmax(1))
-    # some other fields
-    H += sum(0.1*index_sum(s()) for s in [sigmax, sigmay, sigmaz])
+    parser.add_argument('--rdm', action='store_true',
+                        help='Compute a reduced density matrix')
+    parser.add_argument('--keep', type=lambda s: [int(x) for x in s.split(',')],
+                        help='A list of spins, separated by commas, to keep during the '
+                        'RDM computation. By default, the first half are kept.')
 
-elif args.H == 'SYK':
-    seed(0)
+    return parser.parse_args(argv)
 
-    # only compute the majoranas once
-    majoranas = [majorana(i) for i in range(args.L*2)]
+def build_subspace(params, hamiltonian=None):
+    space = params.which_space
 
-    H = op_sum(op_product(majoranas[idx] for idx in idxs).scale(uniform(-1,1))
-               for idxs in combinations(range(args.L*2),4))
+    if params.subspace == 'full':
+        rtn = Full()
 
-elif args.H == 'ising':
-    H = index_sum(sigmaz(0)*sigmaz(1)) + 0.2*index_sum(sigmax())
+    elif params.subspace == 'parity':
+        if space is None:
+            space = 'even'
+        rtn = Parity(space)
 
-elif args.H == 'XX':
-    H = index_sum(sigmax(0)*sigmax(1))
+    elif params.subspace == 'auto':
+        if space is None:
+            half_length = params.L // 2
+            space = 'U'*half_length + 'D'*(params.L - half_length)
+        rtn = Auto(hamiltonian, space)
 
-elif args.H == 'Load':
-    H = load_from_file(args.file)
+    return rtn
 
-else:
-    raise ValueError('Unrecognized Hamiltonian.')
+def build_hamiltonian(params):
 
-if __debug__:
-    Print('nnz:', H.nnz, '\ndensity:', H.density, '\nMSC size:', H.msc_size)
-    Print('dynamite operator built. building PETSc matrix...')
+    if params.H == 'MBL':
+        # dipolar interaction
+        rtn = index_sum(op_sum(s(0)*s(1) for s in (sigmax, sigmay, sigmaz)))
+        # quenched disorder in z direction
+        seed(0)
+        for i in range(params.L):
+            rtn += uniform(-1, 1) * sigmaz(i)
 
-stats['MSC_build_time'] = default_timer() - start
+    elif params.H == 'long_range':
+        # long-range ZZ interaction
+        rtn = op_sum(index_sum(sigmaz(0)*sigmaz(i)) for i in range(1, params.L))
+        # nearest neighbor XX
+        rtn += 0.5 * index_sum(sigmax(0)*sigmax(1))
+        # some other fields
+        rtn += sum(0.1*index_sum(s()) for s in [sigmax, sigmay, sigmaz])
 
-H.shell = args.shell
-if args.parity != -1:
-    H.subspace = Parity(space=args.parity)
+    elif params.H == 'SYK':
+        seed(0)
 
-start = default_timer()
-H.build_mat()
-stats['mat_build_time'] = default_timer() - start
+        # only compute the majoranas once
+        majoranas = [majorana(i) for i in range(params.L*2)]
 
-if __debug__:
-    Print('PETSc matrix built.')
+        rtn = op_sum(op_product(majoranas[idx] for idx in idxs).scale(uniform(-1,1))
+                     for idxs in combinations(range(params.L*2),4))
 
-# compute the norm
-if args.norm:
-    if __debug__:
-        Print('computing norm...')
-    start = default_timer()
-    H.get_mat().norm(NormType.INFINITY)
-    stats['norm_time'] = default_timer() - start
-    if __debug__:
-        Print('norm compute complete.')
+    elif params.H == 'ising':
+        rtn = index_sum(sigmaz(0)*sigmaz(1)) + 0.2*index_sum(sigmax())
 
-if args.eigsolve:
-    if __debug__:
-        Print('beginning eigsolve...')
-    start = default_timer()
-    H.eigsolve(nev=args.nev,target=args.target)
-    stats['eigsolve_time'] = default_timer() - start
-    if __debug__:
-        Print('eigsolve complete.')
+    elif params.H == 'XX':
+        rtn = index_sum(sigmax(0)*sigmax(1))
 
-if args.evolve:
-    if __debug__:
-        Print('beginning evolution...')
-    start = default_timer()
-    s = State(state=args.init_state, subspace = H.subspace)
-    H.evolve(s, t=args.t)
-    stats['evolve_time'] = default_timer() - start
-    if __debug__:
-        Print('evolution complete.')
+    else:
+        raise ValueError('Unrecognized Hamiltonian.')
 
-if args.mult:
-    if __debug__:
-        Print('beginning multiplication...')
-    start = default_timer()
-    s = State(state=args.init_state, subspace = H.subspace)
-    r = s.copy()
-    for _ in range(args.mult_count):
-        H.dot(s,r)
-        H.dot(r,s)
-    stats['mult_time'] = default_timer() - start
-    if __debug__:
-        Print('multiplication complete.')
+    return rtn
 
-H.destroy_mat()
+def compute_norm(hamiltonian):
+    return hamiltonian.get_mat().norm(NormType.INFINITY)
 
-#stats['MaxRSS'] = get_max_memory_usage(mem_type)
+def do_eigsolve(params, hamiltonian):
+    hamiltonian.eigsolve(nev=params.nev,target=params.target)
 
-Print('---RESULTS---')
-for k,v in stats.items():
-    Print(str(k)+','+str(v))
+def do_evolve(params, hamiltonian, state, result):
+    hamiltonian.evolve(state, t=params.t, result=result)
+
+def do_mult(params, hamiltonian, state, result):
+    for _ in range(params.mult_count):
+        hamiltonian.dot(state, result)
+
+def do_rdm(state, keep):
+    reduced_density_matrix(state, keep)
+
+if __name__ == '__main__':
+    arg_params = parse_args()
+    slepc_args = arg_params.slepc_args.split(' ')
+    config.initialize(slepc_args)
+    config.L = arg_params.L
+    config.shell = arg_params.shell
+
+    from petsc4py.PETSc import Sys, NormType
+    Print = Sys.Print
+
+    if not __debug__:
+        Print('---ARGUMENTS---')
+        for k,v in vars(arg_params).items():
+            Print(str(k)+','+str(v))
+
+    if arg_params.track_memory:
+        track_memory()
+
+    stats = {}
+
+    # build our Hamiltonian, if we need it
+    if arg_params.H is not None:
+        H = log_call(build_hamiltonian, stats)(arg_params)
+        if __debug__:
+            Print('nnz:', H.nnz, '\ndensity:', H.density, '\nMSC size:', H.msc_size)
+        log_call(H.build_mat, stats)()
+    else:
+        if (arg_params.subspace == 'auto' or
+                any(getattr(arg_params, x) for x in ['norm', 'eigsolve', 'evolve', 'mult'])):
+            raise ValueError('Must specify Hamiltonian for this benchmark.')
+        H = None
+
+    # build our subspace
+    subspace = log_call(build_subspace, stats)(arg_params, H)
+    if H is not None:
+        H.subspace = subspace
+
+    # build some states to use in the computations
+    in_state = State(L=arg_params.L, subspace=subspace)
+    out_state = State(L=arg_params.L, subspace=subspace)
+    in_state.set_random()
+
+    # compute the norm
+    if arg_params.norm:
+        log_call(compute_norm, stats)(H)
+
+    if arg_params.eigsolve:
+        log_call(do_eigsolve, stats)(arg_params, H)
+
+    if arg_params.evolve:
+        log_call(do_evolve, stats)(arg_params, H, in_state, out_state)
+
+    if arg_params.mult:
+        log_call(do_mult, stats)(arg_params, H, in_state, out_state)
+
+    if arg_params.rdm:
+        keep_idxs = arg_params.keep
+        if keep_idxs is None:
+            keep_idxs = range(0, arg_params.L//2)
+        log_call(do_rdm, stats)(in_state, keep_idxs)
+
+    # trigger memory measurement
+    out_state.vec.destroy()
+
+    if arg_params.track_memory:
+        stats['Gb_memory'] = get_max_memory_usage() / 1E9
+
+    Print('---RESULTS---')
+    for k,v in stats.items():
+        Print('{0}, {1:0.4f}'.format(k, v))
