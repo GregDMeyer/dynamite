@@ -182,6 +182,32 @@ class Sums(ut.TestCase):
                                   (4096, 0, 13),
                                   (16384, 0, 15)])
 
+    def test_large_same(self):
+        dnm = op_sum(sigmaz(0)*sigmaz(k) for k in range(1,5))
+        self.check_same(dnm.msc, [(0, 3, 1),
+                                  (0, 5, 1),
+                                  (0, 9, 1),
+                                  (0, 17, 1)])
+
+    def test_index_sum(self):
+        dnm = op_sum([sigmaz(i)*sigmaz(i+1) for i in range(4)])
+        self.check_same(dnm.msc, [(0, 3, 1),
+                                  (0, 6, 1),
+                                  (0, 12, 1),
+                                  (0, 24, 1)])
+
+    def test_large_repeat_product(self):
+        ops = [op_sum([sigmaz(i)*sigmaz(i+k) for i in range(5-k)]) for k in range(1,5)]
+        dnm = op_sum(op*op for op in ops)
+        self.check_same(dnm.msc, [(0, 0, 10),
+                                  (0, 5,  2),
+                                  (0, 10, 2),
+                                  (0, 20, 2),
+                                  (0, 17, 2),
+                                  (0, 30, 4),
+                                  (0, 15, 4),
+                                  (0, 27, 4)])
+
 class Products(ut.TestCase):
 
     dtype = np.dtype([('masks', np.int32),
