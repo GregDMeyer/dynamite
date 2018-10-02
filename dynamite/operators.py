@@ -473,7 +473,7 @@ class Operator:
 
         if subspaces not in self._mats:
             self.build_mat(subspaces, diag_entries=diag_entries)
-            
+
         return self._mats[subspaces]
 
     def build_mat(self, subspaces=None, diag_entries=False):
@@ -856,9 +856,9 @@ def op_sum(terms, nshow = 3):
 
     .. code:: python
 
-        Sigmax() + Sigmay()
-        op_sum([Sigmax(),Sigmay()])
-        op_sum(s() for s in [Sigmax,Sigmay])
+        sigmax() + sigmay()
+        op_sum([sigmax(), sigmay()])
+        op_sum(s() for s in [sigmax, sigmay])
 
     Parameters
     ----------
@@ -898,12 +898,12 @@ def op_sum(terms, nshow = 3):
 
 def op_product(terms):
     """
-    A product of several operators. Called in same way as :class:`Sum`.
+    A product of several operators. Called in same way as :meth:`op_sum`.
     For example:
 
     .. code:: python
 
-        >>> Sigmax() * Sigmay() == Product([Sigmax(),Sigmay()])
+        >>> sigmax() * sigmay() == op_product([sigmax(), sigmay()])
         True
 
     Parameters
@@ -935,34 +935,13 @@ def op_product(terms):
 
     return o
 
-def all_to_all(ops, n=2, coupling_func=lambda *args: 1):
-    '''
-    Return a sum of all couplings of ``n`` of the operators. For example, with
-    four operators A, B, C, and D, with ``n=2`` this function will return the operator
-    AB + AC + AD + BC + BD + CD. With ``n=3``, it will return ABC + ABD + ACD + BCD.
-
-    Parameters
-    ----------
-    ops : iterable of :class:`dynamite.operators.Operator` objects
-        The operators to couple
-
-    n : int
-        The number of operators per term of the sum
-
-    coupling_func : function(*args)
-        A function of ``n`` index arguments, which returns the coefficient for the term
-        specified by the indices. Called as coupling_func(i, j, ...).
-    '''
-    # TODO: fancy string/tex?
-    raise NotImplementedError()
-
 def index_sum(op, size = None, start = 0, boundary = 'open'):
     """
     Duplicate the operator onto adjacent sites in the spin chain, and sum the resulting
     operators.
     In most cases, ``op`` should have support on site 0 (and possibly others).
 
-    For illustrative examples, see the Examples pages.
+    See the examples for more information.
 
     Parameters
     ----------
@@ -972,7 +951,7 @@ def index_sum(op, size = None, start = 0, boundary = 'open'):
     size : int, optional
         The size of the support of the resulting operator. For open boundary conditions,
         the number of terms in the sum may be smaller than this. If not provided, defaults
-        to the value of :meth:`Operator.L`.
+        to the value of :attr:`Operator.L`.
 
     start : int, optional
         The site for the first operator in the sum.
@@ -1033,8 +1012,8 @@ def index_product(op, size = None, start = 0):
         The operator to translate along the spin chain.
 
     size : int, optional
-        The size of the support of the resulting operator. If omitted, defaults to
-        the spin chain length set by :meth:`Operator.L` or :meth:`dynamite.config.L`.
+        The size of the support of the resulting operator. If not provided, defaults
+        to the value of :attr:`Operator.L`.
 
     start : int, optional
         The site for the first operator in the sum.
@@ -1091,8 +1070,7 @@ def sigmaz(i=0):
 
 def identity():
     """
-    The identity operator. Since it is tensored with identities on all
-    the rest of the sites, the ``index`` argument has no effect.
+    The identity operator.
     """
     o = Operator()
     o.msc = [(0, 0, 1)]
@@ -1103,8 +1081,7 @@ def identity():
 
 def zero():
     """
-    The zero operator---equivalent to a matrix of all zeros of dimension :math:`2^L`.
-    Like for the identity, the ``index`` argument has no effect.
+    The zero operator---equivalent to a matrix of all zeros.
     """
     o = Operator()
     o.msc = []

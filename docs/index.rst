@@ -22,7 +22,7 @@ on moderate size Hilbert spaces (up to :math:`\sim 30` spins or so).
 `Check out dynamite on GitHub! <https://github.com/GregDMeyer/dynamite>`_
 
 .. note::
-    dynamite is in beta! You may, and probably will, find bugs. When you do,
+    dynamite is in beta! You may find bugs. When you do,
     please submit them on the `GitHub Issues <https://github.com/GregDMeyer/dynamite/issues>`_
     page! Additionally, you may want to check you are getting correct answers by
     comparing a small system to output from a different method.
@@ -37,12 +37,6 @@ Features
  - Options such as shell matrices provide customizability and access to
    extremely large Hilbert spaces
 
-Coming Soon
------------
- - Chains of d-level systems
- - Reduce Hilbert space for Hamiltonians that conserve total spin
- - Built-in computation of states' reduced density matrix and entanglement entropy
-
 .. toctree::
    :maxdepth: 2
    :caption: Contents:
@@ -52,4 +46,4 @@ Coming Soon
    FAQ.rst
    dynamite.rst
 
-This package was created by Greg Meyer in `Prof. Norman Yao's lab <https://quantumoptics.physics.berkeley.edu/>`_ at UC Berkeley. Special thanks also to Francisco Machado for contributing helpful ideas.
+This package was created by Greg Meyer in `Prof. Norman Yao's lab <https://quantumoptics.physics.berkeley.edu/>`_ at UC Berkeley.

@@ -10,7 +10,7 @@ these functions. For example:
     from dynamite import config
 
     config.initialize(['-mfn_ncv','20'])
-    config.global_L = 24
+    config.L = 24
 
 .. autoclass:: dynamite._Config
     :members:

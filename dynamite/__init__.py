@@ -121,9 +121,8 @@ class _Config:
     @property
     def shell(self):
         """
-        Whether to use shell matrices everywhere (True), or to use standard
-        PETSc matrices (False, default). Experimental support for GPU shell matrices ('gpu')
-        is also included if the package could find a CUDA compiler during build.
+        Whether to use standard PETSc matrices (``False``, default), shell matrices
+        on the CPU (``cpu``) or on the GPU (``gpu``).
         """
         return self._shell
 
@@ -143,7 +142,7 @@ class _Config:
     def subspace(self):
         """
         The subspace to use for all operators and states. Can also be set for individual
-        operators and states--see :meth:`dynamite.operators.Operator.subspace` for details.
+        operators and states--see :attr:`dynamite.operators.Operator.subspace` for details.
         """
         return self._subspace
 
@@ -154,9 +153,7 @@ class _Config:
     @property
     def info_level(self):
         """
-        How verbose to output debug information. Default is 0. Currently, options are:
-        0 - no information output about execution
-        1 - all debug information printed
+        How verbose to output debug information.
         """
         return self._info_level
 

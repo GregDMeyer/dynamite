@@ -71,7 +71,7 @@ class State:
         """
         The space on which the vector is defined.
 
-        See :module:`dynamite.subspace` for details.
+        See :mod:`dynamite.subspaces` for details.
         """
         return self._subspace
 
