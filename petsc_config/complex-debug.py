@@ -10,29 +10,28 @@ You may want to pipe to "less"; it is a big help page ;)
 
 configure_options = [
 
-  # a name for this PETSc build. Feel free to name it whatever you want, so that
-  # you can keep track of multiple builds.
-  '--with-petsc-arch=complex-debug',
+    # use native complex numbers for scalars. currently required for dynamite.
+    '--with-scalar-type=complex',
 
-  # use native complex numbers for scalars. currently required for dynamite.
-  '--with-scalar-type=complex',
+    # download extra packages for shift-invert eigensolving (solving for the middle
+    # of the spectrum). not required if you won't use that feature
+    #'--with-scalapack', # if you already have scalapack installed
+    '--download-scalapack',
+    '--download-mumps',
 
-  # download extra packages for shift-invert eigensolving (solving for the middle
-  # of the spectrum). not required if you won't use that feature
-  #'--with-scalapack', # if you already have scalapack installed
-  '--download-scalapack',
-  '--download-mumps',
+    # required to work with spin chains larger than 31 spins
+    #'--use-64-bit-indices',
 
-  # required to work with spin chains larger than 31 spins
-  #'--use-64-bit-indices',
+    # uncomment if you don't have an MPI implementation already installed
+    #'--download-mpich',
 
-  # uncomment if you don't have an MPI implementation already installed
-  #'--download-mpich',
-
-  ]
+]
 
 if __name__ == '__main__':
-  import sys, os
-  sys.path.insert(0, os.path.abspath('config'))
-  import configure
-  configure.petsc_configure(configure_options)
+    import sys
+    import os
+    sys.path.insert(0, os.path.abspath('config'))
+    import configure
+
+    configure_options += sys.argv[1:]
+    configure.petsc_configure(configure_options)
