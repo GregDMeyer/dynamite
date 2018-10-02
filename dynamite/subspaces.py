@@ -261,10 +261,8 @@ class Auto(Subspace):
     as an adjacency matrix. The subspace is defined by providing a "start" state; the returned
     subspace will be whatever subspace contains that state.
 
-    This class can provide scalability advantages over the other subspace classes, because it uses
-    Cuthill-McKee ordering to reduce the bandwidth of the matrix, reducing the amount of
-    communication required between MPI nodes. However, currently the actual computation of the
-    ordering only can occur on process 0.
+    Currently the actual computation of the ordering only can occur on process 0, limiting
+    the scalability of this subspace.
 
     Parameters
     ----------
@@ -279,9 +277,13 @@ class Auto(Subspace):
     size_guess : int
         A guess for the dimension of the subspace. By default, memory is allocated for the full
         space, and then trimmed off if not used.
+
+    sort : bool
+        Whether to reorder the mapping after computing it. In some cases this may
+        cause a speedup.
     '''
 
-    def __init__(self, H, state, size_guess=None):
+    def __init__(self, H, state, size_guess=None, sort=True):
 
         Subspace.__init__(self)
 
@@ -305,6 +307,13 @@ class Auto(Subspace):
                                     self.state_map, self.state_rmap, self.state, H.get_length())
 
         self.state_map = self.state_map[:dim]
+
+        if sort:
+            self.state_map.sort()
+
+            # regenerate the rmap to be correct
+            self.state_rmap[:] = -1
+            self.state_rmap[self.state_map] = np.arange(self.state_map.size)
 
     def check_L(self, value):
         if value != self.L:

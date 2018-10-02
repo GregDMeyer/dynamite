@@ -15,27 +15,6 @@ from dynamite.computations import reduced_density_matrix
 
 # TODO: write tests for the benchmarks
 
-# this decorator keeps track of and times function calls
-def log_call(function, stat_dict):
-    fn_name = function.__name__
-
-    def rtn(*args, **kwargs):
-        if __debug__:
-            Print('beginning', fn_name)
-
-        tick = default_timer()
-        rtn_val = function(*args, **kwargs)
-        tock = default_timer()
-
-        if __debug__:
-            Print('completed', fn_name)
-
-        stat_dict[fn_name] = tock-tick
-
-        return rtn_val
-
-    return rtn
-
 def parse_args(argv=None):
 
     parser = ap.ArgumentParser(description='Benchmarking test for dynamite.')
@@ -53,7 +32,8 @@ def parse_args(argv=None):
     parser.add_argument('--track_memory', action='store_true',
                         help='Whether to compute max memory usage')
 
-    parser.add_argument('--subspace', choices=['full', 'parity', 'auto'], default='full',
+    parser.add_argument('--subspace', choices=['full', 'parity', 'auto', 'nosortauto'],
+                        default='full',
                         help='Which subspace to use.')
     parser.add_argument('--which_space', type=str,
                         help='The particular subspace to use. For parity, options are "even" '
@@ -98,11 +78,11 @@ def build_subspace(params, hamiltonian=None):
             space = 'even'
         rtn = Parity(space)
 
-    elif params.subspace == 'auto':
+    elif params.subspace in ['auto','nosortauto']:
         if space is None:
             half_length = params.L // 2
             space = 'U'*half_length + 'D'*(params.L - half_length)
-        rtn = Auto(hamiltonian, space)
+        rtn = Auto(hamiltonian, space, sort=params.subspace=='auto')
 
     return rtn
 
@@ -145,6 +125,8 @@ def build_hamiltonian(params):
     return rtn
 
 def compute_norm(hamiltonian):
+    config.initialize()
+    from petsc4py.PETSc import NormType
     return hamiltonian.get_mat().norm(NormType.INFINITY)
 
 def do_eigsolve(params, hamiltonian):
@@ -160,14 +142,39 @@ def do_mult(params, hamiltonian, state, result):
 def do_rdm(state, keep):
     reduced_density_matrix(state, keep)
 
-if __name__ == '__main__':
+# this decorator keeps track of and times function calls
+def log_call(function, stat_dict):
+    config.initialize()
+    from petsc4py.PETSc import Sys
+    Print = Sys.Print
+
+    fn_name = function.__name__
+
+    def rtn(*args, **kwargs):
+        if __debug__:
+            Print('beginning', fn_name)
+
+        tick = default_timer()
+        rtn_val = function(*args, **kwargs)
+        tock = default_timer()
+
+        if __debug__:
+            Print('completed', fn_name)
+
+        stat_dict[fn_name] = tock-tick
+
+        return rtn_val
+
+    return rtn
+
+def main():
     arg_params = parse_args()
     slepc_args = arg_params.slepc_args.split(' ')
     config.initialize(slepc_args)
     config.L = arg_params.L
     config.shell = arg_params.shell
 
-    from petsc4py.PETSc import Sys, NormType
+    from petsc4py.PETSc import Sys
     Print = Sys.Print
 
     if not __debug__:
@@ -185,7 +192,6 @@ if __name__ == '__main__':
         H = log_call(build_hamiltonian, stats)(arg_params)
         if __debug__:
             Print('nnz:', H.nnz, '\ndensity:', H.density, '\nMSC size:', H.msc_size)
-        log_call(H.build_mat, stats)()
     else:
         if (arg_params.subspace == 'auto' or
                 any(getattr(arg_params, x) for x in ['norm', 'eigsolve', 'evolve', 'mult'])):
@@ -196,6 +202,7 @@ if __name__ == '__main__':
     subspace = log_call(build_subspace, stats)(arg_params, H)
     if H is not None:
         H.subspace = subspace
+        log_call(H.build_mat, stats)()
 
     # build some states to use in the computations
     in_state = State(L=arg_params.L, subspace=subspace)
@@ -230,3 +237,6 @@ if __name__ == '__main__':
     Print('---RESULTS---')
     for k,v in stats.items():
         Print('{0}, {1:0.4f}'.format(k, v))
+
+if __name__ == '__main__':
+    main()

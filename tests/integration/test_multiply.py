@@ -252,18 +252,20 @@ class Subspaces(MPITestCase):
 
     def check_hamiltonian(self, H_name):
         for space in [1, 2]:
-            with self.subTest(space = space):
-                H = getattr(hamiltonians, H_name)()
-                sp = Auto(H, (1 << (H.L//2))-space)
+            for sort in [True, False]:
+                with self.subTest(space=space):
+                    with self.subTest(sort=sort):
+                        H = getattr(hamiltonians, H_name)()
+                        sp = Auto(H, (1 << (H.L//2))-space)
 
-                k = State(subspace = sp, state = 'random', seed = 0)
+                        k = State(subspace = sp, state = 'random', seed = 0)
 
-                from_space = identity()
-                from_space.add_subspace(Full(), sp)
-                ket = State(subspace=Full())
-                from_space.dot(k, ket)
+                        from_space = identity()
+                        from_space.add_subspace(Full(), sp)
+                        ket = State(subspace=Full())
+                        from_space.dot(k, ket)
 
-                self.compare_to_full(H, ket, sp)
+                        self.compare_to_full(H, ket, sp)
 
     # TODO: write tests for multiplication from one subspace to a different one
 
