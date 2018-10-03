@@ -131,6 +131,9 @@ class Full(Subspace):
 
         return Subspace.__eq__(self, s)
 
+    # overriding __eq__ causes this to get unset. :(
+    __hash__ = Subspace.__hash__
+
     def get_dimension(self):
         """
         Get the dimension of the subspace.
