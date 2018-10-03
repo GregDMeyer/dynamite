@@ -124,6 +124,13 @@ class Full(Subspace):
     def __init__(self):
         Subspace.__init__(self)
 
+    # Full is a special case
+    def __eq__(self, s):
+        if isinstance(s, Full):
+            return s.L == self.L
+
+        return Subspace.__eq__(self, s)
+
     def get_dimension(self):
         """
         Get the dimension of the subspace.
