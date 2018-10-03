@@ -73,9 +73,13 @@ PetscErrorCode CopySubspaceData_CUDA_Auto(data_Auto** out_p, const data_Auto* in
   err = cudaMemcpy(cpu_data.state_map, in->state_map,
     sizeof(PetscInt)*in->dim, cudaMemcpyHostToDevice);CHKERRCUDA(err);
 
-  err = cudaMalloc(&(cpu_data.state_rmap), sizeof(PetscInt)*in->rdim);CHKERRCUDA(err);
-  err = cudaMemcpy(cpu_data.state_rmap, in->state_rmap,
-    sizeof(PetscInt)*in->rdim, cudaMemcpyHostToDevice);CHKERRCUDA(err);
+  err = cudaMalloc(&(cpu_data.rmap_indices), sizeof(PetscInt)*in->dim);CHKERRCUDA(err);
+  err = cudaMemcpy(cpu_data.rmap_indices, in->rmap_indices,
+    sizeof(PetscInt)*in->dim, cudaMemcpyHostToDevice);CHKERRCUDA(err);
+
+  err = cudaMalloc(&(cpu_data.rmap_states), sizeof(PetscInt)*in->dim);CHKERRCUDA(err);
+  err = cudaMemcpy(cpu_data.rmap_states, in->rmap_states,
+    sizeof(PetscInt)*in->dim, cudaMemcpyHostToDevice);CHKERRCUDA(err);
 
   err = cudaMalloc((void **) out_p, sizeof(data_Auto));CHKERRCUDA(err);
   err = cudaMemcpy(*out_p, &cpu_data, sizeof(data_Auto), cudaMemcpyHostToDevice);CHKERRCUDA(err);
@@ -91,15 +95,33 @@ PetscErrorCode DestroySubspaceData_CUDA_Auto(data_Auto* data) {
   err = cudaMemcpy(&cpu_data, data, sizeof(data_Auto), cudaMemcpyDeviceToHost);CHKERRCUDA(err);
 
   err = cudaFree(cpu_data.state_map);CHKERRCUDA(err);
-  err = cudaFree(cpu_data.state_rmap);CHKERRCUDA(err);
+  err = cudaFree(cpu_data.rmap_indices);CHKERRCUDA(err);
+  err = cudaFree(cpu_data.rmap_states);CHKERRCUDA(err);
   err = cudaFree(data);CHKERRCUDA(err);
   return 0;
 }
 
-/* this is really not well suited for GPUs */
+/* TODO: this is really not well suited for GPUs */
 /* but I bet we can do something clever! */
 __device__ PetscInt S2I_CUDA_Auto(PetscInt state, const data_Auto* data) {
-  return data->state_rmap[state];
+  PetscInt left, right, mid;
+  left = 0;
+  right = data->dim;
+  while (left <= right) {
+    mid = left + (right-left)/2;
+    if (data->rmap_states[mid] == state) {
+      return data->rmap_indices[mid];
+    }
+
+    if (data->rmap_states[mid] < state) {
+      left = mid + 1;
+    }
+    else {
+      right = mid - 1;
+    }
+  }
+  /* element was not in the array */
+  return -1;
 }
 
 __device__ PetscInt I2S_CUDA_Auto(PetscInt idx, const data_Auto* data) {

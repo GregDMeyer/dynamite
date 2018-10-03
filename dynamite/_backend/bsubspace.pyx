@@ -23,7 +23,8 @@ cdef extern from "bsubspace_impl.h":
         int dim
         int rdim
         int* state_map
-        int* state_rmap
+        int* rmap_indices
+        int* rmap_states
 
     ctypedef enum subspace_type:
         _FULL "FULL"
@@ -69,12 +70,18 @@ cdef class CParity:
 cdef class CAuto:
     cdef data_Auto data[1]
 
-    def __init__(self, PetscInt L, PetscInt [:] state_map, PetscInt [:] state_rmap):
+    def __init__(
+            self,
+            PetscInt L,
+            PetscInt [:] state_map,
+            PetscInt [:] rmap_indices,
+            PetscInt [:] rmap_states
+        ):
         self.data[0].L = L
         self.data[0].dim = state_map.size
-        self.data[0].rdim = state_rmap.size
         self.data[0].state_map = &state_map[0]
-        self.data[0].state_rmap = &state_rmap[0]
+        self.data[0].rmap_indices = &rmap_indices[0]
+        self.data[0].rmap_states = &rmap_states[0]
 
 #####
 
@@ -153,13 +160,14 @@ def state_to_idx_Auto(PetscInt [:] states, CAuto data):
 cdef extern int __builtin_parity(unsigned int x)
 
 def compute_rcm(PetscInt [:] masks, PetscInt [:] signs, np.complex128_t [:] coeffs,
-                PetscInt [:] state_map, PetscInt [:] state_rmap, PetscInt start,
-                PetscInt L):
+                PetscInt [:] state_map, PetscInt start, PetscInt L):
 
     cdef PetscInt full_dim = 2**L
     cdef PetscInt nnz = len(np.unique(masks))
     cdef PetscInt map_idx, i, msc_idx, cur_mask, edge, sign
     cdef np.complex128_t tot_coeff
+
+    state_rmap = {}
 
     map_idx = 0
     state_map[map_idx] = start
@@ -181,7 +189,7 @@ def compute_rcm(PetscInt [:] masks, PetscInt [:] signs, np.complex128_t [:] coef
 
             if (msc_idx+1 == masks.size or masks[msc_idx+1] != cur_mask):
                 edge = state ^ cur_mask
-                if state_rmap[edge] == -1 and tot_coeff != 0:
+                if edge not in state_rmap and tot_coeff != 0:
                     if map_idx >= state_map.size:
                         raise RuntimeError('state_map size too small')
                     state_map[map_idx] = edge

@@ -296,24 +296,18 @@ class Auto(Subspace):
 
         self.state_map = np.ndarray((size_guess,), dtype=bsubspace.dnm_int_t)
 
-        # TODO: use some sort of custom hash table for this data structure?
-        # python's dict won't work because it's not vectorized, and too slow anyway
-        self.state_rmap = np.ndarray((2**H.get_length(),), dtype=bsubspace.dnm_int_t)
-        self.state_rmap[:] = -1
-
         H.reduce_msc()
 
         dim = bsubspace.compute_rcm(H.msc['masks'], H.msc['signs'], H.msc['coeffs'],
-                                    self.state_map, self.state_rmap, self.state, H.get_length())
+                                    self.state_map, self.state, H.get_length())
 
         self.state_map = self.state_map[:dim]
 
+        self.rmap_indices = np.argsort(self.state_map).astype(bsubspace.dnm_int_t, copy=False)
+        self.rmap_states = self.state_map[self.rmap_indices]
         if sort:
-            self.state_map.sort()
-
-            # regenerate the rmap to be correct
-            self.state_rmap[:] = -1
-            self.state_rmap[self.state_map] = np.arange(self.state_map.size)
+            self.state_map = self.rmap_states
+            self.rmap_indices = np.arange(self.state_map.size, dtype=bsubspace.dnm_int_t)
 
     def check_L(self, value):
         if value != self.L:
@@ -349,7 +343,8 @@ class Auto(Subspace):
         return bsubspace.CAuto(
             self.L,
             np.ascontiguousarray(self.state_map),
-            np.ascontiguousarray(self.state_rmap)
+            np.ascontiguousarray(self.rmap_indices),
+            np.ascontiguousarray(self.rmap_states)
         )
 
     def to_enum(self):

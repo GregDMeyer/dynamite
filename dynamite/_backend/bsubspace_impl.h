@@ -124,9 +124,9 @@ typedef struct _data_Auto
 {
   PetscInt L;
   PetscInt dim;
-  PetscInt rdim;
   PetscInt* state_map;
-  PetscInt* state_rmap;
+  PetscInt* rmap_indices;
+  PetscInt* rmap_states;
 } data_Auto;
 
 static inline PetscErrorCode CopySubspaceData_Auto(data_Auto** out_p, const data_Auto* in) {
@@ -136,8 +136,12 @@ static inline PetscErrorCode CopySubspaceData_Auto(data_Auto** out_p, const data
 
   ierr = PetscMalloc1(in->dim, &((*out_p)->state_map));CHKERRQ(ierr);
   ierr = PetscMemcpy((*out_p)->state_map, in->state_map, in->dim*sizeof(PetscInt));CHKERRQ(ierr);
-  ierr = PetscMalloc1(in->rdim, &((*out_p)->state_rmap));CHKERRQ(ierr);
-  ierr = PetscMemcpy((*out_p)->state_rmap, in->state_rmap, in->rdim*sizeof(PetscInt));CHKERRQ(ierr);
+
+  ierr = PetscMalloc1(in->dim, &((*out_p)->rmap_indices));CHKERRQ(ierr);
+  ierr = PetscMemcpy((*out_p)->rmap_indices, in->rmap_indices, in->dim*sizeof(PetscInt));CHKERRQ(ierr);
+
+  ierr = PetscMalloc1(in->dim, &((*out_p)->rmap_states));CHKERRQ(ierr);
+  ierr = PetscMemcpy((*out_p)->rmap_states, in->rmap_states, in->dim*sizeof(PetscInt));CHKERRQ(ierr);
 
   return ierr;
 }
@@ -145,7 +149,8 @@ static inline PetscErrorCode CopySubspaceData_Auto(data_Auto** out_p, const data
 static inline PetscErrorCode DestroySubspaceData_Auto(data_Auto* data) {
   PetscErrorCode ierr;
   ierr = PetscFree(data->state_map);CHKERRQ(ierr);
-  ierr = PetscFree(data->state_rmap);CHKERRQ(ierr);
+  ierr = PetscFree(data->rmap_indices);CHKERRQ(ierr);
+  ierr = PetscFree(data->rmap_states);CHKERRQ(ierr);
   ierr = PetscFree(data);CHKERRQ(ierr);
   return ierr;
 }
@@ -155,7 +160,25 @@ static inline PetscInt Dim_Auto(const data_Auto* data) {
 }
 
 static inline PetscInt S2I_Auto(PetscInt state, const data_Auto* data) {
-  return data->state_rmap[state];
+  /* do a binary search on rmap_states */
+  PetscInt left, right, mid;
+  left = 0;
+  right = data->dim;
+  while (left <= right) {
+    mid = left + (right-left)/2;
+    if (data->rmap_states[mid] == state) {
+      return data->rmap_indices[mid];
+    }
+
+    if (data->rmap_states[mid] < state) {
+      left = mid + 1;
+    }
+    else {
+      right = mid - 1;
+    }
+  }
+  /* element was not in the array */
+  return -1;
 }
 
 static inline PetscInt I2S_Auto(PetscInt idx, const data_Auto* data) {
