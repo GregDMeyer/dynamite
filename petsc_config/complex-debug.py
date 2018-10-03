@@ -20,7 +20,7 @@ configure_options = [
     '--download-mumps',
 
     # required to work with spin chains larger than 31 spins
-    #'--use-64-bit-indices',
+    #'--with-64-bit-indices',
 
     # uncomment if you don't have an MPI implementation already installed
     #'--download-mpich',
