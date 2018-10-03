@@ -69,9 +69,7 @@ class UnaryBinary(ut.TestCase):
     Check the unary and binary operator methods.
     '''
 
-    dtype = np.dtype([('masks', np.int32),
-                      ('signs', np.int32),
-                      ('coeffs', np.complex128)])
+    dtype = msc_tools.msc_dtype
 
     def check_same_msc(self, check, target):
         check = msc_tools.combine_and_sort(check)
@@ -141,9 +139,7 @@ from dynamite.operators import op_sum, op_product
 
 class Sums(ut.TestCase):
 
-    dtype = np.dtype([('masks', np.int32),
-                      ('signs', np.int32),
-                      ('coeffs', np.complex128)])
+    dtype = msc_tools.msc_dtype
 
     def check_same(self, check, target):
         check = msc_tools.combine_and_sort(check)
@@ -210,9 +206,7 @@ class Sums(ut.TestCase):
 
 class Products(ut.TestCase):
 
-    dtype = np.dtype([('masks', np.int32),
-                      ('signs', np.int32),
-                      ('coeffs', np.complex128)])
+    dtype = msc_tools.msc_dtype
 
     def check_same(self, check, target):
         check = msc_tools.combine_and_sort(check)
@@ -247,9 +241,7 @@ class IndexSum(ut.TestCase):
     Tests for the index_sum function.
     '''
 
-    dtype = np.dtype([('masks', np.int32),
-                      ('signs', np.int32),
-                      ('coeffs', np.complex128)])
+    dtype = msc_tools.msc_dtype
 
     def check_same(self, check, target):
         check = msc_tools.combine_and_sort(check)
@@ -337,9 +329,7 @@ class IndexProduct(ut.TestCase):
     Tests for the index_product function.
     '''
 
-    dtype = np.dtype([('masks', np.int32),
-                      ('signs', np.int32),
-                      ('coeffs', np.complex128)])
+    dtype = msc_tools.msc_dtype
 
     def check_same(self, check, target):
         check = msc_tools.combine_and_sort(check)

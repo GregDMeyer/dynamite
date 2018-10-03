@@ -102,7 +102,7 @@ PetscErrorCode C(BuildPetsc,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
       /* sum all terms for this matrix element */
       value = 0;
       for (term_idx = msc->mask_offsets[mask_idx]; term_idx < msc->mask_offsets[mask_idx+1]; ++term_idx) {
-        sign = 1 - 2*(__builtin_parity(bra & msc->signs[term_idx]));
+        sign = 1 - 2*(builtin_parity(bra & msc->signs[term_idx]));
         value += sign * msc->coeffs[term_idx];
       }
 
@@ -116,10 +116,10 @@ PetscErrorCode C(BuildPetsc,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
 
     /* workaround for a bug in PETSc that triggers if there are empty rows */
     if (row_count == 0) {
-      ierr = MatSetValue(*A, row_idx, col_start, 0, INSERT_VALUES);CHKERRQ(ierr);    
+      ierr = MatSetValue(*A, row_idx, col_start, 0, INSERT_VALUES);CHKERRQ(ierr);
     }
   }
-  
+
   ierr = MatAssemblyBegin(*A,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
   ierr = MatAssemblyEnd(*A,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
 
@@ -295,7 +295,7 @@ PetscErrorCode C(MatDestroyCtx_CPU,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A)
 PetscErrorCode C(MatMult_CPU,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, Vec x, Vec b)
 {
   PetscErrorCode ierr;
-  PetscInt mpi_size, mpi_rank;
+  int mpi_size, mpi_rank;
   MPI_Request send_request, recv_request;
   PetscInt x_size, x_local_size, max_proc_size, *x_local_sizes, *x_local_starts;
   PetscInt block_start, row_start, row_end, col_start, col_end;
@@ -445,7 +445,7 @@ void C(MatMult_CPU_kernel,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
       /* sum all terms for this matrix element */
       value = 0;
       for (term_idx = ctx->mask_offsets[mask_idx]; term_idx < ctx->mask_offsets[mask_idx+1]; ++term_idx) {
-        sign = 1 - 2*(__builtin_parity(bra & ctx->signs[term_idx]));
+        sign = 1 - 2*(builtin_parity(bra & ctx->signs[term_idx]));
         if (TERM_REAL(ctx->masks[mask_idx], ctx->signs[term_idx])) {
           value += sign * ctx->real_coeffs[term_idx];
         } else {
@@ -508,7 +508,7 @@ PetscErrorCode C(MatNorm_CPU,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
       for (term_idx = ctx->mask_offsets[mask_idx];
            term_idx < ctx->mask_offsets[mask_idx+1];
            ++term_idx) {
-        sign = 1 - 2*(__builtin_parity(bra & ctx->signs[term_idx]));
+        sign = 1 - 2*(builtin_parity(bra & ctx->signs[term_idx]));
         if (TERM_REAL(ctx->masks[mask_idx], ctx->signs[term_idx])) {
           csum += sign * ctx->real_coeffs[term_idx];
         }

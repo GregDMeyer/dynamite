@@ -5,8 +5,6 @@ Unit tests for subspace.py.
 These tests should NOT require MPI.
 '''
 
-# TODO: change dtypes to correct values
-
 import unittest as ut
 import numpy as np
 from dynamite.subspaces import Full, Parity, Auto
@@ -26,8 +24,8 @@ class TestFull(ut.TestCase):
                 self.assertEqual(Full._get_dimension(L), dim)
 
     def test_mapping_single(self):
-        self.assertEqual(Full._idx_to_state(np.array(10, dtype=np.int32), 5), 10)
-        self.assertEqual(Full._state_to_idx(np.array(10, dtype=np.int32), 5), 10)
+        self.assertEqual(Full._idx_to_state(np.array(10, dtype=dnm_int_t), 5), 10)
+        self.assertEqual(Full._state_to_idx(np.array(10, dtype=dnm_int_t), 5), 10)
 
     def test_mapping_array(self):
         L = 10
@@ -53,23 +51,23 @@ class TestParity(ut.TestCase):
                 self.assertEqual(Parity._get_dimension(L, 1), dim)
 
     def test_mapping_single(self):
-        s = Parity._idx_to_state(np.array([5], dtype=np.int32), 5, 0)
+        s = Parity._idx_to_state(np.array([5], dtype=dnm_int_t), 5, 0)
         self.assertEqual(s, int('00101', 2))
 
         i = Parity._state_to_idx(s, 5, 0)
         self.assertEqual(i, 5)
 
-        s = Parity._idx_to_state(np.array([7], dtype=np.int32), 5, 0)
+        s = Parity._idx_to_state(np.array([7], dtype=dnm_int_t), 5, 0)
         self.assertEqual(s, int('10111', 2))
 
         i = Parity._state_to_idx(s, 5, 0)
         self.assertEqual(i, 7)
 
     def test_mapping_invalid_s2i(self):
-        i = Parity._state_to_idx(np.array([int('01011',2)], dtype=np.int32), 5, 0)
+        i = Parity._state_to_idx(np.array([int('01011',2)], dtype=dnm_int_t), 5, 0)
         self.assertEqual(i, -1)
 
-        i = Parity._state_to_idx(np.array([int('01010',2)], dtype=np.int32), 5, 1)
+        i = Parity._state_to_idx(np.array([int('01010',2)], dtype=dnm_int_t), 5, 1)
         self.assertEqual(i, -1)
 
     def test_mapping_array(self):
@@ -104,10 +102,10 @@ class TestParity(ut.TestCase):
             with self.subTest(parity = p):
                 correct = np.array(
                     [int(x,2) for x in correct_states[p]],
-                    dtype = np.int32
+                    dtype = dnm_int_t
                 )
 
-                states = Parity._idx_to_state(np.arange(len(correct), dtype=np.int32), L, p)
+                states = Parity._idx_to_state(np.arange(len(correct), dtype=dnm_int_t), L, p)
                 idxs = Parity._state_to_idx(correct, L, p)
 
                 for s, c in zip(states, correct):
@@ -120,6 +118,7 @@ class TestParity(ut.TestCase):
                 idxs = Parity._state_to_idx(correct, L, p)
                 self.assertEqual(idxs[2], -1)
 
+# TODO: see if we can enfore state_map being correct
 class TestRCM(ut.TestCase):
 
     def setUp(self):
@@ -138,55 +137,36 @@ class TestRCM(ut.TestCase):
 
     def test_half(self):
         state_map = np.ndarray((16,), dtype=dnm_int_t)
-        state_rmap = np.ndarray((16,), dtype=dnm_int_t)
-        state_rmap[:] = -1
 
-        dim = compute_rcm(self.masks, self.signs, self.coeffs, state_map, state_rmap, 3, 4)
+        dim = compute_rcm(self.masks, self.signs, self.coeffs, state_map, 3, 4)
 
         self.assertEqual(dim, 6)
-        for i in range(dim):
-            self.assertEqual(state_rmap[state_map[i]], i)
 
     def test_trimmed(self):
         state_map = np.ndarray((6,), dtype=dnm_int_t)
-        state_rmap = np.ndarray((16,), dtype=dnm_int_t)
-        state_rmap[:] = -1
 
-        dim = compute_rcm(self.masks, self.signs, self.coeffs, state_map, state_rmap, 3, 4)
+        dim = compute_rcm(self.masks, self.signs, self.coeffs, state_map, 3, 4)
 
         self.assertEqual(dim, 6)
-        for i in range(dim):
-            self.assertEqual(state_rmap[state_map[i]], i)
 
     def test_too_short(self):
         state_map = np.ndarray((4,), dtype=dnm_int_t)
-        state_rmap = np.ndarray((16,), dtype=dnm_int_t)
-        state_rmap[:] = -1
-
         with self.assertRaises(RuntimeError):
-            compute_rcm(self.masks, self.signs, self.coeffs, state_map, state_rmap, 3, 4)
+            compute_rcm(self.masks, self.signs, self.coeffs, state_map, 3, 4)
 
     def test_one(self):
         state_map = np.ndarray((16,), dtype=dnm_int_t)
-        state_rmap = np.ndarray((16,), dtype=dnm_int_t)
-        state_rmap[:] = -1
 
-        dim = compute_rcm(self.masks, self.signs, self.coeffs, state_map, state_rmap, 1, 4)
+        dim = compute_rcm(self.masks, self.signs, self.coeffs, state_map, 1, 4)
 
         self.assertEqual(dim, 4)
-        for i in range(dim):
-            self.assertEqual(state_rmap[state_map[i]], i)
 
     def test_zero(self):
         state_map = np.ndarray((16,), dtype=dnm_int_t)
-        state_rmap = np.ndarray((16,), dtype=dnm_int_t)
-        state_rmap[:] = -1
 
-        dim = compute_rcm(self.masks, self.signs, self.coeffs, state_map, state_rmap, 0, 4)
+        dim = compute_rcm(self.masks, self.signs, self.coeffs, state_map, 0, 4)
 
         self.assertEqual(dim, 1)
-        for i in range(dim):
-            self.assertEqual(state_rmap[state_map[i]], i)
 
 class TestAuto(ut.TestCase):
 

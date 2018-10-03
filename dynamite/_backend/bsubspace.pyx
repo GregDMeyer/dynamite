@@ -157,7 +157,7 @@ def state_to_idx_Auto(PetscInt [:] states, CAuto data):
 
 #####
 
-cdef extern int __builtin_parity(unsigned int x)
+cdef extern int __builtin_parityl(unsigned long x)
 
 def compute_rcm(PetscInt [:] masks, PetscInt [:] signs, np.complex128_t [:] coeffs,
                 PetscInt [:] state_map, PetscInt start, PetscInt L):
@@ -184,7 +184,7 @@ def compute_rcm(PetscInt [:] masks, PetscInt [:] signs, np.complex128_t [:] coef
         tot_coeff = 0
         for msc_idx in range(masks.size):
 
-            sign = __builtin_parity(state & signs[msc_idx])
+            sign = __builtin_parityl(state & signs[msc_idx])
             tot_coeff += (1-2*sign)*coeffs[msc_idx]
 
             if (msc_idx+1 == masks.size or masks[msc_idx+1] != cur_mask):

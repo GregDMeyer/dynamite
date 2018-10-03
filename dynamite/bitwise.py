@@ -16,8 +16,14 @@ def parity(x):
     Compute the parity of x (whether the number of 1 bits set is even or odd).
     '''
     mx = np.max(x)
+
+    if mx == 0:
+        return x
+
     i = 1
-    while mx >> i:
+    # this log is necessary due to a compiler bug where 1>>64 == 1
+    mx_log = np.log2(mx)
+    while i <= mx_log:
         x = x ^ (x>>i)
         i *= 2
     return x & 1

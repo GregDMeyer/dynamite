@@ -92,7 +92,8 @@ PetscErrorCode C(rdm,SUBSPACE)(
   PetscErrorCode ierr;
   const PetscScalar *v0_array;
   PetscInt i, j, n_filled, offset;
-  PetscInt tr_state, tr_dim, mpi_size, mpi_rank;
+  PetscInt tr_state, tr_dim;
+  int mpi_size, mpi_rank;
   PetscScalar a;
   Vec v0;
   VecScatter scat;

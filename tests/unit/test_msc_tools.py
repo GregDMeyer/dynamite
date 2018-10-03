@@ -199,9 +199,7 @@ class MSCSum(ut.TestCase):
     '''
 
     def setUp(self):
-        self.dtype = np.dtype([('masks', np.int32),
-                               ('signs', np.int32),
-                               ('coeffs', np.complex128)])
+        self.dtype = msc_tools.msc_dtype
 
     def check_same(self, check, target):
         check = msc_tools.combine_and_sort(check)
@@ -239,9 +237,7 @@ class MSCProduct(ut.TestCase):
     '''
 
     def setUp(self):
-        self.dtype = np.dtype([('masks', np.int32),
-                               ('signs', np.int32),
-                               ('coeffs', np.complex128)])
+        self.dtype = msc_tools.msc_dtype
 
     def check_same(self, check, target):
         check = msc_tools.combine_and_sort(check)
@@ -337,9 +333,7 @@ class ShiftMSC(ut.TestCase):
     '''
 
     def setUp(self):
-        self.dtype = np.dtype([('masks', np.int32),
-                               ('signs', np.int32),
-                               ('coeffs', np.complex128)])
+        self.dtype = msc_tools.msc_dtype
 
     def test_single_mask(self):
         msc = np.array([(1, 0, 0.5j)], dtype = self.dtype)
@@ -412,9 +406,7 @@ class ReduceMSC(ut.TestCase):
     '''
 
     def setUp(self):
-        self.dtype = np.dtype([('masks', np.int32),
-                               ('signs', np.int32),
-                               ('coeffs', np.complex128)])
+        self.dtype = msc_tools.msc_dtype
 
     def check_same(self, check, target):
         check = msc_tools.combine_and_sort(check)

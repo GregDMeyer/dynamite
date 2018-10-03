@@ -9,7 +9,13 @@
 
 #define intmin(a,b) ((a)^(((a)^(b))&(((a)<(b))-1)))
 
-#define TERM_REAL(mask, sign) (!(__builtin_parity((mask) & (sign))))
+#ifdef PETSC_USE_64BIT_INDICES
+  #define builtin_parity __builtin_parity
+#else
+  #define builtin_parity __builtin_parityl
+#endif
+
+#define TERM_REAL(mask, sign) (!(builtin_parity((mask) & (sign))))
 
 typedef enum _shell_impl {
   NO_SHELL,

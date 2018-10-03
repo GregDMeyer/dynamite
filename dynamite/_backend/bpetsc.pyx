@@ -183,7 +183,7 @@ def get_cur_memory_usage(which='all'):
         raise Error(ierr)
     return mem
 
-def reduced_density_matrix(Vec v, subspace_type sub_type, sub_data, int [:] keep, bint triang=True):
+def reduced_density_matrix(Vec v, subspace_type sub_type, sub_data, PetscInt [:] keep, bint triang=True):
 
     if COMM_WORLD.rank == 0:
         rtn_np = np.zeros((2**keep.size, 2**keep.size), dtype=np.complex128, order='C')
