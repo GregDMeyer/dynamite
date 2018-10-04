@@ -99,6 +99,11 @@ PetscErrorCode C(BuildPetsc,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
     for (mask_idx = 0; mask_idx < msc->nmasks; mask_idx++) {
       bra = ket ^ msc->masks[mask_idx];
 
+      col_idx = C(S2I,RIGHT_SUBSPACE)(bra, right_subspace_data);
+      if (col_idx == -1) {
+        continue;
+      }
+
       /* sum all terms for this matrix element */
       value = 0;
       for (term_idx = msc->mask_offsets[mask_idx]; term_idx < msc->mask_offsets[mask_idx+1]; ++term_idx) {
@@ -106,12 +111,8 @@ PetscErrorCode C(BuildPetsc,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
         value += sign * msc->coeffs[term_idx];
       }
 
-      col_idx = C(S2I,RIGHT_SUBSPACE)(bra, right_subspace_data);
-
-      if (col_idx != -1) {
-	row_count++;
-	ierr = MatSetValue(*A, row_idx, col_idx, value, INSERT_VALUES);CHKERRQ(ierr);
-      }
+      row_count++;
+      ierr = MatSetValue(*A, row_idx, col_idx, value, INSERT_VALUES);CHKERRQ(ierr);
     }
 
     /* workaround for a bug in PETSc that triggers if there are empty rows */

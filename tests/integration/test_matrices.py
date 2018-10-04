@@ -77,5 +77,66 @@ class Fundamental(ut.TestCase):
                             [0,-1]])
         self.proc0_assert_true(np.array_equal(o_np, correct))
 
+from dynamite.operators import identity
+from dynamite.msc_tools import msc_dtype
+from dynamite.subspaces import Auto
+from hamiltonians import localized
+@ut.skipIf(msc_dtype['masks'] != np.int64,
+           reason='only for builds with 64 bit integers')
+class LargeInt64(ut.TestCase):
+    '''
+    Tests for building matrices with 64 bit integers.
+    '''
+
+    def proc0_assert_true(self, *args, **kwargs):
+        # TODO: help this not hang if we fail a test by bcast
+        config.initialize()
+        from petsc4py import PETSc
+        if PETSc.COMM_WORLD.rank == 0:
+            self.assertTrue(*args, **kwargs)
+
+    def setUp(self):
+        self.H = localized(33)
+        self.space = Auto(self.H, 'U'+'D'*32, size_guess=33)
+
+    def test_identity(self):
+        o = identity()
+        o.L = 33
+        o.subspace = self.space
+        o_np = petsc_mat_to_np(o.get_mat())
+        self.proc0_assert_true(np.array_equal(o_np, o.to_numpy(sparse=False)),
+                               msg=str(o_np))
+
+    def test_localized(self):
+        config.initialize()
+        from petsc4py import PETSc
+
+        self.H.subspace = self.space
+        H_dnm = petsc_mat_to_np(self.H.get_mat())
+        H_np = self.H.to_numpy(sparse=False)
+
+        result = np.array_equal(H_dnm, H_np)
+        msg = ''
+        if not result:
+            if PETSc.COMM_WORLD.rank == 0:
+                diffs = np.where(np.abs(H_np-H_dnm) > 1E-15)
+                msg += '\ndiff:\n'
+                for row_idx, col_idx in zip(diffs[0][:30], diffs[1][:30]):
+                    msg += '(%d, %d): np: %s dnm: %s\n' % (
+                        row_idx, col_idx,
+                        str(H_np[row_idx, col_idx]),
+                        str(H_dnm[row_idx, col_idx])
+                    )
+            else:
+                msg = ''
+
+        self.proc0_assert_true(result,
+                               msg=msg)
+
 if __name__ == '__main__':
+    from dynamite import config
+    args = [
+        #'-start_in_debugger', 'noxterm'
+    ]
+    config.initialize(args)
     ut.main()

@@ -3,6 +3,13 @@
 
 #include <petsc.h>
 
+// TODO: include this in a different header?
+#ifdef PETSC_USE_64BIT_INDICES
+  #define builtin_parity __builtin_parityl
+#else
+  #define builtin_parity __builtin_parity
+#endif
+
 /* define a struct & enum to hold subspace information */
 // TODO: more descriptive name?
 typedef enum _subspace_type
@@ -41,7 +48,7 @@ static inline PetscErrorCode DestroySubspaceData_Full(data_Full* data) {
 }
 
 static inline PetscInt Dim_Full(const data_Full* data) {
-  return 1 << data->L;
+  return (PetscInt)1 << data->L;
 }
 
 static inline PetscInt S2I_Full(PetscInt state, const data_Full* data) {
@@ -85,14 +92,14 @@ static inline PetscErrorCode DestroySubspaceData_Parity(data_Parity* data) {
 #define PARITY_MASK(L) (PARITY_BIT(L)-1)
 
 #define PARITY_S2I(x, L) ((x) & PARITY_MASK(L))
-#define PARITY_I2S(x, p, L) ((x) | (( (p)^__builtin_parity(x) ) << ((L)-1) ))
+#define PARITY_I2S(x, p, L) ((x) | (( (p)^builtin_parity(x) ) << ((L)-1) ))
 
 static inline PetscInt Dim_Parity(const data_Parity* data) {
-  return 1 << (data->L-1);
+  return (PetscInt)1 << (data->L-1);
 }
 
 static inline PetscInt S2I_Parity(PetscInt state, const data_Parity* data) {
-  if (__builtin_parity(state) == data->space) {
+  if (builtin_parity(state) == data->space) {
     return PARITY_S2I(state, data->L);
   }
   else {

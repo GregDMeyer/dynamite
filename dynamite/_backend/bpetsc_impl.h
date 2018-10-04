@@ -10,9 +10,9 @@
 #define intmin(a,b) ((a)^(((a)^(b))&(((a)<(b))-1)))
 
 #ifdef PETSC_USE_64BIT_INDICES
-  #define builtin_parity __builtin_parity
-#else
   #define builtin_parity __builtin_parityl
+#else
+  #define builtin_parity __builtin_parity
 #endif
 
 #define TERM_REAL(mask, sign) (!(builtin_parity((mask) & (sign))))
