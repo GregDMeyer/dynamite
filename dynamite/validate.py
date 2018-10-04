@@ -16,7 +16,7 @@ def L(x):
     if int_t == np.int32 and x > 31:
         raise ValueError('Spin chain lengths greater than 31 not supported when '
                          'using 32 bit integers. Rebuild PETSc with the option '
-                         '"--use-64-bit-indices".')
+                         '"--with-64-bit-indices".')
 
     return x
 
