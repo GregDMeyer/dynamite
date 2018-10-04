@@ -27,9 +27,7 @@ class Operator:
         self._is_reduced = False
         self._shell = config.shell
 
-        self._subspaces = [(Full(), Full())]
-        if config.subspace is not None:
-            self.subspace = config.subspace
+        self._subspaces = []
 
         self._tex = r'\[\text{operator}\]'
         self._string = '[operator]'
@@ -51,8 +49,9 @@ class Operator:
         rtn.is_reduced = self.is_reduced
         rtn.shell = self.shell
 
-        for left, right in self.get_subspace_list():
-            rtn.add_subspace(left, right)
+        if self._subspaces:
+            for left, right in self.get_subspace_list():
+                rtn.add_subspace(left, right)
 
         rtn.tex = self.tex
         rtn.string = self.string
@@ -281,6 +280,12 @@ class Operator:
         '''
         Return a list of the subspaces that have been registered for this operator.
         '''
+        if not self._subspaces:
+            if config.subspace is not None:
+                self._subspaces = [config.subspace]
+            else:
+                self._subspaces = [(Full(), Full())]
+
         for left, right in self._subspaces:
             left.L = self.get_length()
             right.L = self.get_length()
