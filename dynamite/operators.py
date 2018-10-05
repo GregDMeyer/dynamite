@@ -400,8 +400,14 @@ class Operator:
         '''
         return msc_tools.table(self.msc, self.get_length())
 
+    def get_latex(self):
+        '''
+        Return a clean LaTeX representation of the operator.
+        '''
+        return self.tex.replace('{IDX', '{')
+
     def _repr_latex_(self):
-        return '$' + self.tex + '$'
+        return '$' + self.get_latex() + '$'
 
     ### save to disk
 
@@ -1001,8 +1007,13 @@ def index_sum(op, size = None, start = 0, boundary = 'open'):
         rtn.string += ', wrapped)'
     else:
         rtn.string += ')'
-    # TODO: make tex prettier by substituting i for the indices
-    rtn.tex = r'\sum_{i=%d}^{%d}' % (start, stop-1) + op.with_brackets(which = 'tex').join('{}') + '_{i}'
+
+    # add i to the indices for TeX representation
+    # TODO: use different letters if we have sum of sums
+    sub_tex = op.with_brackets(which = 'tex')
+    sub_tex = sub_tex.replace('{IDX', '{IDXi+').replace('{IDXi+0','{IDXi')
+
+    rtn.tex = r'\sum_{i=%d}^{%d}' % (start, stop-1) + sub_tex
     rtn.brackets = '[]'
 
     return rtn
@@ -1039,8 +1050,12 @@ def index_product(op, size = None, start = 0):
     rtn.msc = msc_tools.msc_product(op.get_shifted_msc(i, wrap_idx = None) for i in range(start, stop))
 
     rtn.string = 'index_product(' + op.string + ', sites %d - %d)' % (start, stop-1)
-    # TODO: make tex prettier by substituting i for the indices
-    rtn.tex = r'\prod_{i=%d}^{%d}' % (start, stop-1) + op.with_brackets(which = 'tex').join('{}') + '_{i}'
+
+    # add i to the indices for TeX representation
+    # TODO: use different letters if we have sum of sums
+    sub_tex = op.with_brackets(which = 'tex')
+    sub_tex = sub_tex.replace('{IDX', '{IDXi+').replace('{IDXi+0','{IDXi')
+    rtn.tex = r'\prod_{i=%d}^{%d}' % (start, stop-1) + sub_tex
     rtn.brackets = '[]'
 
     return rtn
@@ -1051,7 +1066,7 @@ def sigmax(i=0):
     """
     o = Operator()
     o.msc = [(1<<i, 0, 1)]
-    o.tex = r'\sigma^x_{'+str(i)+'}'
+    o.tex = r'\sigma^x_{IDX'+str(i)+'}'
     o.string = 'σx'+str(i).join('[]')
     return o
 
@@ -1061,7 +1076,7 @@ def sigmay(i=0):
     """
     o = Operator()
     o.msc = [(1<<i, 1<<i, 1j)]
-    o.tex = r'\sigma^y_{'+str(i)+'}'
+    o.tex = r'\sigma^y_{IDX'+str(i)+'}'
     o.string = 'σy'+str(i).join('[]')
     return o
 
@@ -1071,7 +1086,7 @@ def sigmaz(i=0):
     """
     o = Operator()
     o.msc = [(0, 1<<i, 1)]
-    o.tex = r'\sigma^z_{'+str(i)+'}'
+    o.tex = r'\sigma^z_{IDX'+str(i)+'}'
     o.string = 'σz'+str(i).join('[]')
     return o
 

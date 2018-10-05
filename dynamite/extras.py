@@ -49,7 +49,7 @@ def majorana(idx):
         rtn = index_product(sigmaz(), size=b_idx) * rtn
 
     rtn.string = 'χ[%d]' % idx
-    rtn.tex = r'\chi_{%d}' % idx
+    rtn.tex = r'\chi_{IDX%d}' % idx
     rtn.brackets = ''
 
     return rtn
