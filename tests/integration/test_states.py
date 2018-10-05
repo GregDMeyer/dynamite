@@ -3,6 +3,7 @@ Integration tests for states.
 '''
 
 import unittest as ut
+import numpy as np
 from dynamite.states import State
 
 class RandomSeed(ut.TestCase):
@@ -51,6 +52,28 @@ class ToNumpy(ut.TestCase):
         npvec = State._to_numpy(self.v, to_all = True)
         for i in range(PETSc.COMM_WORLD.rank):
             self.assertTrue(npvec[i] == i)
+
+class PetscMethods(ut.TestCase):
+    '''
+    Tests that the methods directly included from PETSc function as intended.
+    '''
+    def setUp(self):
+        from dynamite import config
+        if config.L is None:
+            config.L = 8
+
+    def test_norm(self):
+        state = State()
+        start, end = state.vec.getOwnershipRange()
+        state.vec[start:end] = np.array([1]*(end-start))
+        self.assertTrue(state.norm()**2 == state.subspace.get_dimension())
+
+    def test_normalize(self):
+        state = State()
+        start, end = state.vec.getOwnershipRange()
+        state.vec[start:end] = np.array([1]*(end-start))
+        state.normalize()
+        self.assertTrue(state.norm() == 1)
 
 # TODO: check state setting. e.g. setting an invalid state should fail (doesn't for Full subspace)
 

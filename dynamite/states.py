@@ -279,9 +279,9 @@ class State:
         """
         return self._to_numpy(self.vec, to_all)
 
-    # TODO: should I try to be clever about this
-    def norm(self):
-        return self.vec.norm()
-
     def dot(self, x):
         return self.vec.dot(x.vec)
+
+auto_wrap = ['norm', 'normalize']
+for petsc_func in auto_wrap:
+    setattr(State, petsc_func, lambda self, f=petsc_func: getattr(self.vec, f)())
