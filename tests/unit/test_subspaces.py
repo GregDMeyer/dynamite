@@ -170,6 +170,10 @@ class TestRCM(ut.TestCase):
 
 class TestAuto(ut.TestCase):
 
+    @classmethod
+    def to_bin(cls, x, L):
+        return bin(x)[2:].zfill(L)
+
     def test_string_int_state(self):
         from dynamite.operators import sigmax, sigmay, index_sum
         H = index_sum(sigmax(0)*sigmax(1) + sigmay(0)*sigmay(1), size=8)
@@ -182,8 +186,42 @@ class TestAuto(ut.TestCase):
         self.assertNotEqual(sp2.state, sp3.state)
 
         self.assertEqual(sp1, sp2)
-        self.assertNotEqual(sp1, sp3)
-        self.assertNotEqual(sp2, sp3)
+        self.assertEqual(sp1, sp3)
+
+    def test_XX_parity(self):
+        '''
+        enforce that Auto on XX operator gives the same result as the Parity
+        subspace
+        '''
+        from dynamite.operators import sigmax, index_sum
+        H = index_sum(sigmax(0)*sigmax(1), size=8)
+        auto = Auto(H, 'U'*8)
+        parity = Parity('even')
+        parity.L = 8
+
+        sorted_parity = np.sort(parity.idx_to_state(np.arange(parity.get_dimension())))
+
+        msg = ''
+        if auto.get_dimension() != parity.get_dimension():
+            msg += 'dimensions differ. auto dim: %d, parity dim: %d' % \
+                (auto.get_dimension(), parity.get_dimension())
+        else:
+            msg += '\nauto:     parity:\n'
+            for i in range(auto.get_dimension()):
+                msg += self.to_bin(auto.state_map[i], 8)
+                msg += '  '
+                msg += self.to_bin(sorted_parity[i], 8)
+                msg += '\n'
+
+        self.assertTrue(
+            auto.get_dimension() == parity.get_dimension(),
+            msg=msg
+        )
+
+        self.assertTrue(
+            np.all(auto.state_map == sorted_parity),
+            msg=msg
+        )
 
 class Checksum(ut.TestCase):
 

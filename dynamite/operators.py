@@ -560,8 +560,8 @@ class Operator:
         tuple
             The two states
         '''
-        bra = State(self.L, self.left_subspace)
-        ket = State(self.L, self.right_subspace)
+        bra = State(self.get_length(), self.left_subspace)
+        ket = State(self.get_length(), self.right_subspace)
         return (bra, ket)
 
     ### mask, sign, coefficient representation of operators
