@@ -282,7 +282,7 @@ class Operator:
         '''
         if not self._subspaces:
             if config.subspace is not None:
-                self._subspaces = [config.subspace]
+                self._subspaces = [(config.subspace, config.subspace)]
             else:
                 self._subspaces = [(Full(), Full())]
 
