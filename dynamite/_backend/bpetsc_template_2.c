@@ -289,11 +289,11 @@ PetscErrorCode C(MatDestroyCtx_CPU,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A)
 }
 
 #undef  __FUNCT__
-#define __FUNCT__ "MatMult_CPU"
+#define __FUNCT__ "MatMult_CPU_General"
 /*
  * MatMult for CPU shell matrices.
  */
-PetscErrorCode C(MatMult_CPU,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, Vec x, Vec b)
+PetscErrorCode C(MatMult_CPU_General,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, Vec x, Vec b)
 {
   PetscErrorCode ierr;
   int mpi_size, mpi_rank;
@@ -457,6 +457,380 @@ void C(MatMult_CPU_kernel,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
     }
   }
 }
+
+#define Full_SP 0
+#define Parity_SP 1
+#define Auto_SP 2
+
+/* if subspaces are different, or both are Auto, use this kernel */
+#if (C(LEFT_SUBSPACE,SP) == Auto_SP || C(LEFT_SUBSPACE,SP) != C(RIGHT_SUBSPACE,SP))
+
+PetscErrorCode C(MatMult_CPU,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, Vec x, Vec b)
+{
+  PetscErrorCode ierr;
+  ierr = C(MatMult_CPU_General,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(A,x,b);CHKERRQ(ierr);
+  return ierr;
+}
+
+#else
+/* use the hand-tuned kernel for parity and full subspaces, if we can */
+
+#ifdef PETSC_USE_DEBUG
+  #define VECSET_CACHE_SIZE (1<<7)
+  #define LKP_SIZE (1<<3)
+#else
+  #define VECSET_CACHE_SIZE (1<<11)
+  #define LKP_SIZE (1<<6)
+#endif
+
+#define ITER_CUTOFF 8
+#define LKP_MASK (LKP_SIZE-1)
+
+PetscErrorCode C(MatMult_CPU_Fast,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, Vec x, Vec b);
+
+PetscErrorCode C(MatMult_CPU,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, Vec x, Vec b)
+{
+  PetscErrorCode ierr;
+  PetscBool use_fast_matmult;
+  PetscInt local_size;
+  shell_context *ctx;
+  int mpi_size;
+  MPI_Comm_size(PETSC_COMM_WORLD,&mpi_size);
+
+  ierr = VecGetLocalSize(b, &local_size);CHKERRQ(ierr);
+
+  ierr = MatShellGetContext(A,&ctx);CHKERRQ(ierr);
+
+  /* mpi size is a power of 2 */
+  use_fast_matmult = __builtin_popcount(mpi_size) == 1;
+
+  /* problem size is big enough */
+  use_fast_matmult = use_fast_matmult && (local_size > VECSET_CACHE_SIZE);
+
+  #if (C(LEFT_SUBSPACE,SP) == Parity_SP)
+    use_fast_matmult = use_fast_matmult && (\
+      ((data_Parity*)(ctx->left_subspace_data))->space == \
+      ((data_Parity*)(ctx->right_subspace_data))->space);
+  #endif
+
+  if (use_fast_matmult) {
+    ierr = C(MatMult_CPU_Fast,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(A, x, b);CHKERRQ(ierr);
+  }
+  else {
+    ierr = C(MatMult_CPU_General,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(A, x, b);CHKERRQ(ierr);
+  }
+  return ierr;
+}
+
+#ifndef HELPER_FNS
+#define HELPER_FNS 1
+static inline void _radd(PetscScalar *x,PetscReal c)
+{
+  (*x) += c;
+}
+
+static inline void _cadd(PetscScalar *x,PetscReal c)
+{
+  (*x) += I*c;
+}
+
+void compute_sign_lookup(PetscInt* lookup)
+{
+  PetscInt i, j, tmp;
+  for (i=0;i<LKP_SIZE;++i) {
+    for (j=0;j<LKP_SIZE;++j) {
+      tmp = builtin_parity(i&j);
+      lookup[i*LKP_SIZE + j] = -(tmp^(tmp-1));
+    }
+  }
+}
+
+void compute_parity_sign_lookup(PetscInt parity, PetscInt* lookup)
+{
+  PetscInt i, j, tmp;
+  for (i=0;i<LKP_SIZE;++i) {
+    for (j=0;j<LKP_SIZE;++j) {
+      tmp = builtin_parity(i&j);
+      tmp ^= builtin_parity(j) ^ parity;
+      lookup[i*LKP_SIZE + j] = -(tmp^(tmp-1));
+    }
+  }
+}
+
+void compute_mask_starts(
+  PetscInt nmasks,
+  PetscInt n_local_spins,
+  PetscInt mpi_size,
+  const PetscInt* masks,
+  PetscInt* mask_starts
+)
+{
+  PetscInt proc_idx, mask_idx;
+
+  mask_idx = 0;
+  for (proc_idx = 0; proc_idx < mpi_size; ++proc_idx) {
+    // search for the first mask that has the same prefix as this process
+    // in parity case, we drop the last bit of the mask (by calling S2I on it)
+    while (
+        mask_idx < nmasks &&
+        C(S2I_nocheck,LEFT_SUBSPACE)(masks[mask_idx], NULL) < (proc_idx << n_local_spins)
+      ) {
+      ++mask_idx;
+    }
+    mask_starts[proc_idx] = mask_idx;
+  }
+  mask_starts[mpi_size] = nmasks;
+}
+
+void do_cache_product(
+  PetscInt mask,
+  PetscInt block_start,
+  PetscInt x_start,
+  const PetscScalar* summed_c,
+  const PetscScalar* x_array,
+  PetscScalar* values
+)
+{
+  PetscInt iterate_max, cache_idx, inner_idx, row_idx, stop;
+
+  /* TODO: this is not compatible with 64 bit ints */
+  iterate_max = 1 << __builtin_ctz(mask);
+  if (iterate_max < ITER_CUTOFF) {
+    for (cache_idx=0; cache_idx < VECSET_CACHE_SIZE; ++cache_idx) {
+      row_idx = (block_start+cache_idx) ^ mask;
+      values[cache_idx] += summed_c[cache_idx]*x_array[row_idx-x_start];
+    }
+  }
+  else {
+    for (cache_idx=0; cache_idx < VECSET_CACHE_SIZE;) {
+      row_idx = (block_start+cache_idx) ^ mask;
+      stop = intmin(iterate_max-(row_idx%iterate_max), VECSET_CACHE_SIZE-cache_idx);
+      for (inner_idx=0; inner_idx < stop; ++inner_idx) {
+        values[cache_idx+inner_idx] += summed_c[cache_idx+inner_idx] * x_array[row_idx+inner_idx-x_start];
+      }
+      cache_idx += inner_idx;
+    }
+  }
+
+}
+
+void sum_term(
+  PetscInt block_start,
+  PetscInt sign,
+  PetscInt is_real,
+  PetscScalar coeff,
+  PetscBool check_parity,
+  const PetscInt* lookup,
+  PetscScalar* summed_c
+) {
+  PetscInt cache_idx, lkp_idx, flip;
+  PetscScalar tmp_c;
+
+  const PetscInt* l;
+  l = lookup + (sign&LKP_MASK)*LKP_SIZE;
+
+/* this is the interior of the for loop. The compiler wasn't
+ * doing a good enough job unswitching it so I write a macro
+ * to unswitch it manually.
+ */
+/* TODO: include sign flips due to parity bit in lookup table */
+/**********/
+#define INNER_LOOP(sign_flip,add_func,parity_check)                     \
+  for (cache_idx=0; cache_idx<VECSET_CACHE_SIZE; ) {                    \
+    flip = builtin_parity((cache_idx+block_start)&(~LKP_MASK)&sign);    \
+    if (parity_check)                                                   \
+      flip ^= builtin_parity((cache_idx+block_start)&(~LKP_MASK));      \
+    tmp_c = -(flip^(flip-1))*coeff;                                     \
+    for (lkp_idx=0; lkp_idx<LKP_SIZE; ++lkp_idx,++cache_idx) {          \
+      add_func(summed_c+cache_idx,(sign_flip)*tmp_c);                   \
+    }                                                                   \
+  }
+/**********/
+
+  if (check_parity) {
+    if (sign&LKP_MASK) {
+      if (is_real) {INNER_LOOP(l[lkp_idx],_radd,1)}
+      else {INNER_LOOP(l[lkp_idx],_cadd,1)}
+    }
+    else {
+      if (is_real) {INNER_LOOP(1,_radd,1)}
+      else {INNER_LOOP(1,_cadd,1)}
+    }
+  }
+  else {
+    if (sign&LKP_MASK) {
+      if (is_real) {INNER_LOOP(l[lkp_idx],_radd,0)}
+      else {INNER_LOOP(l[lkp_idx],_cadd,0)}
+    }
+    else {
+      if (is_real) {INNER_LOOP(1,_radd,0)}
+      else {INNER_LOOP(1,_cadd,0)}
+    }
+  }
+}
+#endif
+
+#undef  __FUNCT__
+#define __FUNCT__ "MatMult_CPU_Fast"
+PetscErrorCode C(MatMult_CPU_Fast,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, Vec x, Vec b)
+{
+  PetscErrorCode ierr;
+  PetscInt proc_idx, proc_me, proc_mask, n_local_spins;
+  PetscInt proc_start_idx, block_start_idx;
+  PetscInt mask_idx, term_idx;
+  PetscInt m, s, ms_parity;
+  PetscReal c;
+  PetscInt *mask_starts, *lookup;
+  PetscBool assembling, r;
+
+  #if (C(LEFT_SUBSPACE,SP) == Parity_SP)
+  PetscInt *parity_lookup;
+  #endif
+
+  PetscInt x_start, x_end;
+  const PetscScalar *x_array;
+
+  shell_context *ctx;
+
+  /* cache */
+  PetscInt *row_idx;
+  PetscScalar *summed_coeffs, *values;
+  PetscInt cache_idx;
+
+  int mpi_rank,mpi_size;
+  MPI_Comm_rank(PETSC_COMM_WORLD,&mpi_rank);
+  MPI_Comm_size(PETSC_COMM_WORLD,&mpi_size);
+
+  /* check if number of processors is a multiple of 2 */
+  if ((mpi_size & (mpi_size-1)) != 0) {
+    SETERRQ(PETSC_COMM_WORLD, PETSC_ERR_SUP, "number of MPI procs must be a power of 2");
+  }
+
+  ierr = MatShellGetContext(A,&ctx);CHKERRQ(ierr);
+
+  /* clear out the b vector */
+  ierr = VecSet(b,0);CHKERRQ(ierr);
+
+  /* prepare x array */
+  ierr = VecGetOwnershipRange(x, &x_start, &x_end);CHKERRQ(ierr);
+  ierr = VecGetArrayRead(x, &x_array);CHKERRQ(ierr);
+
+  /* allocate for cache */
+  ierr = PetscMalloc1(VECSET_CACHE_SIZE, &row_idx);CHKERRQ(ierr);
+  ierr = PetscMalloc1(VECSET_CACHE_SIZE, &summed_coeffs);CHKERRQ(ierr);
+  ierr = PetscMalloc1(VECSET_CACHE_SIZE, &values);CHKERRQ(ierr);
+
+  ierr = PetscMalloc1(LKP_SIZE*LKP_SIZE, &lookup);CHKERRQ(ierr);
+  compute_sign_lookup(lookup);
+
+  #if (C(LEFT_SUBSPACE,SP) == Parity_SP)
+    ierr = PetscMalloc1(LKP_SIZE*LKP_SIZE, &parity_lookup);CHKERRQ(ierr);
+    compute_parity_sign_lookup(((data_Parity*)(ctx->left_subspace_data))->space, parity_lookup);
+  #endif
+
+  /* this relies on MPI size being a power of 2 */
+  /* this is log base 2 of the local vector size */
+  n_local_spins = __builtin_ctz(x_end - x_start);
+
+  ierr = PetscMalloc1(mpi_size+1,&(mask_starts));CHKERRQ(ierr);
+  compute_mask_starts(ctx->nmasks, n_local_spins, mpi_size, ctx->masks, mask_starts);
+
+  proc_mask = (-1) << n_local_spins;
+  proc_me = mpi_rank << n_local_spins;
+
+  /* we are not already sending values to another processor */
+  assembling = PETSC_FALSE;
+
+  for (proc_idx = 0; proc_idx < mpi_size; ++proc_idx) {
+
+    /* if there are none for this process, skip it */
+    if (mask_starts[proc_idx] == mask_starts[proc_idx+1]) continue;
+
+    /* if we've hit the end of the masks, stop */
+    if (mask_starts[proc_idx] == ctx->nmasks) break;
+
+    /* the first index of the target */
+    proc_start_idx = C(S2I_nocheck,LEFT_SUBSPACE)(
+      proc_mask & (proc_me ^ ctx->masks[mask_starts[proc_idx]]),
+      NULL
+    );
+
+    for (block_start_idx = proc_start_idx;
+         block_start_idx < proc_start_idx + (x_end - x_start);
+         block_start_idx += VECSET_CACHE_SIZE) {
+
+      ierr = PetscMemzero(values,   sizeof(PetscScalar)*VECSET_CACHE_SIZE);CHKERRQ(ierr);
+      ierr = PetscMemzero(summed_coeffs, sizeof(PetscScalar)*VECSET_CACHE_SIZE);CHKERRQ(ierr);
+
+      for (cache_idx=0; cache_idx < VECSET_CACHE_SIZE; ++cache_idx) {
+        row_idx[cache_idx] = block_start_idx+cache_idx;
+      }
+
+      for (mask_idx = mask_starts[proc_idx]; mask_idx < mask_starts[proc_idx+1]; ++mask_idx) {
+
+        m = C(S2I_nocheck,LEFT_SUBSPACE)(
+          ctx->masks[mask_idx],
+          NULL
+        );
+
+        for (
+            term_idx = ctx->mask_offsets[mask_idx];
+            term_idx < ctx->mask_offsets[mask_idx+1];
+            ++term_idx) {
+
+          s = C(S2I_nocheck,LEFT_SUBSPACE)(
+            ctx->signs[term_idx],
+            NULL
+          );
+
+          ms_parity = builtin_parity(ctx->masks[mask_idx] & ctx->signs[term_idx]);
+          c = -(ms_parity^(ms_parity-1))*ctx->real_coeffs[term_idx];
+          r = TERM_REAL(ctx->masks[mask_idx], ctx->signs[term_idx]);
+
+          #if (C(LEFT_SUBSPACE,SP) == Parity_SP)
+            if (ctx->signs[term_idx] & 1) {
+              sum_term(block_start_idx, s, r, c, 1, parity_lookup, summed_coeffs);
+            }
+            else {
+              sum_term(block_start_idx, s, r, c, 0, lookup, summed_coeffs);
+            }
+          #else
+            sum_term(block_start_idx, s, r, c, 0, lookup, summed_coeffs);
+          #endif
+
+        }
+
+        do_cache_product(m, block_start_idx, x_start, summed_coeffs, x_array, values);
+        ierr = PetscMemzero(summed_coeffs, sizeof(PetscScalar)*VECSET_CACHE_SIZE);CHKERRQ(ierr);
+
+      }
+
+      if (assembling) {
+        ierr = VecAssemblyEnd(b);CHKERRQ(ierr);
+        assembling = PETSC_FALSE;
+      }
+      ierr = VecSetValues(b, VECSET_CACHE_SIZE, row_idx, values, ADD_VALUES);CHKERRQ(ierr);
+
+      ierr = VecAssemblyBegin(b);CHKERRQ(ierr);
+      assembling = PETSC_TRUE;
+    }
+  }
+
+  if (assembling) {
+    ierr = VecAssemblyEnd(b);CHKERRQ(ierr);
+  }
+
+  ierr = VecRestoreArrayRead(x,&x_array);CHKERRQ(ierr);
+
+  ierr = PetscFree(lookup);CHKERRQ(ierr);
+  ierr = PetscFree(row_idx);CHKERRQ(ierr);
+  ierr = PetscFree(values);CHKERRQ(ierr);
+  ierr = PetscFree(summed_coeffs);CHKERRQ(ierr);
+
+  return ierr;
+}
+
+#endif
 
 #undef  __FUNCT__
 #define __FUNCT__ "MatNorm_CPU"

@@ -105,7 +105,7 @@ class FullHamiltonians(MPITestCase):
         H = getattr(hamiltonians, H_name)()
         bra, ket = H.create_states()
 
-        # ket.set_product(0)
+        #ket.set_product(0)
         ket.set_random(seed = 0)
         #ket.vec.set(1)
 
@@ -124,10 +124,16 @@ class FullHamiltonians(MPITestCase):
             inner_prod = bra_check.dot(bra_np.conj())
             if inner_prod != 0:
                 inner_prod /= np.linalg.norm(bra_check) * np.linalg.norm(bra_np)
+
+            bad_idxs = np.where(np.abs(bra_check - bra_np) > 1E-12)[0]
+            msg = '\n'
+            for idx in bad_idxs:
+                msg += 'at {}: correct: {}  check: {}\n'.format(idx, bra_np[idx], bra_check[idx])
         else:
             inner_prod = 1
+            msg = ''
 
-        self.assertLess(np.abs(1 - inner_prod), 1E-9)
+        self.assertLess(np.abs(1 - inner_prod), 1E-9, msg=msg)
 
 @generate_hamiltonian_tests
 class Subspaces(MPITestCase):
@@ -159,13 +165,13 @@ class Subspaces(MPITestCase):
         H.dot(x, correct_full)
         to_space.dot(correct_full, correct_sub)
 
-        with self.subTest():
+        with self.subTest(which='f2s'):
             self.check_f2s(H, x, check_subspace, correct_sub)
 
-        with self.subTest():
+        with self.subTest(which='s2f'):
             self.check_s2f(H, x, check_subspace, correct_sub)
 
-        with self.subTest():
+        with self.subTest(which='s2s'):
             self.check_s2s(H, x, check_subspace, correct_sub)
 
     def compare_vecs(self, H, correct, check):
@@ -181,7 +187,10 @@ class Subspaces(MPITestCase):
         diff = np.abs(correct-check)
         max_idx = np.argmax(diff)
         self.assertTrue(np.allclose(correct, check, rtol=0, atol=eps),
-                        msg = '\ncorrect: %e\ncheck: %e\nat %d' % (np.abs(correct[max_idx]), np.abs(check[max_idx]), max_idx))
+                        msg = '\ncorrect: %e+i%e\ncheck: %e+i%e\ndiff: %e\nat %d' % \
+                            (correct[max_idx].real, correct[max_idx].imag,
+                             check[max_idx].real, check[max_idx].imag,
+                             np.abs(correct[max_idx]-check[max_idx]), max_idx))
 
     def check_f2s(self, H, x, check_subspace, correct):
         '''
@@ -258,7 +267,7 @@ class Subspaces(MPITestCase):
                         H = getattr(hamiltonians, H_name)()
                         sp = Auto(H, (1 << (H.L//2))-space)
 
-                        k = State(subspace = sp, state = 'random', seed = 0)
+                        k = State(subspace=sp, state='random', seed=0)
 
                         from_space = identity()
                         from_space.add_subspace(Full(), sp)

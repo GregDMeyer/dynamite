@@ -52,15 +52,15 @@ class TestParity(ut.TestCase):
 
     def test_mapping_single(self):
         s = Parity._idx_to_state(np.array([5], dtype=dnm_int_t), 5, 0)
-        self.assertEqual(s, int('00101', 2))
+        self.assertEqual(s, int('01010', 2))
 
-        i = Parity._state_to_idx(s, 5, 0)
+        i = Parity._state_to_idx(s, 10, 0)
         self.assertEqual(i, 5)
 
         s = Parity._idx_to_state(np.array([7], dtype=dnm_int_t), 5, 0)
-        self.assertEqual(s, int('10111', 2))
+        self.assertEqual(s, int('01111', 2))
 
-        i = Parity._state_to_idx(s, 5, 0)
+        i = Parity._state_to_idx(s, 15, 0)
         self.assertEqual(i, 7)
 
     def test_mapping_invalid_s2i(self):
@@ -76,23 +76,23 @@ class TestParity(ut.TestCase):
         correct_states = [
             [
                 '0000',
-                '1001',
-                '1010',
                 '0011',
-                '1100',
                 '0101',
                 '0110',
+                '1001',
+                '1010',
+                '1100',
                 '1111',
             ],
             [
-                '1000',
                 '0001',
                 '0010',
-                '1011',
                 '0100',
+                '0111',
+                '1000',
+                '1011',
                 '1101',
                 '1110',
-                '0111',
             ]
         ]
 

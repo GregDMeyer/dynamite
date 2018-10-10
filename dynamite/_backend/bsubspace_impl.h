@@ -55,6 +55,10 @@ static inline PetscInt S2I_Full(PetscInt state, const data_Full* data) {
   return state;
 }
 
+static inline PetscInt S2I_nocheck_Full(PetscInt state, const data_Full* data) {
+  return state;
+}
+
 static inline PetscInt I2S_Full(PetscInt idx, const data_Full* data) {
   return idx;
 }
@@ -88,27 +92,25 @@ static inline PetscErrorCode DestroySubspaceData_Parity(data_Parity* data) {
   return ierr;
 }
 
-#define PARITY_BIT(L) (1<<((L)-1))
-#define PARITY_MASK(L) (PARITY_BIT(L)-1)
-
-#define PARITY_S2I(x, L) ((x) & PARITY_MASK(L))
-#define PARITY_I2S(x, p, L) ((x) | (( (p)^builtin_parity(x) ) << ((L)-1) ))
-
 static inline PetscInt Dim_Parity(const data_Parity* data) {
   return (PetscInt)1 << (data->L-1);
 }
 
 static inline PetscInt S2I_Parity(PetscInt state, const data_Parity* data) {
   if (builtin_parity(state) == data->space) {
-    return PARITY_S2I(state, data->L);
+    return state>>1;
   }
   else {
-    return -1;
+    return (PetscInt)(-1);
   }
 }
 
+static inline PetscInt S2I_nocheck_Parity(PetscInt state, const data_Parity* data) {
+  return state>>1;
+}
+
 static inline PetscInt I2S_Parity(PetscInt idx, const data_Parity* data) {
-  return PARITY_I2S(idx, data->space, data->L);
+  return (idx<<1) | (builtin_parity(idx) ^ data->space);
 }
 
 static inline void S2I_Parity_array(int n, const data_Parity* data, const PetscInt* states, PetscInt* idxs) {
