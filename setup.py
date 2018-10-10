@@ -19,7 +19,7 @@ write_build_headers()
 
 setup(
     name            = "dynamite",
-    version         = "0.0.3",
+    version         = "0.1.0",
     author          = "Greg Meyer",
     author_email    = "gregory.meyer@berkeley.edu",
     description     = "Fast numerics for large quantum spin chains.",
