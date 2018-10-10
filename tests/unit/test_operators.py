@@ -385,8 +385,7 @@ class IndexProduct(ut.TestCase):
             index_product(sigmaz(0) + sigmaz(4), size = 3)
 
     def test_size_0(self):
-        with self.assertRaises(ValueError):
-            index_product(sigmaz(0), size = 0)
+        self.assertEqual(index_product(sigmaz(0), size=0), identity())
 
 class WithBrackets(ut.TestCase):
     '''

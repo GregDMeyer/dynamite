@@ -727,6 +727,8 @@ class Operator:
 
     def __eq__(self, x):
         if isinstance(x, Operator):
+            self.reduce_msc()
+            x.reduce_msc()
             return np.array_equal(self.msc, x.msc)
         else:
             raise TypeError('Equality not supported for types %s and %s'
@@ -1043,6 +1045,9 @@ def index_product(op, size = None, start = 0):
                              'or by setting Operator.L (possibly through config.L).')
         else:
             size = op.L
+
+    if size == 0:
+        return identity()
 
     stop = start + size - op.max_spin_idx
 
