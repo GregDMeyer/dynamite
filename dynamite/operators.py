@@ -45,7 +45,7 @@ class Operator:
             A copy of the operator
         """
         rtn = Operator()
-        rtn.msc = self.msc
+        rtn.msc = self.msc.copy()
         rtn.is_reduced = self.is_reduced
         rtn.shell = self.shell
 
