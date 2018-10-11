@@ -61,10 +61,15 @@ class State:
             else:
                 self.set_product(state)
 
-    def copy(self):
-        rtn = State(self.L, self.subspace.copy())
-        self.vec.copy(rtn.vec)
-        return rtn
+    def copy(self, result=None):
+        if result is None:
+            result = State(self.L, self.subspace.copy())
+
+        if self.subspace != result.subspace:
+            raise ValueError('subspace of state and result must match')
+
+        self.vec.copy(result.vec)
+        return result
 
     @property
     def subspace(self):

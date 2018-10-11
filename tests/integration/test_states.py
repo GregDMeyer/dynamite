@@ -66,14 +66,52 @@ class PetscMethods(ut.TestCase):
         state = State()
         start, end = state.vec.getOwnershipRange()
         state.vec[start:end] = np.array([1]*(end-start))
+        state.vec.assemblyBegin()
+        state.vec.assemblyEnd()
         self.assertTrue(state.norm()**2 == state.subspace.get_dimension())
 
     def test_normalize(self):
         state = State()
         start, end = state.vec.getOwnershipRange()
         state.vec[start:end] = np.array([1]*(end-start))
+        state.vec.assemblyBegin()
+        state.vec.assemblyEnd()
         state.normalize()
         self.assertTrue(state.norm() == 1)
+
+    def test_copy_preallocate(self):
+        state1 = State()
+        state2 = State()
+        start, end = state1.vec.getOwnershipRange()
+        state1.vec[start:end] = np.arange(start, end)
+        state1.vec.assemblyBegin()
+        state1.vec.assemblyEnd()
+
+        result = np.ndarray((end-start,), dtype=np.complex128)
+        state1.copy(state2)
+        result[:] = state2.vec[start:end]
+
+        self.assertTrue(np.array_equal(result, np.arange(start, end)))
+
+    def test_copy_exception_L(self):
+        state1 = State()
+        state2 = State(L=state1.subspace.L+1)
+
+        with self.assertRaises(ValueError):
+            state1.copy(state2)
+
+    def test_copy_nopreallocate(self):
+        state1 = State()
+        start, end = state1.vec.getOwnershipRange()
+        state1.vec[start:end] = np.arange(start, end)
+        state1.vec.assemblyBegin()
+        state1.vec.assemblyEnd()
+
+        result = np.ndarray((end-start,), dtype=np.complex128)
+        state2 = state1.copy()
+        result[:] = state2.vec[start:end]
+
+        self.assertTrue(np.array_equal(result, np.arange(start, end)))
 
 # TODO: check state setting. e.g. setting an invalid state should fail (doesn't for Full subspace)
 
