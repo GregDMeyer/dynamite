@@ -557,41 +557,18 @@ void compute_parity_sign_lookup(PetscInt parity, PetscInt* lookup)
   }
 }
 
-void compute_mask_starts(
-  PetscInt nmasks,
-  PetscInt n_local_spins,
-  PetscInt mpi_size,
-  const PetscInt* masks,
-  PetscInt* mask_starts
-)
-{
-  PetscInt proc_idx, mask_idx;
-
-  mask_idx = 0;
-  for (proc_idx = 0; proc_idx < mpi_size; ++proc_idx) {
-    // search for the first mask that has the same prefix as this process
-    // in parity case, we drop the last bit of the mask (by calling S2I on it)
-    while (
-        mask_idx < nmasks &&
-        C(S2I_nocheck,LEFT_SUBSPACE)(masks[mask_idx], NULL) < (proc_idx << n_local_spins)
-      ) {
-      ++mask_idx;
-    }
-    mask_starts[proc_idx] = mask_idx;
-  }
-  mask_starts[mpi_size] = nmasks;
-}
-
-void do_cache_product(
+PetscErrorCode do_cache_product(
   PetscInt mask,
   PetscInt block_start,
   PetscInt x_start,
+  PetscInt x_end,
   const PetscScalar* summed_c,
   const PetscScalar* x_array,
   PetscScalar* values
 )
 {
   PetscInt iterate_max, cache_idx, inner_idx, row_idx, stop;
+  PetscErrorCode ierr = 0;
 
   /* TODO: this is not compatible with 64 bit ints */
   iterate_max = 1 << __builtin_ctz(mask);
@@ -606,11 +583,19 @@ void do_cache_product(
       row_idx = (block_start+cache_idx) ^ mask;
       stop = intmin(iterate_max-(row_idx%iterate_max), VECSET_CACHE_SIZE-cache_idx);
       for (inner_idx=0; inner_idx < stop; ++inner_idx) {
+        if (row_idx+inner_idx-x_start < 0) {
+          SETERRQ(PETSC_COMM_SELF, PETSC_ERR_MEMC, "negative index on x array");
+        }
+        if (row_idx+inner_idx-x_start >= x_end-x_start) {
+          SETERRQ(PETSC_COMM_SELF, PETSC_ERR_MEMC, "index past end of x array");
+        }
         values[cache_idx+inner_idx] += summed_c[cache_idx+inner_idx] * x_array[row_idx+inner_idx-x_start];
       }
       cache_idx += inner_idx;
     }
   }
+
+  return ierr;
 
 }
 
@@ -669,6 +654,31 @@ void sum_term(
   }
 }
 #endif
+
+void C(compute_mask_starts,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
+  PetscInt nmasks,
+  PetscInt n_local_spins,
+  PetscInt mpi_size,
+  const PetscInt* masks,
+  PetscInt* mask_starts
+)
+{
+  PetscInt proc_idx, mask_idx;
+
+  mask_idx = 0;
+  for (proc_idx = 0; proc_idx < mpi_size; ++proc_idx) {
+    // search for the first mask that has the same prefix as this process
+    // in parity case, we drop the last bit of the mask (by calling S2I on it)
+    while (
+        mask_idx < nmasks &&
+        C(S2I_nocheck,LEFT_SUBSPACE)(masks[mask_idx], NULL) < (proc_idx << n_local_spins)
+      ) {
+      ++mask_idx;
+    }
+    mask_starts[proc_idx] = mask_idx;
+  }
+  mask_starts[mpi_size] = nmasks;
+}
 
 #undef  __FUNCT__
 #define __FUNCT__ "MatMult_CPU_Fast"
@@ -733,7 +743,13 @@ PetscErrorCode C(MatMult_CPU_Fast,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, Vec x,
   n_local_spins = __builtin_ctz(x_end - x_start);
 
   ierr = PetscMalloc1(mpi_size+1,&(mask_starts));CHKERRQ(ierr);
-  compute_mask_starts(ctx->nmasks, n_local_spins, mpi_size, ctx->masks, mask_starts);
+  C(compute_mask_starts,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
+    ctx->nmasks,
+    n_local_spins,
+    mpi_size,
+    ctx->masks,
+    mask_starts
+  );
 
   proc_mask = (-1) << n_local_spins;
   proc_me = mpi_rank << n_local_spins;
@@ -750,10 +766,8 @@ PetscErrorCode C(MatMult_CPU_Fast,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, Vec x,
     if (mask_starts[proc_idx] == ctx->nmasks) break;
 
     /* the first index of the target */
-    proc_start_idx = C(S2I_nocheck,LEFT_SUBSPACE)(
-      proc_mask & (proc_me ^ ctx->masks[mask_starts[proc_idx]]),
-      NULL
-    );
+    m = C(S2I_nocheck,LEFT_SUBSPACE)(ctx->masks[mask_starts[proc_idx]], NULL);
+    proc_start_idx = proc_mask & (proc_me ^ m);
 
     for (block_start_idx = proc_start_idx;
          block_start_idx < proc_start_idx + (x_end - x_start);
@@ -800,7 +814,7 @@ PetscErrorCode C(MatMult_CPU_Fast,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, Vec x,
 
         }
 
-        do_cache_product(m, block_start_idx, x_start, summed_coeffs, x_array, values);
+        ierr = do_cache_product(m, block_start_idx, x_start, x_end, summed_coeffs, x_array, values);CHKERRQ(ierr);
         ierr = PetscMemzero(summed_coeffs, sizeof(PetscScalar)*VECSET_CACHE_SIZE);CHKERRQ(ierr);
 
       }

@@ -235,28 +235,37 @@ class Subspaces(MPITestCase):
 
         self.compare_vecs(H, correct, result)
 
+    @classmethod
+    def generate_random_in_subspace(cls, space):
+        k = State(subspace=space, state='random', seed=0)
+        from_space = identity()
+        from_space.add_subspace(Full(), space)
+        ket = State(subspace=Full())
+        from_space.dot(k, ket)
+        return ket
+
     def test_parity_XX_even(self):
         H = index_sum(sigmax(0)*sigmax(1))
-        x = State(state = 0)
         sp = Parity('even')
+        x = self.generate_random_in_subspace(sp)
         self.compare_to_full(H, x, sp)
 
     def test_parity_XX_odd(self):
         H = index_sum(sigmax(0)*sigmax(1))
-        x = State(state = 1)
         sp = Parity('odd')
+        x = self.generate_random_in_subspace(sp)
         self.compare_to_full(H, x, sp)
 
     def test_parity_YY_even(self):
         H = index_sum(sigmay(0)*sigmay(1))
-        x = State(state = 0)
         sp = Parity('even')
+        x = self.generate_random_in_subspace(sp)
         self.compare_to_full(H, x, sp)
 
     def test_parity_YY_odd(self):
         H = index_sum(sigmay(0)*sigmay(1))
-        x = State(state = 1)
         sp = Parity('odd')
+        x = self.generate_random_in_subspace(sp)
         self.compare_to_full(H, x, sp)
 
     def check_hamiltonian(self, H_name):
@@ -267,12 +276,7 @@ class Subspaces(MPITestCase):
                         H = getattr(hamiltonians, H_name)()
                         sp = Auto(H, (1 << (H.L//2))-space)
 
-                        k = State(subspace=sp, state='random', seed=0)
-
-                        from_space = identity()
-                        from_space.add_subspace(Full(), sp)
-                        ket = State(subspace=Full())
-                        from_space.dot(k, ket)
+                        ket = self.generate_random_in_subspace(sp)
 
                         self.compare_to_full(H, ket, sp)
 
