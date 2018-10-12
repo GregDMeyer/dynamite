@@ -113,6 +113,44 @@ class PetscMethods(ut.TestCase):
 
         self.assertTrue(np.array_equal(result, np.arange(start, end)))
 
+    def test_scale(self):
+        vals = [2, 3.14]
+        for val in vals:
+            with self.subTest(val=val):
+                state = State(state='random')
+                start, end = state.vec.getOwnershipRange()
+                pre_values = np.ndarray((end-start,), dtype=np.complex128)
+                pre_values[:] = state.vec[start:end]
+
+                state *= val
+
+                for i in range(start, end):
+                    self.assertEqual(state.vec[i], val*pre_values[i-start])
+
+    def test_scale_divide(self):
+        val = 3.14
+        state = State(state='random')
+        start, end = state.vec.getOwnershipRange()
+        pre_values = np.ndarray((end-start,), dtype=np.complex128)
+        pre_values[:] = state.vec[start:end]
+
+        state /= val
+
+        for i in range(start, end):
+            self.assertEqual(state.vec[i], (1/val)*pre_values[i-start])
+
+    def test_scale_exception_ary(self):
+        val = np.array([3.1, 4])
+        state = State()
+        with self.assertRaises(TypeError):
+            state *= val
+
+    def test_scale_exception_vec(self):
+        state1 = State()
+        state2 = State()
+        with self.assertRaises(TypeError):
+            state1 *= state2
+
 # TODO: check state setting. e.g. setting an invalid state should fail (doesn't for Full subspace)
 
 if __name__ == '__main__':

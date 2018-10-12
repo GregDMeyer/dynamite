@@ -287,6 +287,14 @@ class State:
     def dot(self, x):
         return self.vec.dot(x.vec)
 
+    def __imul__(self, x):
+        self.vec.scale(x)
+        return self
+
+    def __itruediv__(self, x):
+        self.vec.scale(1/x)
+        return self
+
 auto_wrap = ['norm', 'normalize']
 for petsc_func in auto_wrap:
     setattr(State, petsc_func, lambda self, f=petsc_func: getattr(self.vec, f)())
