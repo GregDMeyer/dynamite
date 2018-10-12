@@ -6,6 +6,20 @@ __all__ = [
     'get_max_memory_usage',
     'get_cur_memory_usage']
 
+def mpi_print(*args, rank=0, **kwargs):
+    '''
+    Print from only a single MPI rank, default rank 0.
+
+    Aside from the extra "rank" keywork argument, call signature is the same
+    as Python 3's ``print()`` function.
+    '''
+    from . import config
+    config.initialize()
+    from petsc4py import PETSc
+
+    if PETSc.COMM_WORLD.rank == rank:
+        print(*args, **kwargs)
+
 def get_version():
     '''
     Gets the version information for dynamite, and the PETSc and SLEPc libraries it's built on.

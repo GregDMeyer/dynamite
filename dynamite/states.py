@@ -5,9 +5,6 @@ import numpy as np
 from os import urandom
 from time import time
 
-# TODO: wrap some of the most common functions of PETSc vectors -- like norm, binary operators, etc.
-# could probably do it in some clever way
-
 class State:
     """
     Class representing a state.
