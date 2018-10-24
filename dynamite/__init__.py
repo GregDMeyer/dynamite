@@ -1,4 +1,6 @@
 
+from sys import stderr
+
 import slepc4py
 from . import validate
 from ._backend import bbuild
@@ -79,7 +81,7 @@ class _Config:
                 build_commit = bbuild.get_build_version()
                 if not commit.startswith(build_commit):
                     print('Changes have been pushed to GitHub since dynamite was installed. '
-                          'Please update!')
+                          'Please update!', file=stderr)
 
             # in general, catching all exceptions is a bad idea. but here, no matter
             # what happens we just want to give up on the check
