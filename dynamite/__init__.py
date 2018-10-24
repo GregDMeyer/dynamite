@@ -1,6 +1,4 @@
 
-from sys import stderr
-
 import slepc4py
 from . import validate
 from ._backend import bbuild
@@ -62,31 +60,7 @@ class _Config:
 
         from petsc4py import PETSc
         if version_check and PETSc.COMM_WORLD.rank == 0:
-            from urllib import request
-            import json
-
-            branch = bbuild.get_build_branch()
-            url = 'https://api.github.com/repos/GregDMeyer/dynamite/git/refs/heads/{branch}'
-            url = url.format(branch = branch)
-
-            try:
-                with request.urlopen(url, timeout=1) as url_req:
-                    try:
-                        data = json.load(url_req)
-                    except TypeError: # python < 3.6
-                        data = json.loads(url_req.readall().decode('utf-8'))
-
-                    commit = data['object']['sha']
-
-                build_commit = bbuild.get_build_version()
-                if not commit.startswith(build_commit):
-                    print('Changes have been pushed to GitHub since dynamite was installed. '
-                          'Please update!', file=stderr)
-
-            # in general, catching all exceptions is a bad idea. but here, no matter
-            # what happens we just want to give up on the check
-            except:
-                pass
+            check_version()
 
     @property
     def global_L(self):
@@ -165,3 +139,65 @@ class _Config:
         self._info_level = value
 
 config = _Config()
+
+def check_version():
+    """
+    Check for any updates to dynamite, skipping if a check has been performed
+    in the last day.
+    """
+
+    from urllib import request
+    import json
+    from os import remove
+    from os.path import isfile
+    from time import time
+    from sys import stderr
+
+    # only check once a day for a new version so that we don't DOS GitHub
+    # we save a file with the time of the last check in it
+    filename = '.dynamite'
+    if isfile(filename):
+        with open(filename) as f:
+            last_check = float(f.read().strip())
+    else:
+        last_check = 0
+
+    # if less than a day has elapsed, return
+    cur_time = time()
+    one_day = 24*60*60
+    if cur_time - last_check < one_day:
+        return
+
+    # otherwise, we should write out a new time file
+    try:
+        with open(filename+'_lock', 'x'):
+            with open(filename, 'w') as f:
+                f.write(str(time()))
+        remove(filename+'_lock')
+    except FileExistsError: # another process is doing this at the same time
+        return
+
+    # finally do the check
+
+    branch = bbuild.get_build_branch()
+    url = 'https://api.github.com/repos/GregDMeyer/dynamite/git/refs/heads/{branch}'
+    url = url.format(branch=branch)
+
+    try:
+        with request.urlopen(url, timeout=1) as url_req:
+            try:
+                data = json.load(url_req)
+            except TypeError: # python < 3.6
+                data = json.loads(url_req.readall().decode('utf-8'))
+
+            commit = data['object']['sha']
+
+        build_commit = bbuild.get_build_version()
+        if not commit.startswith(build_commit):
+            print('Changes have been pushed to GitHub since dynamite was installed. '
+                  'Please update!', file=stderr)
+
+    # in general, catching all exceptions is a bad idea. but here, no matter
+    # what happens we just want to give up on the check
+    except:
+        pass
