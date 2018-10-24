@@ -2,14 +2,16 @@
 Test the reduced density matrix and entropy computation on PETSc vectors.
 '''
 
-import unittest as ut
 import numpy as np
 
+import dynamite_test_runner as dtr
+
+from dynamite import config
 from dynamite.subspaces import Parity, Auto
 from dynamite.states import State
 from dynamite.computations import reduced_density_matrix, entanglement_entropy, renyi_entropy
 
-class Explicit(ut.TestCase):
+class Explicit(dtr.DynamiteTestCase):
     def setUp(self):
         self.state = State()
 
@@ -161,7 +163,7 @@ class Explicit(ut.TestCase):
                 self.compare(check, correct)
                 self.check_entropy(state, keep, entropy)
 
-class Checker(ut.TestCase):
+class Checker(dtr.DynamiteTestCase):
     state = None
     def compare_rdm(self, keep, correct):
         check = reduced_density_matrix(self.state, keep)
@@ -248,9 +250,4 @@ class AutoSpace(FullSpace):
         self.state = State(subspace=Auto(H, 'U'*(config.L//2) + 'D'*(config.L-config.L//2)))
 
 if __name__ == '__main__':
-    from dynamite import config
-    config.initialize([
-        #'-start_in_debugger', 'noxterm'
-    ])
-    config.L = 10
-    ut.main()
+    dtr.main()

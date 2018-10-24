@@ -5,11 +5,13 @@ Test correctness of matrix norm for shell matrices.
 import unittest as ut
 import numpy as np
 import hamiltonians
+
+import dynamite_test_runner as dtr
+
 from dynamite import config
-from dynamite.subspaces import Full, Parity, Auto
 from dynamite._backend.bbuild import have_gpu_shell
 
-class Hamiltonians(ut.TestCase):
+class Hamiltonians(dtr.DynamiteTestCase):
 
     def do_all_shell(self, shelltype):
         config.initialize()
@@ -40,7 +42,4 @@ class Hamiltonians(ut.TestCase):
 # TODO: check correctness in the various subspace combinations
 
 if __name__ == '__main__':
-    config.L = 14
-    config.shell = False
-    #config.initialize(['-start_in_debugger', 'noxterm'])
-    ut.main()
+    dtr.main()

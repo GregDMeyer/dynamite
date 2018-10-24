@@ -4,11 +4,13 @@ import itertools
 import numpy as np
 import hamiltonians
 
+import dynamite_test_runner as dtr
+
 from dynamite.operators import index_sum, sigmax, identity
 from dynamite.states import State
-from dynamite.subspaces import Full, Parity
+from dynamite.subspaces import Parity
 
-class Checker(ut.TestCase):
+class Checker(dtr.DynamiteTestCase):
 
     def is_close(self, x, y, rtol = 1E-10, atol = 1E-10):
         self.assertTrue(np.isclose(x, y, rtol = rtol, atol = atol),
@@ -115,6 +117,4 @@ class ParityTests(Checker):
     # TODO: actually check results
 
 if __name__ == '__main__':
-    from dynamite import config
-    config.L = 12
-    ut.main()
+    dtr.main()

@@ -4,9 +4,12 @@ Integration tests for states.
 
 import unittest as ut
 import numpy as np
+
+import dynamite_test_runner as dtr
+
 from dynamite.states import State
 
-class RandomSeed(ut.TestCase):
+class RandomSeed(dtr.DynamiteTestCase):
 
     def test_generation(self):
         '''
@@ -24,7 +27,7 @@ class RandomSeed(ut.TestCase):
         if comm.rank == 0:
             self.assertTrue(all(s == seed for s in all_seeds))
 
-class ToNumpy(ut.TestCase):
+class ToNumpy(dtr.DynamiteTestCase):
 
     def setUp(self):
         from petsc4py import PETSc
@@ -53,15 +56,10 @@ class ToNumpy(ut.TestCase):
         for i in range(PETSc.COMM_WORLD.rank):
             self.assertTrue(npvec[i] == i)
 
-class PetscMethods(ut.TestCase):
+class PetscMethods(dtr.DynamiteTestCase):
     '''
     Tests that the methods directly included from PETSc function as intended.
     '''
-    def setUp(self):
-        from dynamite import config
-        if config.L is None:
-            config.L = 8
-
     def test_norm(self):
         state = State()
         start, end = state.vec.getOwnershipRange()
@@ -154,4 +152,4 @@ class PetscMethods(ut.TestCase):
 # TODO: check state setting. e.g. setting an invalid state should fail (doesn't for Full subspace)
 
 if __name__ == '__main__':
-    ut.main()
+    dtr.main()

@@ -1,8 +1,9 @@
 
 import unittest as ut
 from dynamite import tools
+import dynamite_test_runner as dtr
 
-class Tools(ut.TestCase):
+class Tools(dtr.DynamiteTestCase):
     '''
     Mostly check that the functions behave as we expect. We can't really verify
     that the output is exactly correct; what we want to ensure is that no
@@ -26,4 +27,4 @@ class Tools(ut.TestCase):
         self.assertTrue(isinstance(tools.get_max_memory_usage(), float))
 
 if __name__ == '__main__':
-    ut.main()
+    dtr.main()

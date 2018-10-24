@@ -1,15 +1,16 @@
 
-import unittest as ut
 import numpy as np
 from scipy.sparse import linalg
 import hamiltonians
 
+import dynamite_test_runner as dtr
+
 from dynamite import config
 from dynamite.operators import sigmax, index_product, identity
 from dynamite.states import State
-from dynamite.subspaces import Full, Parity
+from dynamite.subspaces import Parity
 
-class Analytic(ut.TestCase):
+class Analytic(dtr.DynamiteTestCase):
     '''
     Some cases in which we can easily write down the answer.
     '''
@@ -25,7 +26,7 @@ class Analytic(ut.TestCase):
         H.evolve(ket, t = np.pi/2, result = bra)
         self.assertLess(np.abs(1 - np.abs(bra.dot(bra_check))), 1E-9)
 
-class EvolveChecker(ut.TestCase):
+class EvolveChecker(dtr.DynamiteTestCase):
     def evolve_check(self, H, t):
         bra, ket = H.create_states()
         ket.set_random(seed = 0)
@@ -86,5 +87,4 @@ class ParityTests(EvolveChecker):
     # TODO: actually check output
 
 if __name__ == '__main__':
-    config.L = 10
-    ut.main()
+    dtr.main()

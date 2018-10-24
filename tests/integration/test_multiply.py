@@ -2,9 +2,10 @@
 Test correctness of matvec for various cases.
 '''
 
-import unittest as ut
+import dynamite_test_runner as dtr
 import numpy as np
 import hamiltonians
+from dynamite.msc_tools import msc_dtype
 from dynamite.operators import identity, sigmax, sigmay, index_sum, index_product
 from dynamite.subspaces import Full, Parity, Auto
 from dynamite.states import State
@@ -14,52 +15,7 @@ def generate_hamiltonian_tests(cls):
         setattr(cls, 'test_'+H_name, lambda self, n=H_name: self.check_hamiltonian(n))
     return cls
 
-class MPITestCase(ut.TestCase):
-
-    @classmethod
-    def check_all_procs(cls, success):
-
-        from dynamite import config
-        config.initialize()
-
-        from petsc4py import PETSc
-
-        # workaround since tompi4py() seems to break in some cases w/ GPU
-        if PETSc.COMM_WORLD.size > 1:
-            CW = PETSc.COMM_WORLD.tompi4py()
-            for i in range(CW.size):
-                remote = CW.bcast(success, root = i)
-                success = success and remote
-
-        return success
-
-    def assertEqual(self, first, second, msg=None):
-        success = first == second
-        all_success = self.check_all_procs(success)
-        if not all_success:
-            if success:
-                ut.TestCase.assertTrue(self, all_success, msg = 'failed on another process')
-            else:
-                ut.TestCase.assertEqual(self, first, second, msg)
-
-    def assertLess(self, first, second, msg=None):
-        success = first < second
-        all_success = self.check_all_procs(success)
-        if not all_success:
-            if success:
-                ut.TestCase.assertTrue(self, all_success, msg = 'failed on another process')
-            else:
-                ut.TestCase.assertLess(self, first, second, msg)
-
-    def assertTrue(self, expr, msg = None):
-        all_success = self.check_all_procs(expr)
-        if not all_success:
-            if expr:
-                ut.TestCase.assertTrue(self, all_success, msg = 'failed on another process')
-            else:
-                ut.TestCase.assertTrue(self, expr, msg)
-
-class FullSpace(MPITestCase):
+class FullSpace(dtr.DynamiteTestCase):
 
     def check_nonzeros(self, state, nonzeros):
         '''
@@ -100,7 +56,7 @@ class FullSpace(MPITestCase):
         self.check_nonzeros(r, correct)
 
 @generate_hamiltonian_tests
-class FullHamiltonians(MPITestCase):
+class FullHamiltonians(dtr.DynamiteTestCase):
     def check_hamiltonian(self, H_name):
         H = getattr(hamiltonians, H_name)()
         bra, ket = H.create_states()
@@ -136,7 +92,7 @@ class FullHamiltonians(MPITestCase):
         self.assertLess(np.abs(1 - inner_prod), 1E-9, msg=msg)
 
 @generate_hamiltonian_tests
-class Subspaces(MPITestCase):
+class Subspaces(dtr.DynamiteTestCase):
 
     def compare_to_full(self, H, x, check_subspace):
         '''
@@ -174,24 +130,6 @@ class Subspaces(MPITestCase):
         with self.subTest(which='s2s'):
             self.check_s2s(H, x, check_subspace, correct_sub)
 
-    def compare_vecs(self, H, correct, check):
-
-        # compare the local portions of the vectors
-        istart, iend = correct.vec.getOwnershipRange()
-        correct = correct.vec[istart:iend]
-        check = check.vec[istart:iend]
-
-        # this is the amount of machine rounding error we can accumulate
-        eps = H.nnz * np.finfo(correct.dtype).eps
-
-        diff = np.abs(correct-check)
-        max_idx = np.argmax(diff)
-        self.assertTrue(np.allclose(correct, check, rtol=0, atol=eps),
-                        msg = '\ncorrect: %e+i%e\ncheck: %e+i%e\ndiff: %e\nat %d' % \
-                            (correct[max_idx].real, correct[max_idx].imag,
-                             check[max_idx].real, check[max_idx].imag,
-                             np.abs(correct[max_idx]-check[max_idx]), max_idx))
-
     def check_f2s(self, H, x, check_subspace, correct):
         '''
         check multiplication from full to subspace
@@ -200,7 +138,8 @@ class Subspaces(MPITestCase):
         result = State(subspace=check_subspace)
         H.dot(x, result)
 
-        self.compare_vecs(H, correct, result)
+        eps = H.nnz*np.finfo(msc_dtype[2]).eps
+        self.check_vec_equal(correct, result, eps=eps)
 
     def check_s2f(self, H, x, check_subspace, correct):
         '''
@@ -217,7 +156,8 @@ class Subspaces(MPITestCase):
         H.dot(sub_state, full_state)
         to_space.dot(full_state, sub_state)
 
-        self.compare_vecs(H, correct, sub_state)
+        eps = H.nnz*np.finfo(msc_dtype[2]).eps
+        self.check_vec_equal(correct, sub_state, eps=eps)
 
     def check_s2s(self, H, x, check_subspace, correct):
         '''
@@ -233,7 +173,8 @@ class Subspaces(MPITestCase):
         to_space.dot(x, x_sub)
         H.dot(x_sub, result)
 
-        self.compare_vecs(H, correct, result)
+        eps = H.nnz*np.finfo(msc_dtype[2]).eps
+        self.check_vec_equal(correct, result, eps=eps)
 
     @classmethod
     def generate_random_in_subspace(cls, space):
@@ -283,12 +224,4 @@ class Subspaces(MPITestCase):
     # TODO: write tests for multiplication from one subspace to a different one
 
 if __name__ == '__main__':
-    from dynamite import config
-    config.L = 10
-    config.shell = False
-    #config.initialize(['-start_in_debugger', 'noxterm'])
-
-    ut.main()
-
-    # import cProfile
-    # cProfile.run('ut.main()', 'out.prof')
+    dtr.main()

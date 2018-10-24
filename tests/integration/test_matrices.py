@@ -2,8 +2,10 @@
 Integration tests ensuring that matrices are built correctly.
 '''
 
-import unittest as ut
 import numpy as np
+
+import unittest as ut
+import dynamite_test_runner as dtr
 
 from dynamite import config
 from dynamite.states import State
@@ -47,10 +49,9 @@ def petsc_mat_to_np(mat):
 
 from dynamite.operators import sigmax, sigmay, sigmaz
 
-class Fundamental(ut.TestCase):
+class Fundamental(dtr.DynamiteTestCase):
 
     def proc0_assert_true(self, *args, **kwargs):
-        # TODO: help this not hang if we fail a test by bcast
         config.initialize()
         from petsc4py import PETSc
         if PETSc.COMM_WORLD.rank == 0:
@@ -58,13 +59,15 @@ class Fundamental(ut.TestCase):
 
     def test_sigmax(self):
         o = sigmax()
+        o.L = 1
         o_np = petsc_mat_to_np(o.get_mat())
         correct = np.array([[0, 1],
                             [1, 0]])
-        self.proc0_assert_true(np.array_equal(o_np, correct))
+        self.proc0_assert_true(np.array_equal(o_np, correct), msg=str(o_np))
 
     def test_sigmay(self):
         o = sigmay()
+        o.L = 1
         o_np = petsc_mat_to_np(o.get_mat())
         correct = np.array([[0, -1j],
                             [1j, 0]])
@@ -72,6 +75,7 @@ class Fundamental(ut.TestCase):
 
     def test_sigmaz(self):
         o = sigmaz()
+        o.L = 1
         o_np = petsc_mat_to_np(o.get_mat())
         correct = np.array([[1, 0],
                             [0,-1]])
@@ -83,7 +87,7 @@ from dynamite.subspaces import Auto
 from hamiltonians import localized
 @ut.skipIf(msc_dtype['masks'] != np.int64,
            reason='only for builds with 64 bit integers')
-class LargeInt64(ut.TestCase):
+class LargeInt64(dtr.DynamiteTestCase):
     '''
     Tests for building matrices with 64 bit integers.
     '''
@@ -134,9 +138,4 @@ class LargeInt64(ut.TestCase):
                                msg=msg)
 
 if __name__ == '__main__':
-    from dynamite import config
-    args = [
-        #'-start_in_debugger', 'noxterm'
-    ]
-    config.initialize(args)
-    ut.main()
+    dtr.main()
