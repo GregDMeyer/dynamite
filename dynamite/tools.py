@@ -1,10 +1,6 @@
-
-__all__ = [
-    'get_version',
-    'get_version_str',
-    'track_memory',
-    'get_max_memory_usage',
-    'get_cur_memory_usage']
+'''
+Various tools useful for writing and analyzing dynamite programs.
+'''
 
 def mpi_print(*args, rank=0, **kwargs):
     '''
