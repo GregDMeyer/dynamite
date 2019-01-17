@@ -13,7 +13,7 @@ def parse_command_line(cmd_argv=None):
     parser.add_argument('--mpiexec', default='mpirun',
                         help='Command to launch an MPI job')
 
-    parser.add_argument('--nprocs', default=[1,3,4],
+    parser.add_argument('--nprocs', default=None,
                         type=lambda l: [int(x) for x in l.split(',')],
                         help='Comma separated list of number of processors to test with')
 
@@ -21,7 +21,7 @@ def parse_command_line(cmd_argv=None):
                         help='Number of seconds after which tests should time out')
 
     parser.add_argument('--gpu', action='store_true',
-                        help='Also run tests using a GPU')
+                        help='Run tests using a GPU')
 
     parser.add_argument('-L', type=int, default=10,
                         help='Set spin chain length for tests of variable size')
@@ -47,6 +47,12 @@ def main():
     fnames = sorted(glob('test_*'))
 
     params = parse_command_line()
+
+    if params.nprocs is None:
+        if params.gpu:
+            params.nprocs = [1]
+        else:
+            params.nprocs = [1,3,4]
 
     const_options = ['-v', '0', '-L', str(params.L)]
     run_options = [[], ['--shell']]
