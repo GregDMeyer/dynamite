@@ -51,19 +51,15 @@ from dynamite.operators import sigmax, sigmay, sigmaz
 
 class Fundamental(dtr.DynamiteTestCase):
 
-    def proc0_assert_true(self, *args, **kwargs):
-        config.initialize()
-        from petsc4py import PETSc
-        if PETSc.COMM_WORLD.rank == 0:
-            self.assertTrue(*args, **kwargs)
-
     def test_sigmax(self):
         o = sigmax()
         o.L = 1
         o_np = petsc_mat_to_np(o.get_mat())
         correct = np.array([[0, 1],
                             [1, 0]])
-        self.proc0_assert_true(np.array_equal(o_np, correct), msg=str(o_np))
+
+        if o_np is not None:
+            self.assertTrue(np.array_equal(o_np, correct), msg=str(o_np))
 
     def test_sigmay(self):
         o = sigmay()
@@ -71,7 +67,8 @@ class Fundamental(dtr.DynamiteTestCase):
         o_np = petsc_mat_to_np(o.get_mat())
         correct = np.array([[0, -1j],
                             [1j, 0]])
-        self.proc0_assert_true(np.array_equal(o_np, correct))
+        if o_np is not None:
+            self.assertTrue(np.array_equal(o_np, correct))
 
     def test_sigmaz(self):
         o = sigmaz()
@@ -79,7 +76,8 @@ class Fundamental(dtr.DynamiteTestCase):
         o_np = petsc_mat_to_np(o.get_mat())
         correct = np.array([[1, 0],
                             [0,-1]])
-        self.proc0_assert_true(np.array_equal(o_np, correct))
+        if o_np is not None:
+            self.assertTrue(np.array_equal(o_np, correct))
 
 from dynamite.operators import identity
 from dynamite.msc_tools import msc_dtype
@@ -91,14 +89,6 @@ class LargeInt64(dtr.DynamiteTestCase):
     '''
     Tests for building matrices with 64 bit integers.
     '''
-
-    def proc0_assert_true(self, *args, **kwargs):
-        # TODO: help this not hang if we fail a test by bcast
-        config.initialize()
-        from petsc4py import PETSc
-        if PETSc.COMM_WORLD.rank == 0:
-            self.assertTrue(*args, **kwargs)
-
     def setUp(self):
         self.H = localized(33)
         self.space = Auto(self.H, 'U'+'D'*32, size_guess=33)
@@ -108,8 +98,9 @@ class LargeInt64(dtr.DynamiteTestCase):
         o.L = 33
         o.subspace = self.space
         o_np = petsc_mat_to_np(o.get_mat())
-        self.proc0_assert_true(np.array_equal(o_np, o.to_numpy(sparse=False)),
-                               msg=str(o_np))
+        if o_np is not None:
+            self.assertTrue(np.array_equal(o_np, o.to_numpy(sparse=False)),
+                            msg=str(o_np))
 
     def test_localized(self):
         config.initialize()
@@ -134,8 +125,9 @@ class LargeInt64(dtr.DynamiteTestCase):
             else:
                 msg = ''
 
-        self.proc0_assert_true(result,
-                               msg=msg)
+        if H_np is not None:
+            self.assertTrue(result,
+                            msg=msg)
 
 if __name__ == '__main__':
     dtr.main()

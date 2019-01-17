@@ -80,13 +80,12 @@ def main():
         else:
             config.shell = 'cpu'
 
-    slepc_args = []
     if args.gpu:
-        slepc_args += [
+        args.slepc_args += [
             '-vec_type', 'cuda',
             '-mat_type', 'aijcusparse',
         ]
 
-    config.initialize(slepc_args)
+    config.initialize(args.slepc_args)
 
     mtr.main(name=args.name, failfast=args.failfast, verbose=args.verbose)

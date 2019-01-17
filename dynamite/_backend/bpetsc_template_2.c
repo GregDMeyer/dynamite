@@ -336,80 +336,91 @@ PetscErrorCode C(MatMult_CPU_General,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, Vec
     ierr = PetscMalloc1(mpi_size, &x_local_sizes);CHKERRQ(ierr);
     ierr = MPI_Allgather(&x_local_size, 1, MPIU_INT, x_local_sizes, 1, MPIU_INT, PETSC_COMM_WORLD);
 
-    ierr = PetscMalloc1(BLOCK_SIZE, &(x_array[0]));CHKERRQ(ierr);
-    ierr = PetscMalloc1(BLOCK_SIZE, &(x_array[1]));CHKERRQ(ierr);
-
-    /* compute the starting indices, and largest size on any processor */
-    ierr = PetscMalloc1(mpi_size+1, &x_local_starts);CHKERRQ(ierr);
-    max_proc_size = 0;
-    x_local_starts[0] = 0;
-    for (proc_idx = 0; proc_idx < mpi_size; ++proc_idx) {
-      if (max_proc_size < x_local_sizes[proc_idx]) max_proc_size = x_local_sizes[proc_idx];
-      x_local_starts[proc_idx+1] = x_local_starts[proc_idx] + x_local_sizes[proc_idx];
+    /* see if any processes have no data */
+    for (proc_idx = mpi_size; proc_idx > 0; --proc_idx) {
+      if (x_local_sizes[proc_idx-1] != 0) break;
     }
+    mpi_size = proc_idx;
 
-    ierr = VecGetOwnershipRange(b, &row_start, &row_end);CHKERRQ(ierr);
+    if (mpi_rank < mpi_size) {
 
-    /* iterate through blocks on our process */
-    for (block_start = 0; block_start < max_proc_size; block_start += BLOCK_SIZE) {
+      ierr = PetscMalloc1(BLOCK_SIZE, &(x_array[0]));CHKERRQ(ierr);
+      ierr = PetscMalloc1(BLOCK_SIZE, &(x_array[1]));CHKERRQ(ierr);
 
-      for (proc_shift = 0; proc_shift < mpi_size; ++proc_shift) {
-        /* do a round-robin of the data */
-        /* eventually, skip the ones we don't need */
-        proc_idx = (mpi_rank+proc_shift) % mpi_size;
-
-        col_start = block_start + x_local_starts[proc_idx];
-        col_end = PetscMin(col_start + BLOCK_SIZE, x_local_starts[proc_idx + 1]);
-
-        /* self to self */
-        if (proc_shift == 0) {
-          source_array = local_x_array + block_start;
-        }
-        else {
-          source_array = x_array[proc_shift%2];
-          ierr = MPI_Wait(&recv_request, MPI_STATUS_IGNORE);
-        }
-
-        if (proc_shift < mpi_size - 1) {
-
-          // TODO: put this stuff into a different function
-
-          /* prepare to receive */
-          recv_count = PetscMax(x_local_sizes[(mpi_rank+proc_shift+1)%mpi_size], block_start);
-          recv_count = PetscMin(recv_count, BLOCK_SIZE + block_start) - block_start;
-          if (recv_count > 0) {
-            if (proc_shift > 0) {
-              /* make sure we completed the previous send operation already */
-              ierr = MPI_Wait(&send_request, MPI_STATUS_IGNORE);
-            }
-            /* TODO: is this the right way to catch MPI errors with PETSc? */
-            ierr = MPI_Irecv(x_array[(proc_shift+1)%2], recv_count, MPIU_SCALAR,
-                              (mpi_rank+1)%mpi_size, 0,
-                              PETSC_COMM_WORLD, &recv_request);
-          }
-
-          /* you guys silly I'm still gonna send it */
-          send_count = col_end - col_start;
-          if (send_count > 0) {
-            /* TODO: is this the right way to catch MPI errors with PETSc? */
-            ierr = MPI_Isend(source_array, send_count, MPIU_SCALAR,
-                              (mpi_size+mpi_rank-1)%mpi_size, 0,
-                              PETSC_COMM_WORLD, &send_request);
-          }
-
-        }
-
-        /* finally actually do the computation */
-        C(MatMult_CPU_kernel,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
-          source_array, b_array, ctx, row_start, row_end, col_start, col_end);CHKERRQ(ierr);
-
+      /* compute the starting indices, and largest size on any processor */
+      ierr = PetscMalloc1(mpi_size+1, &x_local_starts);CHKERRQ(ierr);
+      max_proc_size = 0;
+      x_local_starts[0] = 0;
+      for (proc_idx = 0; proc_idx < mpi_size; ++proc_idx) {
+        if (max_proc_size < x_local_sizes[proc_idx]) max_proc_size = x_local_sizes[proc_idx];
+        x_local_starts[proc_idx+1] = x_local_starts[proc_idx] + x_local_sizes[proc_idx];
       }
+
+      ierr = VecGetOwnershipRange(b, &row_start, &row_end);CHKERRQ(ierr);
+
+      /* iterate through blocks on our process */
+      for (block_start = 0; block_start < max_proc_size; block_start += BLOCK_SIZE) {
+
+        for (proc_shift = 0; proc_shift < mpi_size; ++proc_shift) {
+          /* do a round-robin of the data */
+          /* eventually, skip the ones we don't need */
+          proc_idx = (mpi_rank+proc_shift) % mpi_size;
+
+          col_start = block_start + x_local_starts[proc_idx];
+          col_end = PetscMin(col_start + BLOCK_SIZE, x_local_starts[proc_idx + 1]);
+
+          /* self to self */
+          if (proc_shift == 0) {
+            source_array = local_x_array + block_start;
+          }
+          else {
+            source_array = x_array[proc_shift%2];
+            ierr = MPI_Wait(&recv_request, MPI_STATUS_IGNORE);
+          }
+
+          if (proc_shift < mpi_size - 1) {
+
+            // TODO: put this stuff into a different function
+
+            /* prepare to receive */
+            recv_count = PetscMax(x_local_sizes[(mpi_rank+proc_shift+1)%mpi_size], block_start);
+            recv_count = PetscMin(recv_count, BLOCK_SIZE + block_start) - block_start;
+            if (recv_count > 0) {
+              if (proc_shift > 0) {
+                /* make sure we completed the previous send operation already */
+                ierr = MPI_Wait(&send_request, MPI_STATUS_IGNORE);
+              }
+              /* TODO: is this the right way to catch MPI errors with PETSc? */
+              ierr = MPI_Irecv(x_array[(proc_shift+1)%2], recv_count, MPIU_SCALAR,
+                                (mpi_rank+1)%mpi_size, 0,
+                                PETSC_COMM_WORLD, &recv_request);
+            }
+
+            /* you guys silly I'm still gonna send it */
+            send_count = col_end - col_start;
+            if (send_count > 0) {
+              /* TODO: is this the right way to catch MPI errors with PETSc? */
+              ierr = MPI_Isend(source_array, send_count, MPIU_SCALAR,
+                                (mpi_size+mpi_rank-1)%mpi_size, 0,
+                                PETSC_COMM_WORLD, &send_request);
+            }
+
+          }
+
+          /* finally actually do the computation */
+          C(MatMult_CPU_kernel,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
+            source_array, b_array, ctx, row_start, row_end, col_start, col_end);CHKERRQ(ierr);
+
+        }
+      }
+
+      ierr = PetscFree(x_local_starts);CHKERRQ(ierr);
+      ierr = PetscFree(x_array[0]);CHKERRQ(ierr);
+      ierr = PetscFree(x_array[1]);CHKERRQ(ierr);
+
     }
 
     ierr = PetscFree(x_local_sizes);CHKERRQ(ierr);
-    ierr = PetscFree(x_local_starts);CHKERRQ(ierr);
-    ierr = PetscFree(x_array[0]);CHKERRQ(ierr);
-    ierr = PetscFree(x_array[1]);CHKERRQ(ierr);
 
   }
 
