@@ -16,8 +16,9 @@ class _Config:
     _shell = False
     _info_level = 0
     _subspace = None
+    _gpu = False
 
-    def initialize(self, slepc_args = None, version_check = True):
+    def initialize(self, slepc_args=None, version_check=True, gpu=False):
         """
         Initialize PETSc/SLEPc with various arguments (which would be
         passed on the command line for a C program).
@@ -41,13 +42,6 @@ class _Config:
                       'any PETSc modules or interfacing with PETSc functionality ' +\
                       '(like building matrices).'
 
-        if self.initialized:
-            if slepc_args:
-                raise RuntimeError('dynamite.config.initialize() has already been called. ' +\
-                                   explain_str)
-            else:
-                return
-
         if bbuild.petsc_initialized():
             raise RuntimeError('PETSc has been initialized but dynamite has not. ' +\
                                explain_str)
@@ -55,6 +49,20 @@ class _Config:
         if slepc_args is None:
             slepc_args = []
 
+        self._gpu = gpu
+        if self.gpu:
+            slepc_args += [
+                '-vec_type', 'cuda',
+                '-mat_type', 'aijcusparse'
+            ]
+
+        if self.initialized:
+            if slepc_args:
+                raise RuntimeError('dynamite.config.initialize() has already been called. ' +\
+                                   explain_str)
+            else:
+                return
+            
         slepc4py.init(slepc_args)
         self.initialized = True
 
@@ -127,16 +135,12 @@ class _Config:
         self._subspace = validate.subspace(value)
 
     @property
-    def info_level(self):
+    def gpu(self):
         """
-        How verbose to output debug information.
+        Whether to run the computations on a GPU. Cannot be changed after ``config.initialize``
+        is called.
         """
-        return self._info_level
-
-    @info_level.setter
-    def info_level(self,value):
-        validate.info_level(value)
-        self._info_level = value
+        return self._gpu
 
 config = _Config()
 
