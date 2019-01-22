@@ -41,8 +41,7 @@ class _Config:
         if slepc_args is None:
             slepc_args = []
 
-        self._gpu = gpu
-        if self.gpu:
+        if gpu:
             slepc_args += [
                 '-vec_type', 'cuda',
                 '-mat_type', 'aijcusparse'
@@ -65,6 +64,7 @@ class _Config:
 
         slepc4py.init(slepc_args)
         self.initialized = True
+        self._gpu = gpu
 
         from petsc4py import PETSc
         if version_check and PETSc.COMM_WORLD.rank == 0:
