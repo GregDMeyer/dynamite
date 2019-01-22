@@ -4,12 +4,11 @@ Tips, Tricks, and Pitfalls
 
 Pitfalls (TL,DR)
 ----------------
- - Beware of "nondeterministic" code when running in parallel! Of course your
-    code will be technically "deterministic", but I mean code that may run
-    differently on different processes. An especially sneaky example is iterating
-    through dictionaries: since they are unordered, if you do ``for key,value in d.items():``,
-    you may get the items in a different order on different processes. If anything
-    in your for loop involves inter-process communication, things will break!
+ - Beware of "nondeterministic" code when running in parallel!
+   
+   - Making calls to e.g. "numpy.random.rand()" will give different values on each process. If you use this to build your Hamiltonian, you will not have a consistent operator across your different processes! If you need random numbers, make sure to seed them with the same value everywhere.
+   - An especially sneaky example is iterating through dictionaries: since they are unordered, if you do ``for key,value in d.items():``, you may get items in a different order and your processes will not be running the same code. One solution is to set ``PYTHONHASHSEED=0`` in the environment before starting your Python interpreter; this disables the randomization in the hash function.
+
  - It really is useful to read the SLEPc (and PETSc) Users' Manual!
 
 
@@ -34,11 +33,12 @@ you), you may want:
 
     $PETSC_DIR/bin/petscmpiexec -n 4 python3 solve_quantum_gravity.py
 
-Shell matrices
---------------
+Matrix-free matrices
+--------------------
 
-Shell, or "matrix-free" matrices, save significantly on memory usage and can
-also sometimes speed things up. Instead of storing the entire matrix in memory,
+"Matrix-free" matrices (known in dynamite and PETSc as "shell" matrices)
+save significantly on memory usage and can also sometimes speed things up.
+Instead of storing the entire matrix in memory,
 they compute matrix elements on-the-fly when they are needed. When using shell
 matrices, the only significant memory usage is the storage of the state vector
 (and any other vectors used in the evolution or eigensolve computations).
@@ -77,7 +77,25 @@ Krylov subspace used by SLEPc's matrix exponential, one would do
 GPU Support
 -----------
 
-It is possible to run dynamite computations on GPUs, and it is amazingly fast.
-PETSc/SLEPc must be built with the ``cuda-opt.py`` configuration script (in
-dynamite's ``petsc_config`` directory). Details on using dynamite with GPUs are
-coming soon.
+It is possible to run dynamite computations on GPUs, and it is generally quite fast.
+However this functionality is still experimental; make sure to check your results!
+
+The basic steps are the following:
+
+- Find a machine with a GPU and CUDA
+
+.. note::
+
+   Currently PETSc with complex numbers is broken for CUDA versions 8 and above.
+   Dynamite is tested on a PETSc build with CUDA version 7.5. The problem has
+   been identified and reported; the fix is nontrivial but hopefully will be done soon.   
+
+- Build PETSc/SLEPc using the ``cuda-opt.py`` configuration script (in the ``petsc_config`` directory of dynamite)
+
+- Build dynamite with PETSC_ARCH environment variable set to ``cuda-opt``
+
+- Call ``config.initialize(gpu=True)`` at the beginning of your script
+
+A drawback of GPUs is their limited memory that restricts possible system sizes;
+to get to bigger system sizes try using shell matrices on the GPU (by setting
+``config.shell = True``.

@@ -531,7 +531,8 @@ class Operator:
             left_data = subspaces[0].get_cdata(),
             right_type = subspaces[1].to_enum(),
             right_data = subspaces[1].get_cdata(),
-            shell = bpetsc.shell_impl_d[self.shell]
+            shell = self.shell,
+            gpu = config.gpu
         )
 
         self._mats[subspaces] = mat

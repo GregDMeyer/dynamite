@@ -73,20 +73,8 @@ def main():
     args = parse_command_line()
 
     config.L = args.L
+    config.shell = args.shell
 
-    if args.shell:
-        if args.gpu:
-            config.shell = 'gpu'
-        else:
-            config.shell = 'cpu'
-
-    slepc_args = []
-    if args.gpu:
-        slepc_args += [
-            '-vec_type', 'cuda',
-            '-mat_type', 'aijcusparse',
-        ]
-
-    config.initialize(slepc_args)
+    config.initialize(args.slepc_args, gpu=args.gpu)
 
     mtr.main(name=args.name, failfast=args.failfast, verbose=args.verbose)

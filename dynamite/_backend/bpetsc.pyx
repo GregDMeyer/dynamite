@@ -64,12 +64,6 @@ cdef extern from "bpetsc_impl.h":
 
 include "config.pxi"
 
-shell_impl_d = {
-    False : NO_SHELL,
-    'cpu' : CPU_SHELL,
-    'gpu' : GPU_SHELL
-}
-
 def build_mat(int L,
               PetscInt [:] masks,
               PetscInt [:] mask_offsets,
@@ -79,12 +73,14 @@ def build_mat(int L,
               left_data,
               subspace_type right_type,
               right_data,
-              shell_impl shell):
+              bint shell,
+              bint gpu):
 
     cdef int ierr, nterms, nmasks
     cdef subspaces_t subspaces
     cdef msc_t msc
-
+    cdef shell_impl which_shell
+    
     msc.nmasks      = masks.size
     msc.masks       = &masks[0]
     msc.mask_offsets = &mask_offsets[0]
@@ -98,12 +94,20 @@ def build_mat(int L,
     subspaces.right_type = right_type
     bsubspace.set_data_pointer(right_type, right_data, &(subspaces.right_data))
 
-    if shell == GPU_SHELL:
+    if gpu:
         IF not USE_CUDA:
             raise RuntimeError("dynamite was not built with CUDA shell "
                                "functionality (requires nvcc during build).")
 
-    ierr = BuildMat(&msc, &subspaces, shell, &M.mat)
+    if not shell:
+        which_shell = NO_SHELL
+    else:
+        if gpu:
+            which_shell = GPU_SHELL
+        else:
+            which_shell = CPU_SHELL
+            
+    ierr = BuildMat(&msc, &subspaces, which_shell, &M.mat)
 
     if ierr != 0:
         raise Error(ierr)

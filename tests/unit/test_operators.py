@@ -481,11 +481,11 @@ class Properties(ut.TestCase):
         o = Operator()
         self.assertEqual(o.shell, False)
 
-        o.shell = 'cpu'
-        self.assertEqual(o.shell, 'cpu')
+        o.shell = True
+        self.assertTrue(o.shell)
 
-        o.shell = 'gpu'
-        self.assertEqual(o.shell, 'gpu')
+        with self.assertRaises(ValueError):
+            o.shell = 'gpu'
 
         with self.assertRaises(ValueError):
             o.shell = 'crab'

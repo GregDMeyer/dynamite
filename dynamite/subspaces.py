@@ -9,7 +9,7 @@ import numpy as np
 from copy import deepcopy
 from zlib import crc32
 
-from . import validate, info, states
+from . import validate, states
 from ._backend import bsubspace
 
 class Subspace:
@@ -171,7 +171,6 @@ class Full(Subspace):
         '''
         Returns an object containing the subspace data accessible by the C backend.
         '''
-        info.write(2, 'Getting C subspace data for Full subspace.')
         return self._get_cdata(self.L)
 
     @classmethod
@@ -250,7 +249,6 @@ class Parity(Subspace):
         '''
         Returns an object containing the subspace data accessible by the C backend.
         '''
-        info.write(2, 'Getting C subspace data for Parity subspace.')
         return self._get_cdata(self.L, self.space)
 
     @classmethod
@@ -349,7 +347,6 @@ class Auto(Subspace):
         '''
         Returns an object containing the subspace data accessible by the C backend.
         '''
-        info.write(2, 'Getting C subspace data for Auto subspace.')
         return bsubspace.CAuto(
             self.L,
             np.ascontiguousarray(self.state_map),

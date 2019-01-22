@@ -36,10 +36,9 @@ def brackets(x):
     return x
 
 def shell(s):
-    valid_options = [False, 'cpu', 'gpu']
-    if s not in valid_options:
-        raise ValueError('Options for shell matrices are %s.' % \
-                         ', '.join(str(x) for x in valid_options))
+    if not isinstance(s, bool):
+        raise ValueError("Shell must be set to True or False. To use GPU shell matrices, "
+                         "just do config.initialize(gpu=True), and set shell to True.")
     return s
 
 def info_level(level):
