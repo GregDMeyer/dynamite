@@ -25,8 +25,11 @@ def parse_args(argv=None):
     parser.add_argument('-H', choices=['MBL','long_range','SYK','ising','XX'],
                         help='Hamiltonian to use')
 
-    parser.add_argument('--shell', type=str, default=False,
+    parser.add_argument('--shell', action='store_true',
                         help='Make a shell matrix instead of a regular matrix.')
+    parser.add_argument('--gpu', action='store_true',
+                        help='Run computations on GPU instead of CPU.')
+    
     parser.add_argument('--slepc_args', type=str, default='',
                         help='Arguments to pass to SLEPc.')
     parser.add_argument('--track_memory', action='store_true',
@@ -170,10 +173,10 @@ def log_call(function, stat_dict):
 def main():
     arg_params = parse_args()
     slepc_args = arg_params.slepc_args.split(' ')
-    config.initialize(slepc_args)
+    config.initialize(slepc_args, gpu=arg_params.gpu)
     config.L = arg_params.L
     config.shell = arg_params.shell
-
+    
     from petsc4py.PETSc import Sys
     Print = Sys.Print
 
