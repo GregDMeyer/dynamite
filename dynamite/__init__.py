@@ -38,14 +38,6 @@ class _Config:
             Can be set to false if the check is unnecessary or causes problems.
         """
 
-        explain_str = 'Call dynamite.config.initialize(args) before importing ' +\
-                      'any PETSc modules or interfacing with PETSc functionality ' +\
-                      '(like building matrices).'
-
-        if bbuild.petsc_initialized():
-            raise RuntimeError('PETSc has been initialized but dynamite has not. ' +\
-                               explain_str)
-
         if slepc_args is None:
             slepc_args = []
 
@@ -56,6 +48,10 @@ class _Config:
                 '-mat_type', 'aijcusparse'
             ]
 
+        explain_str = 'Call dynamite.config.initialize(args) before importing ' +\
+                      'any PETSc modules or interfacing with PETSc functionality ' +\
+                      '(like building matrices).'
+
         if self.initialized:
             if slepc_args:
                 raise RuntimeError('dynamite.config.initialize() has already been called. ' +\
@@ -63,6 +59,10 @@ class _Config:
             else:
                 return
             
+        if bbuild.petsc_initialized():
+            raise RuntimeError('PETSc has been initialized but dynamite has not. ' +\
+                               explain_str)
+
         slepc4py.init(slepc_args)
         self.initialized = True
 
