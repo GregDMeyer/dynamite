@@ -26,6 +26,9 @@ def parse_command_line(cmd_argv=None):
     parser.add_argument('-L', type=int, default=10,
                         help='Set spin chain length for tests of variable size')
 
+    parser.add_argument('-v', type=int, default=0,
+                        help='Verbosity of output from each test run')
+
     args = parser.parse_args(cmd_argv)
 
     return args
@@ -54,7 +57,7 @@ def main():
         else:
             params.nprocs = [1,3,4]
 
-    const_options = ['-v', '0', '-L', str(params.L)]
+    const_options = ['-v', str(params.v), '-L', str(params.L)]
     run_options = [[], ['--shell']]
 
     if params.gpu:
