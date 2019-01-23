@@ -36,6 +36,9 @@ class _Config:
         version_check : bool
             Whether process 0 should check for a new dynamite version on initialization.
             Can be set to false if the check is unnecessary or causes problems.
+
+        gpu : bool
+            Whether to run all computations using a GPU instead of the CPU.
         """
 
         if slepc_args is None:
@@ -105,8 +108,8 @@ class _Config:
     @property
     def shell(self):
         """
-        Whether to use standard PETSc matrices (``False``, default), shell matrices
-        on the CPU (``cpu``) or on the GPU (``gpu``).
+        Whether to use standard PETSc matrices (``False``, default), or shell 
+        matrices (``True``).
         """
         return self._shell
 
@@ -137,8 +140,8 @@ class _Config:
     @property
     def gpu(self):
         """
-        Whether to run the computations on a GPU. Cannot be changed after ``config.initialize``
-        is called.
+        Whether to run the computations on a GPU. This property is read-only. To use
+        GPUs, :meth:`initialize()` must be called with ``gpu=True``.
         """
         return self._gpu
 
