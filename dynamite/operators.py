@@ -1102,6 +1102,11 @@ def sigmaz(i=0):
 def sigma_plus(i=0):
     r"""
     The :math:`\sigma_+ = \sigma_x + i \sigma_y` operator.
+
+    .. note::
+
+        :math:`\sigma_+ = \left( \begin{array}{cc} 0 & 2 \\ 0 & 0 \\ \end{array} \right)`,
+        so :math:`S_+ = \left( \begin{array}{cc} 0 & 1 \\ 0 & 0 \\ \end{array} \right) = \frac{1}{2} \sigma_+`
     """
     o = sigmax(i) + 1j*sigmay(i)
     o.tex = r'\sigma^+_{IDX'+str(i)+'}'
@@ -1111,6 +1116,11 @@ def sigma_plus(i=0):
 def sigma_minus(i=0):
     r"""
     The :math:`\sigma_- = \sigma_x - i \sigma_y` operator.
+
+    .. note::
+
+        :math:`\sigma_- = \left( \begin{array}{cc} 0 & 0 \\ 2 & 0 \\ \end{array} \right)`,
+        so :math:`S_- = \left( \begin{array}{cc} 0 & 0 \\ 1 & 0 \\ \end{array} \right) = \frac{1}{2} \sigma_-`
     """
     o = sigmax(i) - 1j*sigmay(i)
     o.tex = r'\sigma^-_{IDX'+str(i)+'}'
