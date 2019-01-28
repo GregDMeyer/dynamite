@@ -65,6 +65,36 @@ class ToNumpy(ut.TestCase):
         )
         self.check_same(dnm, npy)
 
+    def test_nonherm_diag(self):
+        dnm = msc_tools.msc_to_numpy([(0, 0, 1j)], (2,2))
+        npy = np.array(
+            [
+                [1j, 0],
+                [0, 1j],
+            ]
+        )
+        self.check_same(dnm, npy)
+
+    def test_nonherm_offdiag(self):
+        dnm = msc_tools.msc_to_numpy([(1, 0, 1j)], (2,2))
+        npy = np.array(
+            [
+                [0, 1j],
+                [1j, 0],
+            ]
+        )
+        self.check_same(dnm, npy)
+
+    def test_nonherm_sign(self):
+        dnm = msc_tools.msc_to_numpy([(1, 1, 1j)], (2,2))
+        npy = np.array(
+            [
+                [0, -1j],
+                [1j, 0],
+            ]
+        )
+        self.check_same(dnm, npy)
+
     def test_twoterms_tall(self):
         def state_to_idx(x):
             rtn = x.copy()
@@ -192,6 +222,40 @@ class ToNumpy(ut.TestCase):
             ]
         )
         self.check_same(dnm, npy)
+
+class IsHermitian(ut.TestCase):
+    '''
+    Test the is_hermitian method.
+    '''
+
+    def test_hermitian(self):
+        check = np.array([(1, 3, 1j)], dtype=msc_tools.msc_dtype)
+        self.assertTrue(msc_tools.is_hermitian(check))
+
+    def test_hermitian_big(self):
+        check = np.array([( 3,  0,  1.        +0.j), ( 3,  3, -1.        +0.j),
+                          ( 0,  3,  1.        +0.j), ( 6,  0,  1.        +0.j),
+                          ( 6,  6, -1.        +0.j), ( 0,  6,  1.        +0.j),
+                          (12,  0,  1.        +0.j), (12, 12, -1.        +0.j),
+                          ( 0, 12,  1.        +0.j), ( 0,  1,  0.09762701+0.j),
+                          ( 0,  2,  0.43037873+0.j), ( 0,  4,  0.20552675+0.j),
+                          ( 0,  8,  0.08976637+0.j)], dtype=msc_tools.msc_dtype)
+        self.assertTrue(msc_tools.is_hermitian(check))
+
+    def test_nonhermitian(self):
+        check = np.array([(1, 3, 3)], dtype=msc_tools.msc_dtype)
+        self.assertFalse(msc_tools.is_hermitian(check))
+
+    def test_nonhermitian_big(self):
+        check = np.array([( 0,  1,  0.09762701+0.j), ( 0,  2,  0.43037873+0.j),
+                          ( 0,  3,  1.        +0.j), ( 0,  4,  0.20552675+0.j),
+                          ( 0,  6,  1.        +0.j), ( 0,  8,  0.08976637+0.j),
+                          ( 0, 12,  1.        +0.j), ( 3,  0,  1.        +0.j),
+                          ( 3,  3, -1.        +0.j), ( 4,  0,  1.        +0.j),
+                          ( 4,  4, -1.        +0.j), ( 6,  0,  1.        +0.j),
+                          ( 6,  6, -1.        +0.j), (12,  0,  1.        +0.j),
+                          (12, 12, -1.        +0.j)], dtype=msc_tools.msc_dtype)
+        self.assertFalse(msc_tools.is_hermitian(check))
 
 class MSCSum(ut.TestCase):
     '''

@@ -18,6 +18,10 @@ length of the spin chain.
 
 .. autofunction:: dynamite.operators.sigmaz
 
+.. autofunction:: dynamite.operators.sigma_plus
+
+.. autofunction:: dynamite.operators.sigma_minus
+
 .. autofunction:: dynamite.operators.identity
 
 .. autofunction:: dynamite.operators.zero

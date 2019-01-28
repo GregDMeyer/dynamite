@@ -16,15 +16,15 @@ from dynamite.states import State
 class StrToIdx(ut.TestCase):
 
     test_cases = [
-        ('UUUDD', 5, 107),
-        ('DDUDD', 5, 104),
-        ('UDDDUDUD', 8, 181),
+        ('DDDUU', 5, 107),
+        ('UUDUU', 5, 104),
+        ('DUUUDUDU', 8, 181),
         (49, 6, 149),
     ]
 
     fail_cases = [
-        ('UUFDDD', 6),     # bad character
-        ('UDDUD',  6),     # wrong size
+        ('DDFUUU', 6),     # bad character
+        ('DUUDU',  6),     # wrong size
     ]
 
     def test_good(self):
@@ -54,10 +54,10 @@ class SetValues(ut.TestCase):
         '''
 
         subtests = [
-            ('DDDDD', (1,1)),
-            ('DUUDD', (7,1)),
-            ('UUUUU', (32,1)),
-            ('DUUUD', (15,1)),
+            ('UUUUU', (1,1)),
+            ('UDDUU', (7,1)),
+            ('DDDDD', (32,1)),
+            ('UDDDU', (15,1)),
         ]
 
         istart, iend = self.s.vec.getOwnershipRange()

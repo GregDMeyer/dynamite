@@ -47,7 +47,7 @@ def petsc_mat_to_np(mat):
     else:
         return None
 
-from dynamite.operators import sigmax, sigmay, sigmaz
+from dynamite.operators import sigmax, sigmay, sigmaz, sigma_plus, sigma_minus
 
 class Fundamental(dtr.DynamiteTestCase):
 
@@ -78,6 +78,15 @@ class Fundamental(dtr.DynamiteTestCase):
                             [0,-1]])
         if o_np is not None:
             self.assertTrue(np.array_equal(o_np, correct))
+
+    def test_nonhermitian_error(self):
+        o = sigma_plus()
+        with self.assertRaises(ValueError):
+            o.get_mat()
+
+        o = sigma_minus()
+        with self.assertRaises(ValueError):
+            o.get_mat()
 
 from dynamite.operators import identity
 from dynamite.msc_tools import msc_dtype

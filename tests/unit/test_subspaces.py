@@ -177,7 +177,7 @@ class TestAuto(ut.TestCase):
     def test_string_int_state(self):
         from dynamite.operators import sigmax, sigmay, index_sum
         H = index_sum(sigmax(0)*sigmax(1) + sigmay(0)*sigmay(1), size=8)
-        sp1 = Auto(H,     'UUDDDDDD')
+        sp1 = Auto(H,     'DDUUUUUU')
         sp2 = Auto(H, int('00000011',2))
         sp3 = Auto(H, int('11000000',2))
 

@@ -92,7 +92,7 @@ class State:
     def str_to_state(cls, s, L):
         '''
         Convert a string to an integer whose bitwise representation is the spin
-        configuration (0=↓, 1=↑) of a product state. The characters
+        configuration (0=↑, 1=↓) of a product state. The characters
         'D' and 'U' represent down and up spins, like ``"DUDDU...UDU"`` (D=↓, U=↑).
 
         .. note::
@@ -122,7 +122,7 @@ class State:
 
             state = 0
             for i,c in enumerate(s):
-                if c == 'U':
+                if c == 'D':
                     state += 1<<i
 
         else:
@@ -133,7 +133,7 @@ class State:
     def set_product(self, s):
         """
         Initialize to a product state. Can be specified either be an integer whose binary
-        representation represents the spin configuration (0=↓, 1=↑) of a product state, or a string
+        representation represents the spin configuration (0=↑, 1=↓) of a product state, or a string
         of the form ``"DUDDU...UDU"`` (D=↓, U=↑). If it is a string, the string's length must
         equal ``L``.
 

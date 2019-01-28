@@ -50,7 +50,7 @@ class FullSpace(dtr.DynamiteTestCase):
 
     def test_spinflip(self):
         H = index_product(sigmax())
-        s = State(state = 'U'*H.get_length())
+        s = State(state='D'*H.get_length())
         r = H * s
         correct = {0 : 1}
         self.check_nonzeros(r, correct)
