@@ -5,6 +5,8 @@ Test correctness of matvec for various cases.
 import dynamite_test_runner as dtr
 import numpy as np
 import hamiltonians
+
+from dynamite import config
 from dynamite.msc_tools import msc_dtype
 from dynamite.operators import identity, sigmax, sigmay, index_sum, index_product
 from dynamite.subspaces import Full, Parity, Auto
@@ -50,7 +52,7 @@ class FullSpace(dtr.DynamiteTestCase):
 
     def test_spinflip(self):
         H = index_product(sigmax())
-        s = State(state = 'U'*H.get_length())
+        s = State(state='D'*H.get_length())
         r = H * s
         correct = {0 : 1}
         self.check_nonzeros(r, correct)
@@ -221,7 +223,49 @@ class Subspaces(dtr.DynamiteTestCase):
 
                         self.compare_to_full(H, ket, sp)
 
-    # TODO: write tests for multiplication from one subspace to a different one
+# TODO: write tests where this is not just the identity
+class Projection(dtr.DynamiteTestCase):
+
+    def check_projection(self, from_subspace, to_subspace):
+
+        s = State(subspace=from_subspace)
+        s.set_random(seed=0)
+
+        r = State(subspace=to_subspace)
+
+        project = identity()
+        project.add_subspace(to_subspace, from_subspace)
+
+        project.dot(s, result=r)
+
+        s_np = s.to_numpy()
+        r_np = r.to_numpy()
+
+        from_states = set(from_subspace.idx_to_state(np.arange(from_subspace.get_dimension())))
+
+        for i,state in enumerate(to_subspace.idx_to_state(np.arange(to_subspace.get_dimension()))):
+
+            if state not in from_states:
+                self.assertEqual(r_np[i], 0, msg=i)
+
+            else:
+                self.assertEqual(s_np[from_subspace.state_to_idx(state)], r_np[i])
+
+    def test_projections(self):
+
+        half_chain = config.L // 2
+        state = 'U'*half_chain + 'D'*(config.L-half_chain)
+
+        full = Full()
+        even_parity = Parity('even')
+        odd_parity = Parity('odd')
+        auto = Auto(hamiltonians.localized(), state)
+
+        subspace_list = [full, even_parity, odd_parity, auto]
+        for from_subspace in subspace_list:
+            for to_subspace in subspace_list:
+                with self.subTest(from_s=from_subspace, to_s=to_subspace):
+                    self.check_projection(from_subspace, to_subspace)
 
 if __name__ == '__main__':
     dtr.main()

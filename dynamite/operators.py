@@ -521,6 +521,9 @@ class Operator:
         mask_offsets[:-1] = indices
         mask_offsets[-1]  = term_array.shape[0]
 
+        if not msc_tools.is_hermitian(term_array):
+            raise ValueError('Building non-Hermitian matrices currently not supported.')
+
         mat = bpetsc.build_mat(
             L = self.get_length(),
             masks = np.ascontiguousarray(masks),
@@ -1094,6 +1097,34 @@ def sigmaz(i=0):
     o.msc = [(0, 1<<i, 1)]
     o.tex = r'\sigma^z_{IDX'+str(i)+'}'
     o.string = 'σz'+str(i).join('[]')
+    return o
+
+def sigma_plus(i=0):
+    r"""
+    The :math:`\sigma_+ = \sigma_x + i \sigma_y` operator.
+
+    .. note::
+
+        :math:`\sigma_+ = \left( \begin{array}{cc} 0 & 2 \\ 0 & 0 \\ \end{array} \right)`,
+        so :math:`S_+ = \left( \begin{array}{cc} 0 & 1 \\ 0 & 0 \\ \end{array} \right) = \frac{1}{2} \sigma_+`
+    """
+    o = sigmax(i) + 1j*sigmay(i)
+    o.tex = r'\sigma^+_{IDX'+str(i)+'}'
+    o.string = 'σ+'+str(i).join('[]')
+    return o
+
+def sigma_minus(i=0):
+    r"""
+    The :math:`\sigma_- = \sigma_x - i \sigma_y` operator.
+
+    .. note::
+
+        :math:`\sigma_- = \left( \begin{array}{cc} 0 & 0 \\ 2 & 0 \\ \end{array} \right)`,
+        so :math:`S_- = \left( \begin{array}{cc} 0 & 0 \\ 1 & 0 \\ \end{array} \right) = \frac{1}{2} \sigma_-`
+    """
+    o = sigmax(i) - 1j*sigmay(i)
+    o.tex = r'\sigma^-_{IDX'+str(i)+'}'
+    o.string = 'σ-'+str(i).join('[]')
     return o
 
 def identity():

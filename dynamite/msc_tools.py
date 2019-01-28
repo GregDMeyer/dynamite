@@ -91,6 +91,32 @@ def msc_to_numpy(msc, dims, idx_to_state = None, state_to_idx = None, sparse = T
 
     return ary
 
+def is_hermitian(msc):
+    '''
+    Checks whether a given MSC matrix represents a Hermitian operator or not.
+
+    Parameters
+    ----------
+    msc : np.ndarray
+        The MSC matrix
+
+    Returns
+    -------
+
+    bool
+        Whether the matrix is Hermitian
+    '''
+
+    should_be_complex = parity(msc['masks'] & msc['signs']) == 1
+
+    if np.any(np.real(msc['coeffs'][should_be_complex])):
+        return False
+
+    if np.any(np.imag(msc['coeffs'][~should_be_complex])):
+        return False
+
+    return True
+
 def msc_sum(iterable):
     '''
     Defines the matrix addition operation for any number of MSC matrices returned by

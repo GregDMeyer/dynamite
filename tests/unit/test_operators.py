@@ -9,7 +9,8 @@ import unittest as ut
 from unittest.mock import Mock, MagicMock
 import numpy as np
 
-from dynamite.operators import Operator, sigmax, sigmay, sigmaz, identity, zero
+from dynamite.operators import Operator, sigmax, sigmay, sigmaz
+from dynamite.operators import sigma_plus, sigma_minus, identity, zero
 from dynamite import msc_tools
 
 # TODO: add test: get_length on identity should fail without explicit L
@@ -52,6 +53,18 @@ class Fundamental(ut.TestCase):
         dnm = msc_tools.msc_to_numpy(zero().msc, (2,2))
         npy = np.array([[0, 0],
                         [0, 0]])
+        self.check_same(dnm, npy)
+
+    def test_sigma_plus(self):
+        dnm = msc_tools.msc_to_numpy(sigma_plus().msc, (2,2))
+        npy = np.array([[0, 2],
+                        [0, 0]])
+        self.check_same(dnm, npy)
+
+    def test_sigma_minus(self):
+        dnm = msc_tools.msc_to_numpy(sigma_minus().msc, (2,2))
+        npy = np.array([[0, 0],
+                        [2, 0]])
         self.check_same(dnm, npy)
 
     def test_antihermitian(self):
@@ -134,6 +147,11 @@ class UnaryBinary(ut.TestCase):
     def test_rproduct_num(self):
         dnm = sigmay() * 4
         self.check_same_msc(dnm.msc, [(1, 1, 4j)])
+
+    def test_hopping(self):
+        ladder = 0.5*(sigma_plus(0)*sigma_minus(1) + sigma_minus(0)*sigma_plus(1))
+        pauli  = sigmax(0)*sigmax(1) + sigmay(0)*sigmay(1)
+        self.check_same_msc(ladder.msc, pauli.msc)
 
 from dynamite.operators import op_sum, op_product
 

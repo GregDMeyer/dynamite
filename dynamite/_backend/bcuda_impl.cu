@@ -2,10 +2,12 @@
 #include "bcuda_impl.h"
 
 #ifdef PETSC_USE_64BIT_INDICES
-  #define TERM_REAL_CUDA(mask, sign) (!(__popcll((mask) & (sign)) & 1))
+  #define CUDA_PARITY(x) (__popcll(x)&1)
 #else
-  #define TERM_REAL_CUDA(mask, sign) (!(__popc((mask) & (sign)) & 1))
+  #define CUDA_PARITY(x) (__popc(x)&1)
 #endif
+
+#define TERM_REAL_CUDA(mask, sign) (!CUDA_PARITY((mask) & (sign)))
 
 /* subspace functions for the GPU */
 
@@ -46,19 +48,12 @@ PetscErrorCode DestroySubspaceData_CUDA_Parity(data_Parity* data) {
   return 0;
 }
 
-#define PARITY_BIT(L) (1<<((L)-1))
-#define PARITY_MASK(L) (PARITY_BIT(L)-1)
-
 __device__ PetscInt S2I_CUDA_Parity(PetscInt state, const data_Parity* data) {
-  return state & PARITY_MASK(data->L);
+  return (CUDA_PARITY(state) == data->space) ? state>>1 : (PetscInt)(-1);
 }
 
 __device__ PetscInt I2S_CUDA_Parity(PetscInt idx, const data_Parity* data) {
-#ifdef PETSC_USE_64BIT_INDICES
-  return idx | (( (data->space)^__popcll(idx)&1 ) << (data->L - 1) );
-#else
-  return idx | (( (data->space)^__popc(idx)&1 ) << (data->L - 1) );
-#endif
+  return (idx<<1) | (CUDA_PARITY(idx) ^ data->space);
 }
 
 PetscErrorCode CopySubspaceData_CUDA_Auto(data_Auto** out_p, const data_Auto* in) {
