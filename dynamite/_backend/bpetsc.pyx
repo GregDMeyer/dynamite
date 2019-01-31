@@ -1,3 +1,4 @@
+# cython: language_level=3
 
 from . cimport bsubspace
 
@@ -80,7 +81,7 @@ def build_mat(int L,
     cdef subspaces_t subspaces
     cdef msc_t msc
     cdef shell_impl which_shell
-    
+
     msc.nmasks      = masks.size
     msc.masks       = &masks[0]
     msc.mask_offsets = &mask_offsets[0]
@@ -106,7 +107,7 @@ def build_mat(int L,
             which_shell = GPU_SHELL
         else:
             which_shell = CPU_SHELL
-            
+
     ierr = BuildMat(&msc, &subspaces, which_shell, &M.mat)
 
     if ierr != 0:

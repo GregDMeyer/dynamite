@@ -1,6 +1,4 @@
-
-# fix cython "can't resolve package from __spec__ or __package__" warning
-from __future__ import absolute_import
+# cython: language_level=3
 
 import numpy as np
 cimport numpy as np

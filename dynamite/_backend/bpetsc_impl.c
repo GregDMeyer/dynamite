@@ -42,6 +42,9 @@ PetscErrorCode ReducedDensityMatrix(
     case AUTO:
       ierr = rdm_Auto(vec, sub_data_p, keep_size, keep, triang, rtn_dim, rtn);CHKERRQ(ierr);
       break;
+    default: // shouldn't happen, but give ierr some (nonzero) value for consistency
+      ierr = 1;
+      break;
   }
   return ierr;
 }

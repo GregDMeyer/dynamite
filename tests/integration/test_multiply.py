@@ -243,13 +243,15 @@ class Projection(dtr.DynamiteTestCase):
 
         from_states = set(from_subspace.idx_to_state(np.arange(from_subspace.get_dimension())))
 
-        for i,state in enumerate(to_subspace.idx_to_state(np.arange(to_subspace.get_dimension()))):
+        if s_np is not None:
+            states = to_subspace.idx_to_state(np.arange(to_subspace.get_dimension()))
+            for i,state in enumerate(states):
 
-            if state not in from_states:
-                self.assertEqual(r_np[i], 0, msg=i)
+                if state not in from_states:
+                    self.assertEqual(r_np[i], 0, msg=i)
 
-            else:
-                self.assertEqual(s_np[from_subspace.state_to_idx(state)], r_np[i])
+                else:
+                    self.assertEqual(s_np[from_subspace.state_to_idx(state)], r_np[i])
 
     def test_projections(self):
 

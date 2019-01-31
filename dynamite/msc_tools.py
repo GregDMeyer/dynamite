@@ -139,7 +139,7 @@ def msc_sum(iterable):
     except StopIteration:
         return np.ndarray(0, dtype = msc_dtype)
 
-    return np.hstack(chain([first],iterable))
+    return np.hstack([first]+list(iterable))
 
 def msc_product(iterable):
     '''
