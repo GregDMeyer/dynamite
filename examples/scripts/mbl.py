@@ -4,7 +4,6 @@ This example performs an analysis of the level statistics of many-body localizat
 
 import numpy as np
 import argparse
-from matplotlib import pyplot as plt
 
 from dynamite import config
 from dynamite.operators import sigma_plus, sigma_minus, sigmaz, index_sum, op_sum
@@ -121,6 +120,8 @@ def plot_results(results, disorder_strengths):
     '''
     Generate a line plot and heat-map plot of the results.
     '''
+    from matplotlib import pyplot as plt
+
     f, (lineax, heatax) = plt.subplots(2,1)
 
     # plot our line of average ratio vs disorder
