@@ -121,6 +121,7 @@ class Subspaces(dtr.DynamiteTestCase):
         correct_full = State(subspace=Full())
         correct_sub = State(subspace=check_subspace)
         H.dot(x, correct_full)
+
         to_space.dot(correct_full, correct_sub)
 
         with self.subTest(which='f2s'):
@@ -217,7 +218,7 @@ class Subspaces(dtr.DynamiteTestCase):
                 with self.subTest(space=space):
                     with self.subTest(sort=sort):
                         H = getattr(hamiltonians, H_name)()
-                        sp = Auto(H, (1 << (H.L//2))-space)
+                        sp = Auto(H, (1 << (H.L//2))-space, sort=sort)
 
                         ket = self.generate_random_in_subspace(sp)
 

@@ -9,7 +9,8 @@ __all__ = [
 from itertools import combinations
 import numpy as np
 from dynamite import config
-from dynamite.operators import sigmax, sigmay, sigmaz, index_sum, op_sum, op_product
+from dynamite.operators import sigmax, sigmay, sigmaz
+from dynamite.operators import index_sum, op_sum, op_product
 from dynamite.extras import majorana
 
 def ising(L = None):

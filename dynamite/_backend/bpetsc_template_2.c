@@ -300,7 +300,7 @@ PetscErrorCode C(MatMult_CPU_General,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, Vec
   MPI_Request send_request, recv_request;
   PetscInt x_size, x_local_size, max_proc_size, *x_local_sizes, *x_local_starts;
   PetscInt block_start, row_start, row_end, col_start, col_end;
-  PetscInt proc_shift, proc_idx, send_count, recv_count;
+  PetscInt proc_shift, proc_idx, send_count, recv_idx, recv_start, recv_end, recv_count;
   const PetscScalar* local_x_array;
   const PetscScalar* source_array;
   PetscScalar* x_array[2];
@@ -375,34 +375,36 @@ PetscErrorCode C(MatMult_CPU_General,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, Vec
           }
           else {
             source_array = x_array[proc_shift%2];
-            ierr = MPI_Wait(&recv_request, MPI_STATUS_IGNORE);
-          }
+	    ierr = MPI_Wait(&recv_request, MPI_STATUS_IGNORE);CHKERRQ(ierr);
+	  }
 
           if (proc_shift < mpi_size - 1) {
 
             // TODO: put this stuff into a different function
 
             /* prepare to receive */
-            recv_count = PetscMax(x_local_sizes[(mpi_rank+proc_shift+1)%mpi_size], block_start);
-            recv_count = PetscMin(recv_count, BLOCK_SIZE + block_start) - block_start;
+	    recv_idx = (mpi_rank+proc_shift+1)%mpi_size;
+            recv_start = x_local_starts[recv_idx] + block_start;
+            recv_end = PetscMin(recv_start + BLOCK_SIZE, x_local_starts[recv_idx+1]);
+	    recv_count = recv_end - recv_start;
             if (recv_count > 0) {
               if (proc_shift > 0) {
                 /* make sure we completed the previous send operation already */
-                ierr = MPI_Wait(&send_request, MPI_STATUS_IGNORE);
+                ierr = MPI_Wait(&send_request, MPI_STATUS_IGNORE);CHKERRQ(ierr);
               }
               /* TODO: is this the right way to catch MPI errors with PETSc? */
               ierr = MPI_Irecv(x_array[(proc_shift+1)%2], recv_count, MPIU_SCALAR,
-                                (mpi_rank+1)%mpi_size, 0,
-                                PETSC_COMM_WORLD, &recv_request);
+			       (mpi_rank+1)%mpi_size, 0,
+			       PETSC_COMM_WORLD, &recv_request);CHKERRQ(ierr);
             }
 
             /* you guys silly I'm still gonna send it */
             send_count = col_end - col_start;
             if (send_count > 0) {
               /* TODO: is this the right way to catch MPI errors with PETSc? */
-              ierr = MPI_Isend(source_array, send_count, MPIU_SCALAR,
-                                (mpi_size+mpi_rank-1)%mpi_size, 0,
-                                PETSC_COMM_WORLD, &send_request);
+	      ierr = MPI_Isend(source_array, send_count, MPIU_SCALAR,
+			       (mpi_size+mpi_rank-1)%mpi_size, 0,
+			       PETSC_COMM_WORLD, &send_request);CHKERRQ(ierr);
             }
 
           }
@@ -412,6 +414,11 @@ PetscErrorCode C(MatMult_CPU_General,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, Vec
             source_array, b_array, ctx, row_start, row_end, col_start, col_end);CHKERRQ(ierr);
 
         }
+      }
+
+      /* complete the final send before deallocating the arrays */
+      if (mpi_size > 1) {
+	ierr = MPI_Wait(&send_request, MPI_STATUS_IGNORE);CHKERRQ(ierr);
       }
 
       ierr = PetscFree(x_local_starts);CHKERRQ(ierr);

@@ -10,8 +10,15 @@ class DynamiteTestCase(mtr.MPITestCase):
         '''
         Compare two PETSc vectors, checking that they are equal.
         '''
+        # compare via dot product
+        nrm = (a.vec-b.vec).norm()
+
         # compare the local portions of the vectors
         istart, iend = a.vec.getOwnershipRange()
+
+        if istart == iend:
+            return
+
         a = a.vec[istart:iend]
         b = b.vec[istart:iend]
 
@@ -21,11 +28,27 @@ class DynamiteTestCase(mtr.MPITestCase):
 
         diff = np.abs(a-b)
         max_idx = np.argmax(diff)
-        self.assertTrue(np.allclose(a, b, rtol=0, atol=eps),
-                        msg = '\na: %e+i%e\nb: %e+i%e\ndiff: %e\nat %d' % \
-                            (a[max_idx].real, a[max_idx].imag,
-                             b[max_idx].real, b[max_idx].imag,
-                             np.abs(a[max_idx]-b[max_idx]), max_idx))
+        far_idxs = np.nonzero(~np.isclose(a, b, rtol=0, atol=eps))[0]
+        self.assertTrue(far_idxs.size == 0,
+                        msg = '''
+{nfar} values do not match.
+indices: {idxs}
+diff norm: {nrm}
+largest diff:
+a: {a_real}+i{a_imag}
+b: {b_real}+i{b_imag}
+diff: {diff}
+at {max_idx}'''.format(
+    nrm = nrm,
+    idxs = far_idxs,
+    nfar = far_idxs.size,
+    a_real = a[max_idx].real,
+    a_imag = a[max_idx].imag,
+    b_real = b[max_idx].real,
+    b_imag = b[max_idx].imag,
+    diff = np.abs(a[max_idx]-b[max_idx]),
+    max_idx = max_idx,
+))
 
 # add these attributes to the test case
 # checks = [
