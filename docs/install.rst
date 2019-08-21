@@ -26,7 +26,7 @@ following. There is a configuration script that comes with dynamite which should
 
 .. code:: bash
 
-    git clone -b maint https://bitbucket.org/petsc/petsc petsc
+    git clone -b maint https://gitlab.com/petsc/petsc.git petsc
     cd petsc
     python2 <dynamite directory>/petsc_config/complex-opt.py
 
