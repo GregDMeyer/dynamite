@@ -651,14 +651,8 @@ void sum_term(
 /**********/
 
   if (check_parity) {
-    if (sign&LKP_MASK) {
-      if (is_real) {INNER_LOOP(l[lkp_idx],_radd,1)}
-      else {INNER_LOOP(l[lkp_idx],_cadd,1)}
-    }
-    else {
-      if (is_real) {INNER_LOOP(1,_radd,1)}
-      else {INNER_LOOP(1,_cadd,1)}
-    }
+    if (is_real) {INNER_LOOP(l[lkp_idx],_radd,1)}
+    else {INNER_LOOP(l[lkp_idx],_cadd,1)}
   }
   else {
     if (sign&LKP_MASK) {
