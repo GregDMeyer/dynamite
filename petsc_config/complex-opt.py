@@ -25,8 +25,8 @@ configure_options = [
     # download extra packages for shift-invert eigensolving (solving for the middle
     # of the spectrum). not required if you won't use that feature
     #'--with-scalapack', # if you already have scalapack installed
-    '--download-scalapack',
-    '--download-mumps',
+    #'--download-scalapack',
+    #'--download-mumps',
 
     # required to work with spin chains larger than 31 spins
     #'--with-64-bit-indices',
@@ -43,4 +43,9 @@ if __name__ == '__main__':
     import configure
     
     configure_options += sys.argv[1:]
+
+    if '--download-mumps' not in configure_options:
+        print('Building without MUMPS.\nIf you want to solve for interior eigenvalues, '
+              'enable MUMPS and Scalapack by editing this script.')
+
     configure.petsc_configure(configure_options)

@@ -34,7 +34,8 @@ def parse_command_line(cmd_argv=None):
     return args
 
 def run_test(mpiexec, nproc, fname, options, timeout=None):
-    cmd = [mpiexec, '-n', str(nproc), 'python', fname] + options
+    cmd = mpiexec.split(' ')
+    cmd += ['-n', str(nproc), 'python', fname] + options
     print(' '.join(cmd))
 
     try:

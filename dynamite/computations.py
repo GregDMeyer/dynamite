@@ -68,6 +68,10 @@ def evolve(H, state, t, result=None, **kwargs):
     elif state.subspace != result.subspace:
         raise ValueError('input and result states are on different subspaces.')
 
+    if t == 0.0:
+        state.vec.copy(result.vec)
+        return result
+
     mfn = SLEPc.MFN().create()
     f = mfn.getFN()
     f.setType(SLEPc.FN.Type.EXP)

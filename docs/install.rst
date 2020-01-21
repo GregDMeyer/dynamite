@@ -2,9 +2,8 @@ Installing
 ==========
 
 .. note ::
-    dynamite is written for Python 3.6! You may need to install that first if
-    you don't already have it. Flexibility for other Python 3 versions coming
-    soon.
+    dynamite is written for Python >=3.6! You may need to install an appropriate
+    version first if you don't already have it.
 
 Download dynamite
 -----------------
@@ -14,8 +13,7 @@ Download dynamite
     git clone https://github.com/GregDMeyer/dynamite.git
 
 Dynamite is built on the `PETSc <www.mcs.anl.gov/petsc/>`_ and `SLEPc <http://slepc.upv.es/>`_
-packages, as well as the Python wrappers around them, ``petsc4py`` and ``slepc4py``.
-The next step is to install those.
+packages. The next step is to install those.
 
 Build PETSc
 --------------
@@ -28,7 +26,8 @@ following. There is a configuration script that comes with dynamite which should
 
     git clone -b maint https://gitlab.com/petsc/petsc.git petsc
     cd petsc
-    python2 <dynamite directory>/petsc_config/complex-opt.py
+    git checkout tags/v3.12.3
+    python <dynamite directory>/petsc_config/complex-opt.py
 
 Note that you may want to adjust some of the build options. Just take a look at
 the script and modify as desired. There are also a couple other scripts in that
@@ -54,8 +53,9 @@ Now download and install SLEPc:
 
 .. code:: bash
 
-    git clone -b maint https://bitbucket.org/slepc/slepc
+    git clone -b maint https://gitlab.com/slepc/slepc.git slepc
     cd slepc
+    git checkout tags/v3.12.2
     ./configure
 
 If it configures correctly, it will output a ``make`` command to run. Copy and
@@ -88,8 +88,7 @@ everything by just running
 
 .. note::
     When using ``pip`` with ``sudo``, you need to pass the ``-E`` flag to
-    ``sudo`` to preserve the environment variables (``PETSC_DIR`` etc.). For
-    example, you would do ``sudo -E pip3 install petsc4py``.
+    ``sudo`` to preserve the environment variables (``PETSC_DIR`` etc.).
 
 I suggest using a `virtual environment <https://docs.python.org/3/library/venv.html>`_,
 to keep all of the packages tidy.
