@@ -133,7 +133,7 @@ PetscErrorCode C(MatMult_GPU,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, Vec x, Vec 
   ierr = MatShellGetContext(A, &ctx);CHKERRQ(ierr);
 
   ierr = VecCUDAGetArrayRead(x, &xarray);CHKERRQ(ierr);
-  ierr = VecCUDAGetArrayReadWrite(b, &barray);CHKERRQ(ierr);
+  ierr = VecCUDAGetArray(b, &barray);CHKERRQ(ierr);
 
   ierr = VecGetSize(b, &size);CHKERRQ(ierr);
 
@@ -154,7 +154,7 @@ PetscErrorCode C(MatMult_GPU,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, Vec x, Vec 
   err = cudaThreadSynchronize();CHKERRCUDA(err);
 
   ierr = VecCUDARestoreArrayRead(x, &xarray);CHKERRQ(ierr);
-  ierr = VecCUDARestoreArrayReadWrite(b, &barray);CHKERRQ(ierr);
+  ierr = VecCUDARestoreArray(b, &barray);CHKERRQ(ierr);
 
   return ierr;
 }

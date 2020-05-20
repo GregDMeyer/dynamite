@@ -2,7 +2,6 @@
 #include <cuda_runtime.h>
 #include <thrust/device_ptr.h>
 #include <petscmat.h>
-#include <petsccuda.h>
 #include "bcuda_template.h"
 
 #define GPU_BLOCK_SIZE 128

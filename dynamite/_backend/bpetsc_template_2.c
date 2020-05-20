@@ -5,7 +5,7 @@
  */
 
 #include "bpetsc_template_2.h"
-#if PETSC_HAVE_VECCUDA
+#if PETSC_HAVE_CUDA
 #include "bcuda_template.h"
 #endif
 
@@ -27,7 +27,7 @@ PetscErrorCode C(BuildMat,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
     ierr = C(BuildCPUShell,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
       msc, left_subspace_data, right_subspace_data, A);
   }
-#if PETSC_HAVE_VECCUDA
+#if PETSC_HAVE_CUDA
   else if (shell == GPU_SHELL) {
     ierr = C(BuildGPUShell,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
       msc, left_subspace_data, right_subspace_data, A);

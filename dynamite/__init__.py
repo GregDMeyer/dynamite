@@ -47,8 +47,12 @@ class _Config:
         if gpu:
             slepc_args += [
                 '-vec_type', 'cuda',
-                '-mat_type', 'aijcusparse'
+                '-mat_type', 'aijcusparse',
             ]
+
+        # prevent PETSc from being sad if we don't use gpu aware mpi
+        if not self.initialized and bbuild.have_gpu_shell():
+            slepc_args += ['-use_gpu_aware_mpi', '0'] # we only use one process anyway
 
         explain_str = 'Call dynamite.config.initialize(args) before importing ' +\
                       'any PETSc modules or interfacing with PETSc functionality ' +\

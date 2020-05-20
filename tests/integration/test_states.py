@@ -66,7 +66,7 @@ class PetscMethods(dtr.DynamiteTestCase):
         state.vec[start:end] = np.array([1]*(end-start))
         state.vec.assemblyBegin()
         state.vec.assemblyEnd()
-        self.assertTrue(state.norm()**2 == state.subspace.get_dimension())
+        self.assertAlmostEqual(state.norm()**2, state.subspace.get_dimension())
 
     def test_normalize(self):
         state = State()
