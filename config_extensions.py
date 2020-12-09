@@ -2,7 +2,6 @@
 from os import environ
 from os.path import join, dirname, realpath
 from subprocess import check_output
-from shutil import which
 
 from setuptools import Extension
 from setuptools.command.build_ext import build_ext
@@ -24,6 +23,7 @@ header_only = {
 cython_only = {
     'bbuild',
 }
+
 
 def extensions():
 
@@ -48,7 +48,7 @@ def extensions():
                         'dynamite/_backend/bcuda_impl.cu',
                         'dynamite/_backend/shellcontext.h',
                         'dynamite/_backend/bsubspace_impl.h']
-            if have_nvcc():
+            if check_cuda():
                 object_files += ['dynamite/_backend/bcuda_impl.o'.format(name=name)]
 
         exts += [
@@ -61,11 +61,26 @@ def extensions():
 
     return exts
 
-def have_nvcc():
+USE_CUDA = None
+def check_cuda():
     '''
-    Whether the nvcc compiler can be found.
+    Whether PETSc was built with CUDA support
     '''
-    return which('nvcc') is not None
+    global USE_CUDA
+    if USE_CUDA is not None:
+        return USE_CUDA
+
+    with open(join(environ['PETSC_DIR'],
+                   environ['PETSC_ARCH'],
+                   'include/petscconf.h')) as f:
+        for line in f:
+            if 'PETSC_HAVE_CUDA' in line:
+                USE_CUDA = True
+                break
+        else:
+            USE_CUDA = False
+
+    return USE_CUDA
 
 def write_build_headers():
     '''
@@ -75,7 +90,7 @@ def write_build_headers():
     print('Writing header files...')
     with open(join(dirname(__file__), 'dynamite', '_backend', 'config.pxi'), 'w') as f:
 
-        f.write('DEF USE_CUDA = %d\n' % int(have_nvcc()))
+        f.write('DEF USE_CUDA = %d\n' % int(check_cuda()))
 
         dnm_version = check_output(['git', 'describe', '--always'],
                                    cwd = dirname(realpath(__file__)),
@@ -136,8 +151,7 @@ class MakeBuildExt(build_ext):
                                 cwd='dynamite/_backend')
             print(make.decode())
 
-        # if we have nvcc, build the CUDA backend
-        if have_nvcc():
+        if check_cuda():
             make = check_output(['make', 'bcuda_impl.o'], cwd='dynamite/_backend')
             print(make.decode())
 
