@@ -74,7 +74,7 @@ def check_cuda():
                    environ['PETSC_ARCH'],
                    'include/petscconf.h')) as f:
         for line in f:
-            if 'PETSC_HAVE_CUDA' in line:
+            if 'PETSC_HAVE_CUDA 1' in line:
                 USE_CUDA = True
                 break
         else:

@@ -34,7 +34,7 @@ def intlog2(x):
     Also, intlog2(0) = -1.
     '''
     x = np.array(x)
-    count = np.zeros(x.shape, dtype = np.int)
+    count = np.zeros(x.shape, dtype=int)
     count -= 1
     mx = np.max(x)
     while mx:
