@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 
 '''
 This file is intended to be used to configure PETSc for dynamite.
@@ -41,7 +41,7 @@ if __name__ == '__main__':
     import os
     sys.path.insert(0, os.path.abspath('config'))
     import configure
-    
+
     configure_options += sys.argv[1:]
 
     if '--download-mumps' not in configure_options:

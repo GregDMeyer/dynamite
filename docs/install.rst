@@ -37,9 +37,6 @@ If all goes well, ``configure`` will tell you to run a ``make`` command. Copy
 the command and run it. It should look like:
 ``make PETSC_DIR=<your_petsc_directory> PETSC_ARCH=complex-opt all``
 
-If you want, you can run the PETSc tests as specified in the output of ``make``
-(same as above, with ``test`` in place of ``all``).
-
 Building SLEPc
 --------------
 
@@ -62,13 +59,6 @@ If it configures correctly, it will output a ``make`` command to run. Copy and
 paste that, and run it. It should look like:
 ``make SLEPC_DIR=$PWD PETSC_DIR=<petsc_dir> PETSC_ARCH=complex-opt``
 
-After that runs, it will tell you to test the installation with ``make test``.
-This seems to fail unless you include the installation directories:
-``make SLEPC_DIR=$PWD PETSC_DIR=<petsc_dir> PETSC_ARCH=complex-opt test``
-
-It may suggest running ``make install`` as well. You don't need to do this. To
-use dynamite, you can keep it in this local directory.
-
 Building dynamite
 -----------------
 
@@ -85,6 +75,11 @@ everything by just running
 
     cd dynamite
     pip install -r requirements.txt
+
+.. note::
+   For some reason, this step sometimes fails because pip tries to install ``petsc4py``
+   before ``cython``, even though ``cython`` is required by ``petsc4py``.
+   To fix this, simply run ``pip install cython`` and then try again with ``requirements.txt``.
 
 .. note::
     When using ``pip`` with ``sudo``, you need to pass the ``-E`` flag to
