@@ -2,7 +2,7 @@ Installing
 ==========
 
 .. note ::
-    dynamite is written for Python >=3.6! You may need to install an appropriate
+    dynamite is written for Python >=3.8! You may need to install an appropriate
     version first if you don't already have it.
 
 Download dynamite
