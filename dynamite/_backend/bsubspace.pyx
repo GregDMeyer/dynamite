@@ -16,6 +16,12 @@ cdef extern from "bsubspace_impl.h":
         int L
         int space
 
+    ctypedef struct data_SpinConserve:
+        int L
+        int k
+        int ld_nchoosek
+        int* nchoosek
+
     ctypedef struct data_Auto:
         int L
         int dim
@@ -28,6 +34,7 @@ cdef extern from "bsubspace_impl.h":
         _FULL "FULL"
         _PARITY "PARITY"
         _AUTO "AUTO"
+        _SPIN_CONSERVE "SPIN_CONSERVE"
 
     PetscInt Dim_Full(data_Full* data);
     void S2I_Full_array(int n, const data_Full* data, const PetscInt* states, PetscInt* idxs);
@@ -36,6 +43,10 @@ cdef extern from "bsubspace_impl.h":
     PetscInt Dim_Parity(const data_Parity* data);
     void S2I_Parity_array(int n, const data_Parity* data, const PetscInt* states, PetscInt* idxs);
     void I2S_Parity_array(int n, const data_Parity* data, const PetscInt* idxs, PetscInt* states);
+
+    PetscInt Dim_SpinConserve(const data_SpinConserve* data);
+    void S2I_SpinConserve_array(int n, const data_SpinConserve* data, const PetscInt* states, PetscInt* idxs);
+    void I2S_SpinConserve_array(int n, const data_SpinConserve* data, const PetscInt* idxs, PetscInt* states);
 
     PetscInt Dim_Auto(const data_Auto* data);
     void S2I_Auto_array(int n, const data_Auto* data, const PetscInt* states, PetscInt* idxs);
@@ -47,6 +58,7 @@ class SubspaceType:
     FULL = _FULL
     PARITY = _PARITY
     AUTO = _AUTO
+    SPIN_CONSERVE = _SPIN_CONSERVE
 
 #####
 
@@ -63,8 +75,22 @@ cdef class CParity:
         self.data[0].L = L
         self.data[0].space = space
 
-# need to be careful here that the numpy arrays don't get freed
+# need to be careful in SpinConserve and Auto that the numpy arrays don't get freed
 # if we will use this class in shell matrices, should copy maps
+cdef class CSpinConserve:
+    cdef data_SpinConserve data[1]
+
+    def __init__(
+            self,
+            PetscInt L,
+            PetscInt k,
+            PetscInt [:,:] nchoosek
+        ):
+        self.data[0].L = L
+        self.data[0].k = k
+        self.data[0].ld_nchoosek = nchoosek.shape[1]
+        self.data[0].nchoosek = &nchoosek[0, 0]
+
 cdef class CAuto:
     cdef data_Auto data[1]
 
@@ -88,6 +114,8 @@ cdef void set_data_pointer(int sub_type, object data, void** ptr):
         set_data_pointer_Full(data, ptr)
     elif sub_type == _PARITY:
         set_data_pointer_Parity(data, ptr)
+    elif sub_type == _SPIN_CONSERVE:
+        set_data_pointer_SpinConserve(data, ptr)
     elif sub_type == _AUTO:
         set_data_pointer_Auto(data, ptr)
     else:
@@ -97,6 +125,9 @@ cdef void set_data_pointer_Full(CFull data, void** ptr):
     ptr[0] = data.data
 
 cdef void set_data_pointer_Parity(CParity data, void** ptr):
+    ptr[0] = data.data
+
+cdef void set_data_pointer_SpinConserve(CSpinConserve data, void** ptr):
     ptr[0] = data.data
 
 cdef void set_data_pointer_Auto(CAuto data, void** ptr):
@@ -109,6 +140,9 @@ def get_dimension_Full(CFull data):
 
 def get_dimension_Parity(CParity data):
     return Dim_Parity(data.data)
+
+def get_dimension_SpinConserve(CSpinConserve data):
+    return Dim_SpinConserve(data.data)
 
 def get_dimension_Auto(CAuto data):
     return Dim_Auto(data.data)
@@ -125,6 +159,12 @@ def idx_to_state_Parity(PetscInt [:] idxs, CParity data):
     states_np = np.ndarray(idxs.size, dtype = dnm_int_t)
     cdef PetscInt [:] states = states_np
     I2S_Parity_array(idxs.size, data.data, &idxs[0], &states[0])
+    return states_np
+
+def idx_to_state_SpinConserve(PetscInt [:] idxs, CSpinConserve data):
+    states_np = np.ndarray(idxs.size, dtype = dnm_int_t)
+    cdef PetscInt [:] states = states_np
+    I2S_SpinConserve_array(idxs.size, data.data, &idxs[0], &states[0])
     return states_np
 
 def idx_to_state_Auto(PetscInt [:] idxs, CAuto data):
@@ -145,6 +185,12 @@ def state_to_idx_Parity(PetscInt [:] states, CParity data):
     idxs_np = np.ndarray(states.size, dtype = dnm_int_t)
     cdef PetscInt [:] idxs = idxs_np
     S2I_Parity_array(states.size, data.data, &states[0], &idxs[0])
+    return idxs_np
+
+def state_to_idx_SpinConserve(PetscInt [:] states, CSpinConserve data):
+    idxs_np = np.ndarray(states.size, dtype = dnm_int_t)
+    cdef PetscInt [:] idxs = idxs_np
+    S2I_SpinConserve_array(states.size, data.data, &states[0], &idxs[0])
     return idxs_np
 
 def state_to_idx_Auto(PetscInt [:] states, CAuto data):

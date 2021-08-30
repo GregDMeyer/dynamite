@@ -8,8 +8,9 @@ one implementation of each of the functions.
 import numpy as np
 from copy import deepcopy
 from zlib import crc32
+import math
 
-from . import validate, states
+from . import validate, states, config
 from ._backend import bsubspace
 
 class Subspace:
@@ -184,6 +185,7 @@ class Full(Subspace):
         '''
         return bsubspace.SubspaceType.FULL
 
+
 class Parity(Subspace):
     '''
     The subspaces of states in which the number of up spins is even or odd.
@@ -261,6 +263,120 @@ class Parity(Subspace):
         used in the C backend.
         '''
         return bsubspace.SubspaceType.PARITY
+
+
+class SpinConserve(Subspace):
+    '''
+    The subspaces of states in which conserve total magnetization (total
+    number of up spins).
+
+    Parameters
+    ----------
+    L : int
+        Length of spin chain (constant for this class)
+
+    k : int
+        Number of up spins (0's in integer representation of state)
+    '''
+
+    def __init__(self, L, k):
+        Subspace.__init__(self)
+        self._L = self._check_L(L)
+        self._k = self._check_k(k)
+
+        self._nchoosek = self._compute_nchoosek(L, k)
+
+    @classmethod
+    def _compute_nchoosek(cls, L, k):
+        # we index over k first to hopefully make the memory access pattern
+        # slightly better. sorry :-(
+        rtn = np.ndarray((k+1, L+1), dtype=bsubspace.dnm_int_t)
+
+        # there is a more efficient algorithm where we use a combinations
+        # identity to compute the values way faster. but it's super fast anyway
+        # and this is more readable
+        for (kk, LL), _ in np.ndenumerate(rtn):
+            rtn[kk, LL] = math.comb(LL, kk)
+
+        return rtn
+
+    def _check_L(self, L):
+        if config.L is not None and L != config.L:
+            raise ValueError('attempted to set L to value different from config.L')
+
+        return validate.L(L)
+
+    def _check_k(self, k):
+        if not (0 <= k <= self.L):
+            raise ValueError('k must be between 0 and L')
+
+        return k
+
+    @Subspace.L.setter
+    def L(self, value):
+        if value != self.L:
+            raise AttributeError('cannot change L for SpinConserve class')
+
+    @property
+    def k(self):
+        """
+        The number of up ("0") spins.
+        """
+        return self._k
+
+    def get_dimension(self):
+        """
+        Get the dimension of the subspace.
+        """
+        return self._get_dimension(self.L, self.k, self._nchoosek)
+
+    @classmethod
+    def _get_dimension(cls, L, k, nchoosek):
+        return bsubspace.get_dimension_SpinConserve(cls._get_cdata(L, k, nchoosek))
+
+    def idx_to_state(self, idx):
+        """
+        Maps an index to an integer that in binary corresponds to the spin configuration.
+        Vectorized implementation allows passing a numpy array of indices as idx.
+        """
+        idx = self._numeric_to_array(idx)
+        return self._idx_to_state(idx, self.L, self.k, self._nchoosek)
+
+    def state_to_idx(self, state):
+        """
+        The inverse mapping of :meth:`idx_to_state`.
+        """
+        state = self._numeric_to_array(state)
+        return self._state_to_idx(state, self.L, self.k, self._nchoosek)
+
+    @classmethod
+    def _idx_to_state(cls, idx, L, k, nchoosek):
+        return bsubspace.idx_to_state_SpinConserve(idx, cls._get_cdata(L, k, nchoosek))
+
+    @classmethod
+    def _state_to_idx(cls, state, L, k, nchoosek):
+        return bsubspace.state_to_idx_SpinConserve(state, cls._get_cdata(L, k, nchoosek))
+
+    def get_cdata(self):
+        '''
+        Returns an object containing the subspace data accessible by the C backend.
+        '''
+        return self._get_cdata(self.L, self.k, self._nchoosek)
+
+    @classmethod
+    def _get_cdata(cls, L, k, nchoosek):
+        return bsubspace.CSpinConserve(
+            L, k,
+            np.ascontiguousarray(nchoosek)
+        )
+
+    def to_enum(self):
+        '''
+        Convert the class types used in the Python frontend to the enum values
+        used in the C backend.
+        '''
+        return bsubspace.SubspaceType.SPIN_CONSERVE
+
 
 class Auto(Subspace):
     '''

@@ -9,7 +9,7 @@ import hamiltonians
 from dynamite import config
 from dynamite.msc_tools import msc_dtype
 from dynamite.operators import identity, sigmax, sigmay, index_sum, index_product
-from dynamite.subspaces import Full, Parity, Auto
+from dynamite.subspaces import Full, Parity, Auto, SpinConserve
 from dynamite.states import State
 
 def generate_hamiltonian_tests(cls):
@@ -209,6 +209,18 @@ class Subspaces(dtr.DynamiteTestCase):
     def test_parity_YY_odd(self):
         H = index_sum(sigmay(0)*sigmay(1))
         sp = Parity('odd')
+        x = self.generate_random_in_subspace(sp)
+        self.compare_to_full(H, x, sp)
+
+    def test_spin_conserve_half_filling(self):
+        H = index_sum(sigmax(0)*sigmax(1) + sigmay(0)*sigmay(1))
+        sp = SpinConserve(config.L, config.L//2)
+        x = self.generate_random_in_subspace(sp)
+        self.compare_to_full(H, x, sp)
+
+    def test_spin_conserve_third_filling(self):
+        H = index_sum(sigmax(0)*sigmax(1) + sigmay(0)*sigmay(1))
+        sp = SpinConserve(config.L, config.L//3)
         x = self.generate_random_in_subspace(sp)
         self.compare_to_full(H, x, sp)
 

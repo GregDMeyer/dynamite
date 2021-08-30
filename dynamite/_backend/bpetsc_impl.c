@@ -15,6 +15,10 @@
   #include "bpetsc_template_1.c"
 #undef SUBSPACE
 
+#define SUBSPACE SpinConserve
+  #include "bpetsc_template_1.c"
+#undef SUBSPACE
+
 #define SUBSPACE Auto
   #include "bpetsc_template_1.c"
 #undef SUBSPACE
@@ -39,6 +43,9 @@ PetscErrorCode ReducedDensityMatrix(
     case PARITY:
       ierr = rdm_Parity(vec, sub_data_p, keep_size, keep, triang, rtn_dim, rtn);CHKERRQ(ierr);
       break;
+    case SPIN_CONSERVE:
+      ierr = rdm_SpinConserve(vec, sub_data_p, keep_size, keep, triang, rtn_dim, rtn);CHKERRQ(ierr);
+      break;
     case AUTO:
       ierr = rdm_Auto(vec, sub_data_p, keep_size, keep, triang, rtn_dim, rtn);CHKERRQ(ierr);
       break;
@@ -58,6 +65,10 @@ PetscErrorCode ReducedDensityMatrix(
     #include "bpetsc_template_2.c"
   #undef RIGHT_SUBSPACE
 
+  #define RIGHT_SUBSPACE SpinConserve
+    #include "bpetsc_template_2.c"
+  #undef RIGHT_SUBSPACE
+
   #define RIGHT_SUBSPACE Auto
     #include "bpetsc_template_2.c"
   #undef RIGHT_SUBSPACE
@@ -72,6 +83,28 @@ PetscErrorCode ReducedDensityMatrix(
     #include "bpetsc_template_2.c"
   #undef RIGHT_SUBSPACE
 
+  #define RIGHT_SUBSPACE SpinConserve
+    #include "bpetsc_template_2.c"
+  #undef RIGHT_SUBSPACE
+
+  #define RIGHT_SUBSPACE Auto
+    #include "bpetsc_template_2.c"
+  #undef RIGHT_SUBSPACE
+#undef LEFT_SUBSPACE
+
+#define LEFT_SUBSPACE SpinConserve
+  #define RIGHT_SUBSPACE Full
+    #include "bpetsc_template_2.c"
+  #undef RIGHT_SUBSPACE
+
+  #define RIGHT_SUBSPACE Parity
+    #include "bpetsc_template_2.c"
+  #undef RIGHT_SUBSPACE
+
+  #define RIGHT_SUBSPACE SpinConserve
+    #include "bpetsc_template_2.c"
+  #undef RIGHT_SUBSPACE
+
   #define RIGHT_SUBSPACE Auto
     #include "bpetsc_template_2.c"
   #undef RIGHT_SUBSPACE
@@ -83,6 +116,10 @@ PetscErrorCode ReducedDensityMatrix(
   #undef RIGHT_SUBSPACE
 
   #define RIGHT_SUBSPACE Parity
+    #include "bpetsc_template_2.c"
+  #undef RIGHT_SUBSPACE
+
+  #define RIGHT_SUBSPACE SpinConserve
     #include "bpetsc_template_2.c"
   #undef RIGHT_SUBSPACE
 
@@ -108,6 +145,10 @@ PetscErrorCode BuildMat(const msc_t *msc, subspaces_t *subspaces, shell_impl she
           ierr = BuildMat_Full_Parity(msc, subspaces->left_data, subspaces->right_data, shell, A);
           break;
 
+        case SPIN_CONSERVE:
+          ierr = BuildMat_Full_SpinConserve(msc, subspaces->left_data, subspaces->right_data, shell, A);
+          break;
+
         case AUTO:
           ierr = BuildMat_Full_Auto(msc, subspaces->left_data, subspaces->right_data, shell, A);
           break;
@@ -124,8 +165,32 @@ PetscErrorCode BuildMat(const msc_t *msc, subspaces_t *subspaces, shell_impl she
           ierr = BuildMat_Parity_Parity(msc, subspaces->left_data, subspaces->right_data, shell, A);
           break;
 
+        case SPIN_CONSERVE:
+          ierr = BuildMat_Parity_SpinConserve(msc, subspaces->left_data, subspaces->right_data, shell, A);
+          break;
+
         case AUTO:
           ierr = BuildMat_Parity_Auto(msc, subspaces->left_data, subspaces->right_data, shell, A);
+          break;
+      }
+      break;
+
+    case SPIN_CONSERVE:
+      switch (subspaces->right_type) {
+        case FULL:
+          ierr = BuildMat_SpinConserve_Full(msc, subspaces->left_data, subspaces->right_data, shell, A);
+          break;
+
+        case PARITY:
+          ierr = BuildMat_SpinConserve_Parity(msc, subspaces->left_data, subspaces->right_data, shell, A);
+          break;
+
+      case SPIN_CONSERVE:
+          ierr = BuildMat_SpinConserve_SpinConserve(msc, subspaces->left_data, subspaces->right_data, shell, A);
+          break;
+
+        case AUTO:
+          ierr = BuildMat_SpinConserve_Auto(msc, subspaces->left_data, subspaces->right_data, shell, A);
           break;
       }
       break;
@@ -138,6 +203,10 @@ PetscErrorCode BuildMat(const msc_t *msc, subspaces_t *subspaces, shell_impl she
 
         case PARITY:
           ierr = BuildMat_Auto_Parity(msc, subspaces->left_data, subspaces->right_data, shell, A);
+          break;
+
+      case SPIN_CONSERVE:
+          ierr = BuildMat_Auto_SpinConserve(msc, subspaces->left_data, subspaces->right_data, shell, A);
           break;
 
         case AUTO:

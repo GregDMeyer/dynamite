@@ -7,7 +7,7 @@ import numpy as np
 import dynamite_test_runner as dtr
 
 from dynamite import config
-from dynamite.subspaces import Parity, Auto
+from dynamite.subspaces import Parity, Auto, SpinConserve
 from dynamite.states import State
 from dynamite.computations import reduced_density_matrix, entanglement_entropy, renyi_entropy
 
@@ -248,6 +248,10 @@ class AutoSpace(FullSpace):
         from dynamite.operators import sigmax, sigmay, index_sum
         H = index_sum(sigmax(0)*sigmax(1) + sigmay(0)*sigmay(1))
         self.state = State(subspace=Auto(H, 'U'*(config.L//2) + 'D'*(config.L-config.L//2)))
+
+class SpinConserveSpace(FullSpace):
+    def setUp(self):
+        self.state = State(subspace=SpinConserve(config.L, config.L//2))
 
 if __name__ == '__main__':
     dtr.main()
