@@ -478,20 +478,12 @@ void C(MatMult_CPU_kernel,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
 
 #define Full_SP 0
 #define Parity_SP 1
-#define Auto_SP 2
+#define SpinConserve_SP 2
+#define Auto_SP 3
 
-/* if subspaces are different, or both are Auto, use this kernel */
-#if (C(LEFT_SUBSPACE,SP) == Auto_SP || C(LEFT_SUBSPACE,SP) != C(RIGHT_SUBSPACE,SP))
-
-PetscErrorCode C(MatMult_CPU,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, Vec x, Vec b)
-{
-  PetscErrorCode ierr;
-  ierr = C(MatMult_CPU_General,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(A,x,b);CHKERRQ(ierr);
-  return ierr;
-}
-
-#else
 /* use the hand-tuned kernel for parity and full subspaces, if we can */
+/* if subspaces are the same, and are both Full or Parity, use the fancy fast matvec */
+#if C(LEFT_SUBSPACE,SP) == C(RIGHT_SUBSPACE,SP) && (C(LEFT_SUBSPACE,SP) == Full_SP || C(LEFT_SUBSPACE,SP) == Parity_SP)
 
 #ifdef PETSC_USE_DEBUG
   #define VECSET_CACHE_SIZE (1<<7)
@@ -853,6 +845,15 @@ PetscErrorCode C(MatMult_CPU_Fast,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, Vec x,
   ierr = PetscFree(values);CHKERRQ(ierr);
   ierr = PetscFree(summed_coeffs);CHKERRQ(ierr);
 
+  return ierr;
+}
+
+#else
+
+PetscErrorCode C(MatMult_CPU,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, Vec x, Vec b)
+{
+  PetscErrorCode ierr;
+  ierr = C(MatMult_CPU_General,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(A,x,b);CHKERRQ(ierr);
   return ierr;
 }
 
