@@ -91,13 +91,19 @@ def parse_command_line(cmd_argv=None):
 
     return parser.parse_args(cmd_argv)
 
-def main():
+def main(slepc_args=None):
     from dynamite import config
     args = parse_command_line()
 
     config.L = args.L
     config.shell = args.shell
 
-    config.initialize(args.slepc_args, gpu=args.gpu)
+    if slepc_args is None:
+        slepc_args = []
+
+    if args.slepc_args is not None:
+        slepc_args += args.slepc_args
+
+    config.initialize(slepc_args, gpu=args.gpu)
 
     mtr.main(name=args.name, failfast=args.failfast, verbose=args.verbose)
