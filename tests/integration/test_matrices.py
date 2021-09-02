@@ -99,8 +99,13 @@ class LargeInt64(dtr.DynamiteTestCase):
     Tests for building matrices with 64 bit integers.
     '''
     def setUp(self):
+        self.old_L = config.L
+        config.L = 33
         self.H = localized(33)
         self.space = Auto(self.H, 'U'+'D'*32, size_guess=33)
+
+    def tearDown(self):
+        config.L = self.old_L
 
     def test_identity(self):
         o = identity()
