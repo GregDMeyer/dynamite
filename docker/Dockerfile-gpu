@@ -1,0 +1,107 @@
+FROM nvidia/cuda:11.4.1-devel-ubuntu20.04 AS build
+
+LABEL org.opencontainers.image.authors="Greg Meyer <gregory.meyer@gmail.com>"
+
+# install dependencies
+RUN apt-get update && \
+    \
+    DEBIAN_FRONTEND="noninteractive" \
+    apt-get install -y --no-install-recommends \
+    python3-dev \
+    python3-pip \
+    gfortran \
+    curl \
+    ca-certificates \
+    libopenblas-dev \
+    && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# copy petsc config files
+RUN mkdir /opt/dynamite
+WORKDIR /opt/dynamite
+COPY petsc_config petsc_config
+
+ARG PETSC_ARCH=cuda-opt
+ENV PETSC_ARCH=$PETSC_ARCH
+
+# install PETSc
+ARG PETSC_VERSION=3.15.0
+WORKDIR /opt
+RUN curl https://ftp.mcs.anl.gov/pub/petsc/release-snapshots/petsc-$PETSC_VERSION.tar.gz | tar xzf -
+WORKDIR /opt/petsc-$PETSC_VERSION
+ENV PETSC_DIR=/opt/petsc-$PETSC_VERSION
+
+RUN cp ../dynamite/petsc_config/$PETSC_ARCH.py . && \
+    ./$PETSC_ARCH.py --with-mpi=0 && \
+    make all
+
+# install SLEPc
+ARG SLEPC_VERSION=3.15.1
+WORKDIR /opt
+RUN curl https://slepc.upv.es/download/distrib/slepc-$SLEPC_VERSION.tar.gz | tar xzf -
+WORKDIR /opt/slepc-$SLEPC_VERSION
+ENV SLEPC_DIR=/opt/slepc-$SLEPC_VERSION
+RUN ./configure && make
+
+# install python packages
+# they need to be installed in order, so we can't do pip install -r requirements.txt....
+WORKDIR /opt/dynamite
+COPY requirements.txt requirements.txt
+RUN while read PACKAGE; \
+        do pip3 install --no-cache-dir --no-warn-script-location $PACKAGE; \
+    done <requirements.txt
+
+# install dynamite!
+ARG GIT_BRANCH=unknown
+ARG GIT_COMMIT=unknown
+
+RUN echo $GIT_BRANCH > /opt/dynamite/dnm_branch && \
+    echo $GIT_COMMIT > /opt/dynamite/dnm_commit
+
+COPY . .
+ENV DNM_DOCKER=1
+RUN pip3 install ./
+
+
+FROM nvidia/cuda:11.4.1-runtime-ubuntu20.04 AS release
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    python3 \
+    python3-pip \
+    libopenblas0 \
+    && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+ARG PETSC_ARCH=cuda-opt
+ARG PETSC_VERSION=3.15.0
+ARG SLEPC_VERSION=3.15.1
+
+# get petsc and slepc libraries
+COPY --from=build /opt/petsc-$PETSC_VERSION/$PETSC_ARCH/lib /opt/petsc-$PETSC_VERSION/$PETSC_ARCH/lib
+COPY --from=build /opt/slepc-$SLEPC_VERSION/$PETSC_ARCH/lib /opt/slepc-$SLEPC_VERSION/$PETSC_ARCH/lib
+
+# get all the python stuff
+COPY --from=build /usr/local/lib/python3.8/dist-packages/ /usr/local/lib/python3.8/dist-packages/
+
+# switch to non-privileged user
+RUN groupadd dnm && useradd --no-log-init -m -g dnm dnm
+USER dnm
+
+# make work directory and switch to it
+RUN mkdir /home/dnm/work
+WORKDIR /home/dnm/work
+
+
+FROM release AS jupyter
+
+# install jupyter
+USER root
+RUN pip3 install --no-cache-dir jupyterlab
+
+# run it!
+USER dnm
+WORKDIR /home/dnm/work
+CMD ["jupyter", "lab", "--no-browser", "--ip=0.0.0.0"]

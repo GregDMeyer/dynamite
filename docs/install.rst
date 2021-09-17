@@ -1,5 +1,14 @@
-Installing
-==========
+.. _installing:
+
+**********************
+Installing from source
+**********************
+
+The easiest way to use ``dynamite`` is through the pre-built container images---see :ref:`containers`.
+If for some reason you can't use the containers, or if you want a site-specific build (for example to optimize message passing performance between nodes on a cluster), you can build from source.
+
+Building from source
+====================
 
 .. note ::
     dynamite is written for Python >=3.8! You may need to install an appropriate

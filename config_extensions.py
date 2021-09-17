@@ -92,15 +92,19 @@ def write_build_headers():
 
         f.write('DEF USE_CUDA = %d\n' % int(check_cuda()))
 
-        dnm_version = check_output(['git', 'describe', '--always'],
-                                   cwd = dirname(realpath(__file__)),
-                                   universal_newlines = True).strip()
-        f.write('DEF DNM_VERSION = "%s"\n' % dnm_version)
+        if 'DNM_DOCKER' in environ:
+            commit = open('/opt/dynamite/dnm_commit').read().strip()
+            branch = open('/opt/dynamite/dnm_branch').read().strip()
+        else:
+            commit = check_output(['git', 'describe', '--always'],
+                                  cwd=dirname(realpath(__file__)),
+                                  universal_newlines=True).strip()
+            branch = check_output(['git', 'rev-parse', '--abbrev-ref', 'HEAD'],
+                                  cwd=dirname(realpath(__file__)),
+                                  universal_newlines=True).strip()
 
-        dnm_version = check_output(['git', 'rev-parse', '--abbrev-ref', 'HEAD'],
-                                   cwd = dirname(realpath(__file__)),
-                                   universal_newlines = True).strip()
-        f.write('DEF DNM_BRANCH = "%s"\n' % dnm_version)
+        f.write('DEF DNM_VERSION = "%s"\n' % commit)
+        f.write('DEF DNM_BRANCH = "%s"\n' % branch)
 
 def configure_paths():
 
