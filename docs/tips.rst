@@ -5,7 +5,7 @@ Tips, Tricks, and Pitfalls
 Pitfalls (TL,DR)
 ----------------
  - Beware of "nondeterministic" code when running in parallel!
-   
+
    - Making calls to e.g. "numpy.random.rand()" will give different values on each process. If you use this to build your Hamiltonian, you will not have a consistent operator across your different processes! If you need random numbers, make sure to seed them with the same value everywhere.
    - An especially sneaky example is iterating through dictionaries: since they are unordered, if you do ``for key,value in d.items():``, you may get items in a different order and your processes will not be running the same code. One solution is to set ``PYTHONHASHSEED=0`` in the environment before starting your Python interpreter; this disables the randomization in the hash function.
 
@@ -82,13 +82,7 @@ However this functionality is still experimental; make sure to check your result
 
 The basic steps are the following:
 
-- Find a machine with a GPU and CUDA
-
-.. note::
-
-   Currently PETSc with complex numbers is broken for CUDA versions 8 and above.
-   Dynamite is tested on a PETSc build with CUDA version 7.5. The problem has
-   been identified and reported; the fix is nontrivial but hopefully will be done soon.   
+- Find a machine with an Nvidia GPU and CUDA version > 11.0
 
 - Build PETSc/SLEPc using the ``cuda-opt.py`` configuration script (in the ``petsc_config`` directory of dynamite)
 
