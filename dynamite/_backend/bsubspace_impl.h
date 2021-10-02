@@ -66,6 +66,15 @@ static inline PetscInt I2S_Full(PetscInt idx, const data_Full* data) {
   return idx;
 }
 
+static inline PetscInt NextState_Full(
+  PetscInt prev_state,
+  PetscInt idx,
+  const data_Full* data
+)
+{
+  return I2S_Full(idx, data);
+};
+
 static inline void S2I_Full_array(int n, const data_Full* data, const PetscInt* states, PetscInt* idxs) {
   PetscMemcpy(idxs, states, n*sizeof(PetscInt));
 }
@@ -115,6 +124,15 @@ static inline PetscInt S2I_nocheck_Parity(PetscInt state, const data_Parity* dat
 static inline PetscInt I2S_Parity(PetscInt idx, const data_Parity* data) {
   return (idx<<1) | (builtin_parity(idx) ^ data->space);
 }
+
+static inline PetscInt NextState_Parity(
+  PetscInt prev_state,
+  PetscInt idx,
+  const data_Parity* data
+)
+{
+  return I2S_Parity(idx, data);
+};
 
 static inline void S2I_Parity_array(int n, const data_Parity* data, const PetscInt* states, PetscInt* idxs) {
   PetscInt i;
@@ -202,6 +220,24 @@ static inline PetscInt I2S_SpinConserve(PetscInt idx, const data_SpinConserve* d
   return state;
 }
 
+static inline PetscInt NextState_SpinConserve(
+  PetscInt prev_state,
+  PetscInt idx,
+  const data_SpinConserve* data
+)
+{
+  PetscInt tz = __builtin_ctz(prev_state);
+  prev_state >>= tz;
+  ++prev_state;
+  PetscInt to = __builtin_ctz(prev_state);
+  prev_state >>= to;
+  prev_state <<= to + tz;
+  prev_state |= (1 << (to - 1)) - 1;
+
+  return prev_state;
+};
+
+
 static inline void S2I_SpinConserve_array(int n, const data_SpinConserve* data, const PetscInt* states, PetscInt* idxs) {
   PetscInt i;
   for (i = 0; i < n; ++i) {
@@ -282,6 +318,15 @@ static inline PetscInt S2I_Auto(PetscInt state, const data_Auto* data) {
 static inline PetscInt I2S_Auto(PetscInt idx, const data_Auto* data) {
   return data->state_map[idx];
 }
+
+static inline PetscInt NextState_Auto(
+  PetscInt prev_state,
+  PetscInt idx,
+  const data_Auto* data
+)
+{
+  return I2S_Auto(idx, data);
+};
 
 static inline void S2I_Auto_array(int n, const data_Auto* data, const PetscInt* states, PetscInt* idxs) {
   PetscInt i;
