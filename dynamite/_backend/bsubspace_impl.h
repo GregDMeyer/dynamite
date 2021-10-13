@@ -7,9 +7,11 @@
 #ifdef PETSC_USE_64BIT_INDICES
   #define builtin_parity __builtin_parityl
   #define builtin_popcount __builtin_popcountl
+  #define builtin_ctz __builtin_ctzl
 #else
   #define builtin_parity __builtin_parity
   #define builtin_popcount __builtin_popcount
+  #define builtin_ctz __builtin_ctz
 #endif
 
 /* define a struct & enum to hold subspace information */
@@ -183,18 +185,15 @@ static inline PetscInt Dim_SpinConserve(const data_SpinConserve* data) {
 }
 
 static inline PetscInt S2I_nocheck_SpinConserve(PetscInt state, const data_SpinConserve* data) {
-  PetscInt idx = 0;
-  PetscInt k = 0;
+  PetscInt n, k=0, idx=0;
 
-  for (PetscInt n=0; n<data->L; ++n) {
-    if (state & 1) {
-      k++;
-      if (k <= n) idx += data->nchoosek[k*data->ld_nchoosek + n];
-    }
-    state >>= 1;
-    if (state == 0) return idx ;
+  while (state) {
+    n = builtin_ctz(state);
+    k++;
+    if (k <= n) idx += data->nchoosek[k*data->ld_nchoosek + n];
+    state &= state-1;  // pop least significant bit off of state
   }
-  return idx ;
+  return idx;
 }
 
 static inline PetscInt S2I_SpinConserve(PetscInt state, const data_SpinConserve* data) {
@@ -226,10 +225,10 @@ static inline PetscInt NextState_SpinConserve(
   const data_SpinConserve* data
 )
 {
-  PetscInt tz = __builtin_ctz(prev_state);
+  PetscInt tz = builtin_ctz(prev_state);
   prev_state >>= tz;
   ++prev_state;
-  PetscInt to = __builtin_ctz(prev_state);
+  PetscInt to = builtin_ctz(prev_state);
   prev_state >>= to;
   prev_state <<= to + tz;
   prev_state |= (1 << (to - 1)) - 1;
