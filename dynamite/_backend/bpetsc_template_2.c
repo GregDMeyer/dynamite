@@ -56,7 +56,7 @@ PetscErrorCode C(BuildPetsc,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
   PetscInt row_idx, ket, col_idx, bra, sign;
   PetscScalar value;
 
-  MPI_Comm_size(PETSC_COMM_WORLD, &mpi_size);
+  ierr = MPI_Comm_size(PETSC_COMM_WORLD, &mpi_size);CHKERRMPI(ierr);
 
   /* N is dimension of right subspace, M of left */
   M = C(Dim,LEFT_SUBSPACE)(left_subspace_data);
@@ -147,8 +147,8 @@ PetscErrorCode C(ComputeNonzeros,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))
   ierr = PetscSplitOwnership(PETSC_COMM_WORLD, &local_cols, &N);CHKERRQ(ierr);
 
   /* prefix sum to get the start indices on each process */
-  MPI_Scan(&local_rows, &row_start, 1, MPIU_INT, MPI_SUM, PETSC_COMM_WORLD);
-  MPI_Scan(&local_cols, &col_start, 1, MPIU_INT, MPI_SUM, PETSC_COMM_WORLD);
+  ierr = MPI_Scan(&local_rows, &row_start, 1, MPIU_INT, MPI_SUM, PETSC_COMM_WORLD);CHKERRMPI(ierr);
+  ierr = MPI_Scan(&local_cols, &col_start, 1, MPIU_INT, MPI_SUM, PETSC_COMM_WORLD);CHKERRMPI(ierr);
 
   /* MPI_Scan includes current value in the sum */
   row_start -= local_rows;
@@ -318,8 +318,8 @@ PetscErrorCode C(MatMult_CPU_General,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, Vec
 
   shell_context *ctx;
 
-  MPI_Comm_size(PETSC_COMM_WORLD, &mpi_size);
-  MPI_Comm_rank(PETSC_COMM_WORLD, &mpi_rank);
+  ierr = MPI_Comm_size(PETSC_COMM_WORLD, &mpi_size);CHKERRMPI(ierr);
+  ierr = MPI_Comm_rank(PETSC_COMM_WORLD, &mpi_rank);CHKERRMPI(ierr);
 
   /* TODO: check that vectors are of correct type */
 
@@ -388,7 +388,7 @@ PetscErrorCode C(MatMult_CPU_General,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, Vec
 	  if (assembling) {
 	    ierr = VecAssemblyEnd(b);CHKERRQ(ierr);
 	    im_done = 0;
-	    MPI_Allreduce(&im_done, &done_communicating, 1, MPI_INT, MPI_BAND, MPI_COMM_WORLD);
+	    ierr = MPI_Allreduce(&im_done, &done_communicating, 1, MPI_INT, MPI_BAND, MPI_COMM_WORLD);CHKERRMPI(ierr);
 	    assembling = PETSC_FALSE;
 	  }
 
@@ -402,13 +402,14 @@ PetscErrorCode C(MatMult_CPU_General,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, Vec
       }
     }
 
+    im_done = cache_idx==0;
+    done_communicating = PETSC_FALSE;
     if (assembling) {
       ierr = VecAssemblyEnd(b);CHKERRQ(ierr);
-      im_done = cache_idx==0;
-      MPI_Allreduce(&im_done, &done_communicating, 1, MPI_INT, MPI_BAND, MPI_COMM_WORLD);
+      ierr = MPI_Allreduce(&im_done, &done_communicating, 1, MPI_INT, MPI_BAND, MPI_COMM_WORLD);CHKERRMPI(ierr);
     }
 
-    if (cache_idx != 0) {
+    if (!im_done) {
       ierr = VecSetValues(b, cache_idx, row_idxs, to_send, ADD_VALUES);CHKERRQ(ierr);
     }
 
@@ -416,7 +417,7 @@ PetscErrorCode C(MatMult_CPU_General,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, Vec
       ierr = VecAssemblyBegin(b);CHKERRQ(ierr);
       ierr = VecAssemblyEnd(b);CHKERRQ(ierr);
       im_done = 1;
-      MPI_Allreduce(&im_done, &done_communicating, 1, MPI_INT, MPI_BAND, MPI_COMM_WORLD);
+      ierr = MPI_Allreduce(&im_done, &done_communicating, 1, MPI_INT, MPI_BAND, MPI_COMM_WORLD);CHKERRMPI(ierr);
     }
 
     ierr = PetscFree(row_idxs);CHKERRQ(ierr);
@@ -498,7 +499,7 @@ PetscErrorCode C(MatMult_CPU,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, Vec x, Vec 
   PetscInt local_size;
   shell_context *ctx;
   int mpi_size;
-  MPI_Comm_size(PETSC_COMM_WORLD,&mpi_size);
+  ierr = MPI_Comm_size(PETSC_COMM_WORLD,&mpi_size);CHKERRMPI(ierr);
 
   ierr = VecGetLocalSize(b, &local_size);CHKERRQ(ierr);
 
@@ -705,8 +706,8 @@ PetscErrorCode C(MatMult_CPU_Fast,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, Vec x,
   PetscInt cache_idx;
 
   int mpi_rank,mpi_size;
-  MPI_Comm_rank(PETSC_COMM_WORLD,&mpi_rank);
-  MPI_Comm_size(PETSC_COMM_WORLD,&mpi_size);
+  ierr = MPI_Comm_rank(PETSC_COMM_WORLD,&mpi_rank);CHKERRMPI(ierr);
+  ierr = MPI_Comm_size(PETSC_COMM_WORLD,&mpi_size);CHKERRMPI(ierr);
 
   /* check if number of processors is a multiple of 2 */
   if ((mpi_size & (mpi_size-1)) != 0) {
