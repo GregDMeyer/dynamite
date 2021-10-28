@@ -3,8 +3,10 @@
 
 #ifdef PETSC_USE_64BIT_INDICES
   #define CUDA_POPCOUNT(x) (__popcll(x))
+  #define CUDA_CTZ(x) (__ffsll(x)-1)
 #else
   #define CUDA_POPCOUNT(x) (__popc(x))
+  #define CUDA_CTZ(x) (__ffs(x)-1)
 #endif
 
 #define CUDA_PARITY(x) (CUDA_POPCOUNT(x)&1)
@@ -90,21 +92,18 @@ PetscErrorCode DestroySubspaceData_CUDA_SpinConserve(data_SpinConserve* data) {
 }
 
 __device__ PetscInt S2I_CUDA_SpinConserve(PetscInt state, const data_SpinConserve* data) {
-  PetscInt idx = 0;
-  PetscInt k = 0;
+  PetscInt n, k=0, idx=0;
 
   if (state >> data->L) return (PetscInt)(-1);
   if (CUDA_POPCOUNT(state) != data->k) return (PetscInt)(-1);
 
-  for (PetscInt n=0; n<data->L; ++n) {
-    if (state & 1) {
-      k++;
-      if (k <= n) idx += data->nchoosek[k*data->ld_nchoosek + n];
-    }
-    state >>= 1;
-    if (state == 0) return idx ;
+  while (state) {
+    n = CUDA_CTZ(state);
+    k++;
+    if (k <= n) idx += data->nchoosek[k*data->ld_nchoosek + n];
+    state &= state-1;  // pop least significant bit off of state
   }
-  return idx ;
+  return idx;
 }
 
 __device__ PetscInt I2S_CUDA_SpinConserve(PetscInt idx, const data_SpinConserve* data) {
