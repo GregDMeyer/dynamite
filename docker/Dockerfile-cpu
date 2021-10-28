@@ -22,7 +22,7 @@ ARG PETSC_ARCH=complex-opt
 ENV PETSC_ARCH=$PETSC_ARCH
 
 # install PETSc
-ARG PETSC_VERSION=3.15.4
+ARG PETSC_VERSION=3.16.0
 WORKDIR /opt
 RUN curl https://ftp.mcs.anl.gov/pub/petsc/release-snapshots/petsc-$PETSC_VERSION.tar.gz | tar xzf -
 WORKDIR /opt/petsc-$PETSC_VERSION
@@ -33,7 +33,7 @@ RUN cp ../dynamite/petsc_config/$PETSC_ARCH.py . && \
     make all
 
 # install SLEPc
-ARG SLEPC_VERSION=3.15.1
+ARG SLEPC_VERSION=3.16.0
 WORKDIR /opt
 RUN curl https://slepc.upv.es/download/distrib/slepc-$SLEPC_VERSION.tar.gz | tar xzf -
 WORKDIR /opt/slepc-$SLEPC_VERSION
@@ -75,8 +75,8 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 ARG PETSC_ARCH=complex-opt
-ARG PETSC_VERSION=3.15.4
-ARG SLEPC_VERSION=3.15.1
+ARG PETSC_VERSION=3.16.0
+ARG SLEPC_VERSION=3.16.0
 
 # get petsc and slepc libraries
 COPY --from=build /opt/petsc-$PETSC_VERSION/$PETSC_ARCH/lib /opt/petsc-$PETSC_VERSION/$PETSC_ARCH/lib

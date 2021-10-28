@@ -35,7 +35,7 @@ following. There is a configuration script that comes with dynamite which should
 
     git clone https://gitlab.com/petsc/petsc.git petsc
     cd petsc
-    git checkout tags/v3.15.0
+    git checkout tags/v3.16.0
     python <dynamite directory>/petsc_config/complex-opt.py
 
 Note that you may want to adjust some of the build options. Just take a look at
@@ -61,7 +61,7 @@ Now download and install SLEPc:
 
     git clone https://gitlab.com/slepc/slepc.git slepc
     cd slepc
-    git checkout tags/v3.15.0
+    git checkout tags/v3.16.0
     ./configure
 
 If it configures correctly, it will output a ``make`` command to run. Copy and
