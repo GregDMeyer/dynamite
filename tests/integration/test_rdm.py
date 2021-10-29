@@ -5,11 +5,13 @@ Test the reduced density matrix and entropy computation on PETSc vectors.
 import numpy as np
 
 import dynamite_test_runner as dtr
+import unittest as ut
 
 from dynamite import config
 from dynamite.subspaces import Parity, Auto, SpinConserve
 from dynamite.states import State
 from dynamite.computations import reduced_density_matrix, entanglement_entropy, renyi_entropy
+from dynamite.tools import complex_enabled
 
 class Explicit(dtr.DynamiteTestCase):
     def setUp(self):
@@ -89,6 +91,7 @@ class Explicit(dtr.DynamiteTestCase):
             dtype=np.complex128)
         self.compare(dm, correct)
 
+    @ut.skipIf(not complex_enabled(), 'complex numbers not enabled')
     def test_complex_sign(self):
         state = State(L=2)
         keep = [0]
@@ -106,6 +109,7 @@ class Explicit(dtr.DynamiteTestCase):
             dtype=np.complex128)
         self.compare(dm, correct)
 
+    @ut.skipIf(not complex_enabled(), 'complex numbers not enabled')
     def test_L4(self):
         state_vals = [
             (0.03-0.293j),(0.131+0.203j),(0.063+0.17j),(0.027+0.226j),(-0.047+0.292j),

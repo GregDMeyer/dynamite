@@ -9,6 +9,7 @@ import dynamite_test_runner as dtr
 
 from dynamite import config
 from dynamite.states import State
+from dynamite.tools import complex_enabled
 
 def petsc_mat_to_np(mat):
 
@@ -19,7 +20,7 @@ def petsc_mat_to_np(mat):
     dims = mat.getSize()
 
     if PROC_0:
-        rtn = np.ndarray(dims,dtype=np.complex128)
+        rtn = np.ndarray(dims, dtype=np.complex128)
 
     select = PETSc.Vec().create()
     select.setSizes(dims[1])
@@ -64,7 +65,14 @@ class Fundamental(dtr.DynamiteTestCase):
     def test_sigmay(self):
         o = sigmay()
         o.L = 1
+
+        if not complex_enabled():
+            with self.assertRaises(ValueError):
+                petsc_mat_to_np(o.get_mat())
+            return
+
         o_np = petsc_mat_to_np(o.get_mat())
+
         correct = np.array([[0, -1j],
                             [1j, 0]])
         if o_np is not None:

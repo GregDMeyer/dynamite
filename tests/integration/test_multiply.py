@@ -11,9 +11,12 @@ from dynamite.msc_tools import msc_dtype
 from dynamite.operators import identity, sigmax, sigmay, index_sum, index_product
 from dynamite.subspaces import Full, Parity, Auto, SpinConserve
 from dynamite.states import State
+from dynamite.tools import complex_enabled
 
 def generate_hamiltonian_tests(cls):
-    for H_name in hamiltonians.__all__:
+    for H_name, real in hamiltonians.names:
+        if not complex_enabled() and not real:
+            continue
         setattr(cls, 'test_'+H_name, lambda self, n=H_name: self.check_hamiltonian(n))
     return cls
 

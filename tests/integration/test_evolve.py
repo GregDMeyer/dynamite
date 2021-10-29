@@ -4,12 +4,15 @@ from scipy.sparse import linalg
 import hamiltonians
 
 import dynamite_test_runner as dtr
+import unittest as ut
 
 from dynamite import config
 from dynamite.operators import sigmax, index_product, identity
 from dynamite.states import State
 from dynamite.subspaces import Parity
+from dynamite.tools import complex_enabled
 
+@ut.skipIf(not complex_enabled(), 'complex numbers not enabled')
 class Analytic(dtr.DynamiteTestCase):
     '''
     Some cases in which we can easily write down the answer.
@@ -26,6 +29,7 @@ class Analytic(dtr.DynamiteTestCase):
         H.evolve(ket, t = np.pi/2, result = bra)
         self.assertLess(np.abs(1 - np.abs(bra.dot(bra_check))), 1E-9)
 
+@ut.skipIf(not complex_enabled(), 'complex numbers not enabled')
 class EvolveChecker(dtr.DynamiteTestCase):
     def evolve_check(self, H, t):
         bra, ket = H.create_states()
@@ -42,13 +46,14 @@ class EvolveChecker(dtr.DynamiteTestCase):
             bra_np = linalg.expm_multiply(-1j*t*H_np, ket_np)
             self.assertLess(np.abs(1 - bra_check.dot(bra_np.conj())), 1E-9)
 
+@ut.skipIf(not complex_enabled(), 'complex numbers not enabled')
 class Hamiltonians(EvolveChecker):
 
     def evolve_all(self, t, skip=None):
         if skip is None:
             skip = set()
 
-        for H_name in hamiltonians.__all__:
+        for H_name, _ in hamiltonians.names:
             if H_name in skip:
                 continue
 
@@ -69,6 +74,7 @@ class Hamiltonians(EvolveChecker):
         self.evolve_all(50.0, skip={'syk'})
         config.L = old_L
 
+@ut.skipIf(not complex_enabled(), 'complex numbers not enabled')
 class ParityTests(EvolveChecker):
 
     def test_exceptions(self):
@@ -85,6 +91,16 @@ class ParityTests(EvolveChecker):
         H.evolve(full_state, t=1.0)
 
     # TODO: actually check output
+
+@ut.skipIf(complex_enabled(), 'complex numbers enabled')
+class FailTest(dtr.DynamiteTestCase):
+    def test_fail(self):
+        H = identity()
+        full_state = State(state=0)
+        with self.assertRaises(ValueError):
+            H.evolve(full_state, t=1.0)
+
+# TODO: check imaginary time evolution
 
 if __name__ == '__main__':
     dtr.main()

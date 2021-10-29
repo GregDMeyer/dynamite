@@ -9,6 +9,7 @@ import dynamite_test_runner as dtr
 from dynamite.operators import index_sum, sigmax, identity
 from dynamite.states import State
 from dynamite.subspaces import Parity
+from dynamite.tools import complex_enabled
 
 class Checker(dtr.DynamiteTestCase):
 
@@ -89,8 +90,10 @@ class Analytic(Checker):
 class Hamiltonians(Checker):
 
     def test_all(self):
-        for H_name in hamiltonians.__all__:
-            with self.subTest(H = H_name):
+        for H_name, real in hamiltonians.names:
+            if not complex_enabled() and not real:
+                continue
+            with self.subTest(H=H_name):
                 H = getattr(hamiltonians, H_name)()
 
                 with self.subTest(which = 'smallest'):

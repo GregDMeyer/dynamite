@@ -121,3 +121,7 @@ def get_cur_memory_usage(which='all'):
     config.initialize()
     from ._backend import bpetsc
     return bpetsc.get_cur_memory_usage(which=which)
+
+def complex_enabled():
+    from ._backend import bbuild
+    return bbuild.complex_enabled()

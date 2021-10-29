@@ -1,6 +1,7 @@
 
 from . import config
 from .states import State
+from .tools import complex_enabled
 from .msc_tools import dnm_int_t
 
 import numpy as np
@@ -72,9 +73,14 @@ def evolve(H, state, t, result=None, **kwargs):
         state.vec.copy(result.vec)
         return result
 
+    if not complex_enabled() and t.real != 0:
+        raise ValueError('configure PETSc to use complex numbers to '
+                         'perform real time evolution')
+
     mfn = SLEPc.MFN().create()
     f = mfn.getFN()
     f.setType(SLEPc.FN.Type.EXP)
+
     f.setScale(-1j*t)
 
     if 'algo' in kwargs:

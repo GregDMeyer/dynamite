@@ -48,7 +48,7 @@ def run_test(mpiexec, nproc, fname, options, timeout=None):
     print()
 
 def main():
-    fnames = sorted(glob('test_*'))
+    fnames = sorted(glob('test_*.py'))
 
     params = parse_command_line()
 

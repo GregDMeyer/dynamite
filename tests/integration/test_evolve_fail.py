@@ -4,13 +4,15 @@ from scipy.sparse import linalg
 import hamiltonians
 
 import dynamite_test_runner as dtr
+import unittest as ut
 
 from dynamite import config
 from dynamite.operators import sigmax, index_product, identity
 from dynamite.states import State
 from dynamite.subspaces import Parity
+from dynamite.tools import complex_enabled
 
-
+@ut.skipIf(not complex_enabled(), 'complex numbers not enabled')
 class EvolveFail(dtr.DynamiteTestCase):
     def test_evolve_fail(self):
         H = hamiltonians.localized()

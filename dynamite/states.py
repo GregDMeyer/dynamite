@@ -1,5 +1,6 @@
 
 from . import config, validate, subspaces
+from .tools import complex_enabled
 
 import numpy as np
 from os import urandom
@@ -214,8 +215,12 @@ class State:
         R.seed((seed + PETSc.COMM_WORLD.rank) % 2**32)
 
         local_size = iend-istart
-        self.vec[istart:iend] =    R.standard_normal(local_size) + \
-                                1j*R.standard_normal(local_size)
+
+        if complex_enabled():
+            self.vec[istart:iend] =    R.standard_normal(local_size) + \
+                                    1j*R.standard_normal(local_size)
+        else:
+            self.vec[istart:iend] = R.standard_normal(local_size)
 
         self.vec.assemblyBegin()
         self.vec.assemblyEnd()
