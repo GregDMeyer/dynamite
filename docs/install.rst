@@ -35,7 +35,7 @@ following. There is a configuration script that comes with dynamite which should
 
     git clone https://gitlab.com/petsc/petsc.git petsc
     cd petsc
-    git checkout tags/v3.16.0
+    git checkout tags/v3.16.1
     python <dynamite directory>/petsc_config/complex-opt.py
 
 Note that you may want to adjust some of the build options. Just take a look at

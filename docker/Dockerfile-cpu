@@ -22,7 +22,7 @@ ARG PETSC_ARCH=complex-opt
 ENV PETSC_ARCH=$PETSC_ARCH
 
 # install PETSc
-ARG PETSC_VERSION=3.16.0
+ARG PETSC_VERSION=3.16.1
 WORKDIR /opt
 RUN curl https://ftp.mcs.anl.gov/pub/petsc/release-snapshots/petsc-$PETSC_VERSION.tar.gz | tar xzf -
 WORKDIR /opt/petsc-$PETSC_VERSION
@@ -43,6 +43,9 @@ RUN ./configure && make
 # install python packages
 # they need to be installed in order, so we can't do pip install -r requirements.txt....
 WORKDIR /opt/dynamite
+
+RUN pip3 install --no-cache-dir --upgrade pip
+
 COPY requirements.txt requirements.txt
 RUN while read PACKAGE; \
         do pip3 install --no-cache-dir --no-warn-script-location $PACKAGE; \
@@ -75,7 +78,7 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 ARG PETSC_ARCH=complex-opt
-ARG PETSC_VERSION=3.16.0
+ARG PETSC_VERSION=3.16.1
 ARG SLEPC_VERSION=3.16.0
 
 # get petsc and slepc libraries

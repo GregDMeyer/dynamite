@@ -26,7 +26,7 @@ ARG PETSC_ARCH=cuda-opt
 ENV PETSC_ARCH=$PETSC_ARCH
 
 # install PETSc
-ARG PETSC_VERSION=3.16.0
+ARG PETSC_VERSION=3.16.1
 WORKDIR /opt
 RUN curl https://ftp.mcs.anl.gov/pub/petsc/release-snapshots/petsc-$PETSC_VERSION.tar.gz | tar xzf -
 WORKDIR /opt/petsc-$PETSC_VERSION
@@ -76,7 +76,7 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 ARG PETSC_ARCH=cuda-opt
-ARG PETSC_VERSION=3.16.0
+ARG PETSC_VERSION=3.16.1
 ARG SLEPC_VERSION=3.16.0
 
 # get petsc and slepc libraries
