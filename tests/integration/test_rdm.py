@@ -260,6 +260,8 @@ class SpinConserveSpace(FullSpace):
 
 class SpinConserveSpinFlipSpace(FullSpace):
     def test_spinflip_fail(self):
+        if config.L % 2:
+            self.skipTest("only for even L")
         state = State(subspace=SpinConserve(config.L, config.L//2, spinflip=True))
         with self.assertRaises(ValueError):
             reduced_density_matrix(state, [0])
