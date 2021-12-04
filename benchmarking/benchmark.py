@@ -35,7 +35,10 @@ def parse_args(argv=None):
     parser.add_argument('--track_memory', action='store_true',
                         help='Whether to compute max memory usage')
 
-    parser.add_argument('--subspace', choices=['full', 'parity', 'spinconserve', 'auto', 'nosortauto'],
+    parser.add_argument('--subspace', choices=['full', 'parity',
+                                               'spinconserve',
+                                               'spinconservespinflip',
+                                               'auto', 'nosortauto'],
                         default='full',
                         help='Which subspace to use.')
     parser.add_argument('--which_space', type=str,
@@ -82,14 +85,16 @@ def build_subspace(params, hamiltonian=None):
             space = 'even'
         rtn = Parity(space)
 
-    elif params.subspace == 'spinconserve':
+    elif params.subspace in ['spinconserve', 'spinconservespinflip']:
         if space is None:
             space = params.L//2
         else:
             space = int(space)
-        rtn = SpinConserve(params.L, space)
 
-    elif params.subspace in ['auto','nosortauto']:
+        spinflip = 'spinflip' in params.subspace
+        rtn = SpinConserve(params.L, space, spinflip=spinflip)
+
+    elif params.subspace in ['auto', 'nosortauto']:
         if space is None:
             half_length = params.L // 2
             space = 'U'*half_length + 'D'*(params.L - half_length)

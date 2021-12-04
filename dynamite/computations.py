@@ -270,6 +270,10 @@ def reduced_density_matrix(state, keep):
     config.initialize()
     from ._backend import bpetsc
 
+    if not state.subspace.product_state_basis:
+        raise ValueError('reduced density matrices currently only supported '
+                         'for product state basis subspace types.')
+
     keep = np.array(keep, dtype=dnm_int_t)
 
     if keep.size == 0:

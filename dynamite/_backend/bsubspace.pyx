@@ -8,6 +8,7 @@ from .bbuild import dnm_int_t
 cdef extern from "bsubspace_impl.h":
 
     ctypedef int PetscInt
+    ctypedef int PetscBool
 
     ctypedef struct data_Full:
         int L
@@ -19,6 +20,7 @@ cdef extern from "bsubspace_impl.h":
     ctypedef struct data_SpinConserve:
         int L
         int k
+        int spinflip
         int ld_nchoosek
         int* nchoosek
 
@@ -84,10 +86,12 @@ cdef class CSpinConserve:
             self,
             PetscInt L,
             PetscInt k,
-            PetscInt [:,:] nchoosek
+            PetscInt [:,:] nchoosek,
+            PetscBool spinflip
         ):
         self.data[0].L = L
         self.data[0].k = k
+        self.data[0].spinflip = spinflip
         self.data[0].ld_nchoosek = nchoosek.shape[1]
         self.data[0].nchoosek = &nchoosek[0, 0]
 

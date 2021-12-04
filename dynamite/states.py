@@ -297,6 +297,10 @@ class State:
         self.vec.scale(1/x)
         return self
 
+    def __len__(self):
+        return self.vec.getSize()
+
+
 auto_wrap = ['norm', 'normalize']
 for petsc_func in auto_wrap:
     setattr(State, petsc_func, lambda self, f=petsc_func: getattr(self.vec, f)())

@@ -156,6 +156,7 @@ typedef struct _data_SpinConserve
 {
   PetscInt L;
   PetscInt k;
+  PetscBool spinflip;
   PetscInt ld_nchoosek;
   PetscInt* nchoosek;
 } data_SpinConserve;
@@ -181,6 +182,9 @@ static inline PetscErrorCode DestroySubspaceData_SpinConserve(data_SpinConserve*
 }
 
 static inline PetscInt Dim_SpinConserve(const data_SpinConserve* data) {
+  if (data->spinflip) {
+    return data->nchoosek[data->k*data->ld_nchoosek + data->L]/2;
+  }
   return data->nchoosek[data->k*data->ld_nchoosek + data->L];
 }
 
@@ -193,6 +197,11 @@ static inline PetscInt S2I_nocheck_SpinConserve(PetscInt state, const data_SpinC
     if (k <= n) idx += data->nchoosek[k*data->ld_nchoosek + n];
     state &= state-1;  // pop least significant bit off of state
   }
+
+  if (data->spinflip && idx >= Dim_SpinConserve(data)) {
+    idx = 2*Dim_SpinConserve(data) - idx - 1;
+  }
+
   return idx;
 }
 

@@ -103,6 +103,15 @@ __device__ PetscInt S2I_CUDA_SpinConserve(PetscInt state, const data_SpinConserv
     if (k <= n) idx += data->nchoosek[k*data->ld_nchoosek + n];
     state &= state-1;  // pop least significant bit off of state
   }
+
+  PetscInt dim;
+  if (data->spinflip) {
+    dim = data->nchoosek[data->k*data->ld_nchoosek + data->L]/2;
+    if (idx >= dim) {
+      idx = 2*dim - idx - 1;
+    }
+  }
+
   return idx;
 }
 

@@ -4,6 +4,7 @@ Test the reduced density matrix and entropy computation on PETSc vectors.
 
 import numpy as np
 
+import unittest as ut
 import dynamite_test_runner as dtr
 import unittest as ut
 
@@ -256,6 +257,12 @@ class AutoSpace(FullSpace):
 class SpinConserveSpace(FullSpace):
     def setUp(self):
         self.state = State(subspace=SpinConserve(config.L, config.L//2))
+
+class SpinConserveSpinFlipSpace(FullSpace):
+    def test_spinflip_fail(self):
+        state = State(subspace=SpinConserve(config.L, config.L//2, spinflip=True))
+        with self.assertRaises(ValueError):
+            reduced_density_matrix(state, [0])
 
 if __name__ == '__main__':
     dtr.main()

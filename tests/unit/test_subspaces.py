@@ -37,6 +37,10 @@ class TestFull(ut.TestCase):
             self.assertEqual(state, i)
             self.assertEqual(idx, i)
 
+    def test_product_state_basis(self):
+        self.assertTrue(Full._product_state_basis)
+
+
 class TestParity(ut.TestCase):
 
     def test_dimension(self):
@@ -49,6 +53,9 @@ class TestParity(ut.TestCase):
             with self.subTest(L = L):
                 self.assertEqual(Parity._get_dimension(L, 0), dim)
                 self.assertEqual(Parity._get_dimension(L, 1), dim)
+
+    def test_product_state_basis(self):
+        self.assertTrue(Parity._product_state_basis)
 
     def test_mapping_single(self):
         s = Parity._idx_to_state(np.array([5], dtype=dnm_int_t), 5, 0)
@@ -136,6 +143,29 @@ class TestSpinConserve(ut.TestCase):
                 self.assertEqual(SpinConserve._get_dimension(L, k, nchoosek), dim)
                 self.assertEqual(SpinConserve._get_dimension(L, k, nchoosek), dim)
 
+    def test_product_state_basis_generic(self):
+        self.assertFalse(SpinConserve._product_state_basis)
+
+    def test_product_state_basis_spinflip(self):
+        self.assertFalse(SpinConserve(4, 2, spinflip=True).product_state_basis)
+
+    def test_product_state_basis_no_spinflip(self):
+        self.assertTrue(SpinConserve(4, 2).product_state_basis)
+
+    def test_dimension_spinflip(self):
+        # each tuple is (L, k, dim)
+        test_cases = [
+            (2, 1, 1),
+            (10, 5, 126),
+        ]
+        for L, k, dim in test_cases:
+            with self.subTest(L=L, k=k):
+                nchoosek = SpinConserve._compute_nchoosek(L, k)
+                self.assertEqual(SpinConserve._get_dimension(L, k, nchoosek,
+                                                             spinflip=True), dim)
+                self.assertEqual(SpinConserve._get_dimension(L, k, nchoosek,
+                                                             spinflip=True), dim)
+
     def test_parameter_exceptions(self):
         # test cases are (L, k)
         test_cases = [
@@ -218,6 +248,46 @@ class TestSpinConserve(ut.TestCase):
                 correct[2] = bad_state
                 idxs = SpinConserve._state_to_idx(correct, L, k, nchoosek)
                 self.assertEqual(idxs[2], -1)
+
+    def test_mapping_array_spinflip(self):
+        L = 4
+        k = L//2
+
+        correct = np.array([
+            0b0011,
+            0b0101,
+            0b0110,
+            0b1001,
+            0b1010,
+            0b1100,
+        ], dtype=dnm_int_t)
+
+        bad_state = 0b0111
+
+        nchoosek = SpinConserve._compute_nchoosek(L, k)
+
+        # TODO: implement this bounds checking
+        # space_size = len(correct)//2
+        # states = SpinConserve._idx_to_state(
+        #     np.arange(space_size, 2*space_size, dtype=dnm_int_t), L, k, nchoosek, spinflip=True
+        # )
+        # for s in states:
+        #     self.assertEqual(s, -1)
+
+        idxs = SpinConserve._state_to_idx(correct, L, k, nchoosek, spinflip=True)
+        for i, idx in enumerate(idxs):
+            if i < len(correct)//2:
+                self.assertEqual(i, idx)
+            else:
+                self.assertEqual(len(correct)-i-1, idx)
+
+        correct[2] = bad_state
+        idxs = SpinConserve._state_to_idx(correct, L, k, nchoosek, spinflip=True)
+        self.assertEqual(idxs[2], -1)
+
+    def test_spinflip_exception(self):
+        with self.assertRaises(ValueError):
+            SpinConserve(5, 2, spinflip=True)
 
     def test_compare_to_auto(self):
         test_cases = [
