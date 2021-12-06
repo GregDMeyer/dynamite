@@ -61,7 +61,7 @@ Now download and install SLEPc:
 
     git clone https://gitlab.com/slepc/slepc.git slepc
     cd slepc
-    git checkout tags/v3.16.0
+    git checkout tags/v3.16.1
     ./configure
 
 If it configures correctly, it will output a ``make`` command to run. Copy and

@@ -1,5 +1,5 @@
-Cython==0.29.24
-numpy==1.21.3
-scipy==1.7.1
-petsc4py==3.16.0
-slepc4py==3.16.0
+Cython==0.29.25
+numpy==1.21.4
+scipy==1.7.3
+petsc4py==3.16.1
+slepc4py==3.16.1
