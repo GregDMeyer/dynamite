@@ -9,11 +9,14 @@ import hamiltonians
 from dynamite import config
 from dynamite.msc_tools import msc_dtype
 from dynamite.operators import identity, sigmax, sigmay, index_sum, index_product
-from dynamite.subspaces import Full, Parity, Auto
+from dynamite.subspaces import Full, Parity, Auto, SpinConserve
 from dynamite.states import State
+from dynamite.tools import complex_enabled
 
 def generate_hamiltonian_tests(cls):
-    for H_name in hamiltonians.__all__:
+    for H_name, real in hamiltonians.names:
+        if not complex_enabled() and not real:
+            continue
         setattr(cls, 'test_'+H_name, lambda self, n=H_name: self.check_hamiltonian(n))
     return cls
 
@@ -96,7 +99,7 @@ class FullHamiltonians(dtr.DynamiteTestCase):
 @generate_hamiltonian_tests
 class Subspaces(dtr.DynamiteTestCase):
 
-    def compare_to_full(self, H, x, check_subspace):
+    def compare_to_full(self, H, x_sub, x_full, check_subspace):
         '''
         Compare multiplication under the full Hamiltonian to multiplication
         in the subspace.
@@ -112,39 +115,67 @@ class Subspaces(dtr.DynamiteTestCase):
         check_subspace : dynamite.subspace.Subspace
             The subspace to multiply under.
         '''
+        extra_conversion = isinstance(check_subspace, SpinConserve)
+        extra_conversion = extra_conversion and check_subspace.spinflip
+
         # compare all possible combinations of going to and from the full space
-        self.assertTrue(isinstance(x.subspace, Full))
+        self.assertTrue(isinstance(x_full.subspace, Full))
+        self.assertIs(x_sub.subspace, check_subspace)
 
         to_space = identity()
-        to_space.add_subspace(check_subspace, Full())
+        if extra_conversion:
+            to_space.add_subspace(SpinConserve(check_subspace.L, check_subspace.k), Full())
+        else:
+            to_space.add_subspace(check_subspace, Full())
 
         correct_full = State(subspace=Full())
-        correct_sub = State(subspace=check_subspace)
-        H.dot(x, correct_full)
+        H.dot(x_full, correct_full)
 
-        to_space.dot(correct_full, correct_sub)
-
-        with self.subTest(which='f2s'):
-            self.check_f2s(H, x, check_subspace, correct_sub)
-
-        with self.subTest(which='s2f'):
-            self.check_s2f(H, x, check_subspace, correct_sub)
+        if extra_conversion:
+            tmp = State(subspace=to_space.left_subspace)
+            to_space.dot(correct_full, tmp)
+            correct_sub = SpinConserve.convert_spinflip(tmp)
+        else:
+            correct_sub = State(subspace=check_subspace)
+            to_space.dot(correct_full, correct_sub)
 
         with self.subTest(which='s2s'):
-            self.check_s2s(H, x, check_subspace, correct_sub)
+            self.check_s2s(H, x_sub, check_subspace, correct_sub)
 
-    def check_f2s(self, H, x, check_subspace, correct):
+        if not extra_conversion:
+            with self.subTest(which='f2s'):
+                self.check_f2s(H, x_full, check_subspace, correct_sub)
+
+            with self.subTest(which='s2f'):
+                self.check_s2f(H, x_sub, check_subspace, correct_sub)
+
+    @classmethod
+    def generate_random_in_subspace(cls, space):
+        x_sub = State(subspace=space, state='random', seed=0)
+
+        if isinstance(space, SpinConserve) and space.spinflip:
+            tmp = SpinConserve.convert_spinflip(x_sub)
+        else:
+            tmp = x_sub
+
+        from_space = identity()
+        from_space.add_subspace(Full(), tmp.subspace)
+        x_full = State(subspace=Full())
+        from_space.dot(tmp, x_full)
+        return x_sub, x_full
+
+    def check_f2s(self, H, x_full, check_subspace, correct):
         '''
         check multiplication from full to subspace
         '''
         H.add_subspace(check_subspace, Full())
         result = State(subspace=check_subspace)
-        H.dot(x, result)
+        H.dot(x_full, result)
 
         eps = H.nnz*np.finfo(msc_dtype[2]).eps
         self.check_vec_equal(correct, result, eps=eps)
 
-    def check_s2f(self, H, x, check_subspace, correct):
+    def check_s2f(self, H, x_sub, check_subspace, correct):
         '''
         check multiplication from subspace to full
         '''
@@ -155,62 +186,63 @@ class Subspaces(dtr.DynamiteTestCase):
         sub_state = State(subspace=check_subspace)
         full_state = State(subspace=Full())
 
-        to_space.dot(x, sub_state)
-        H.dot(sub_state, full_state)
+        H.dot(x_sub, full_state)
         to_space.dot(full_state, sub_state)
 
         eps = H.nnz*np.finfo(msc_dtype[2]).eps
         self.check_vec_equal(correct, sub_state, eps=eps)
 
-    def check_s2s(self, H, x, check_subspace, correct):
+    def check_s2s(self, H, x_sub, check_subspace, correct):
         '''
         check multiplication from subspace to subspace
         '''
         H.add_subspace(check_subspace)
-        to_space = identity()
-        to_space.add_subspace(check_subspace, Full())
-
-        x_sub = State(subspace=check_subspace)
-        result = State(subspace=check_subspace)
-
-        to_space.dot(x, x_sub)
-        H.dot(x_sub, result)
+        result = H.dot(x_sub)
 
         eps = H.nnz*np.finfo(msc_dtype[2]).eps
         self.check_vec_equal(correct, result, eps=eps)
 
-    @classmethod
-    def generate_random_in_subspace(cls, space):
-        k = State(subspace=space, state='random', seed=0)
-        from_space = identity()
-        from_space.add_subspace(Full(), space)
-        ket = State(subspace=Full())
-        from_space.dot(k, ket)
-        return ket
-
     def test_parity_XX_even(self):
         H = index_sum(sigmax(0)*sigmax(1))
         sp = Parity('even')
-        x = self.generate_random_in_subspace(sp)
-        self.compare_to_full(H, x, sp)
+        xs = self.generate_random_in_subspace(sp)
+        self.compare_to_full(H, *xs, sp)
 
     def test_parity_XX_odd(self):
         H = index_sum(sigmax(0)*sigmax(1))
         sp = Parity('odd')
-        x = self.generate_random_in_subspace(sp)
-        self.compare_to_full(H, x, sp)
+        xs = self.generate_random_in_subspace(sp)
+        self.compare_to_full(H, *xs, sp)
 
     def test_parity_YY_even(self):
         H = index_sum(sigmay(0)*sigmay(1))
         sp = Parity('even')
-        x = self.generate_random_in_subspace(sp)
-        self.compare_to_full(H, x, sp)
+        xs = self.generate_random_in_subspace(sp)
+        self.compare_to_full(H, *xs, sp)
 
     def test_parity_YY_odd(self):
         H = index_sum(sigmay(0)*sigmay(1))
         sp = Parity('odd')
-        x = self.generate_random_in_subspace(sp)
-        self.compare_to_full(H, x, sp)
+        xs = self.generate_random_in_subspace(sp)
+        self.compare_to_full(H, *xs, sp)
+
+    def test_spin_conserve_half_filling(self):
+        H = index_sum(sigmax(0)*sigmax(1) + sigmay(0)*sigmay(1))
+
+        for spinflip in [True, False]:
+            if spinflip and config.L%2 != 0:
+                continue
+
+            with self.subTest(spinflip=spinflip):
+                sp = SpinConserve(config.L, config.L//2, spinflip=spinflip)
+                xs = self.generate_random_in_subspace(sp)
+                self.compare_to_full(H, *xs, sp)
+
+    def test_spin_conserve_third_filling(self):
+        H = index_sum(sigmax(0)*sigmax(1) + sigmay(0)*sigmay(1))
+        sp = SpinConserve(config.L, config.L//3)
+        xs = self.generate_random_in_subspace(sp)
+        self.compare_to_full(H, *xs, sp)
 
     def check_hamiltonian(self, H_name):
         for space in [1, 2]:
@@ -220,9 +252,9 @@ class Subspaces(dtr.DynamiteTestCase):
                         H = getattr(hamiltonians, H_name)()
                         sp = Auto(H, (1 << (H.L//2))-space, sort=sort)
 
-                        ket = self.generate_random_in_subspace(sp)
+                        xs = self.generate_random_in_subspace(sp)
 
-                        self.compare_to_full(H, ket, sp)
+                        self.compare_to_full(H, *xs, sp)
 
 # TODO: write tests where this is not just the identity
 class Projection(dtr.DynamiteTestCase):

@@ -8,14 +8,20 @@ one implementation of each of the functions.
 import numpy as np
 from copy import deepcopy
 from zlib import crc32
+import math
 
-from . import validate, states
+from . import validate, states, config
 from ._backend import bsubspace
+from .msc_tools import dnm_int_t
 
 class Subspace:
     '''
     Base subspace class.
     '''
+
+    # subclasses should set to False if they need
+    _product_state_basis = True
+    _checksum_start = 0
 
     def __init__(self):
         self._L = None
@@ -26,8 +32,14 @@ class Subspace:
         Returns true if the two subspaces correspond to the same mapping, even if they
         are different classes.
         '''
+        if s is self:
+            return True
+
         if not isinstance(s, Subspace):
             raise ValueError('Cannot compare Subspace to non-Subspace type')
+
+        if self._L is None:
+            raise ValueError('Cannot compare subspaces before setting L')
 
         if self.get_dimension() != s.get_dimension():
             return False
@@ -62,6 +74,14 @@ class Subspace:
         """
         raise NotImplementedError()
 
+    @property
+    def product_state_basis(self):
+        """
+        A boolean value indicating whether the given subspace's basis
+        states are product states.
+        """
+        return self._product_state_basis
+
     @classmethod
     def _numeric_to_array(cls, x):
         '''
@@ -94,7 +114,7 @@ class Subspace:
         '''
         if self._chksum is None:
             BLOCK = 2**14
-            chksum = 0
+            chksum = self._checksum_start
             for start in range(0, self.get_dimension(), BLOCK):
                 stop = min(start+BLOCK, self.get_dimension())
                 smap = self.idx_to_state(np.arange(start, stop))
@@ -184,6 +204,7 @@ class Full(Subspace):
         '''
         return bsubspace.SubspaceType.FULL
 
+
 class Parity(Subspace):
     '''
     The subspaces of states in which the number of up spins is even or odd.
@@ -261,6 +282,188 @@ class Parity(Subspace):
         used in the C backend.
         '''
         return bsubspace.SubspaceType.PARITY
+
+
+class SpinConserve(Subspace):
+    '''
+    The subspaces of states in which conserve total magnetization (total
+    number of up spins).
+
+    Parameters
+    ----------
+    L : int
+        Length of spin chain (constant for this class)
+
+    k : int
+        Number of up spins (0's in integer representation of state)
+    '''
+
+    _product_state_basis = False
+
+    def __init__(self, L, k, spinflip=False):
+        Subspace.__init__(self)
+        self._L = self._check_L(L)
+        self._spinflip = spinflip
+        self._product_state_basis = not spinflip
+        if spinflip:
+            self._checksum_start = 1
+        else:
+            self._checksum_start = 0
+
+        self._k = self._check_k(k)
+
+        self._nchoosek = self._compute_nchoosek(L, k)
+
+    @property
+    def spinflip(self):
+        """
+        Whether the subspace uses the additional spinflip symmetry.
+        """
+        return self._spinflip
+
+    @classmethod
+    def convert_spinflip(cls, state):
+        """
+        Convert a state on a subspace with one spinflip value
+        to a state with opposite spinflip value
+
+        .. note::
+
+            When setting spinflip=True, this method projects into
+            the +X subspace
+        """
+        new_space = SpinConserve(state.subspace.L,
+                                 state.subspace.k,
+                                 spinflip=not state.subspace.spinflip)
+
+        rtn_state = states.State(subspace=new_space)
+        istart, iend = state.vec.getOwnershipRange()
+
+        n_in = len(state)
+        n_rtn = len(rtn_state)
+        if state.subspace.spinflip:  # to product state basis
+            rtn_state.vec[istart:iend] = state.vec[istart:iend]
+
+            start = n_rtn-istart-1
+            end = n_rtn-iend-1
+            rtn_state.vec[start:end:-1] = state.vec[istart:iend]
+
+        else:  # from product state basis
+            rtn_state.vec.set(0)
+            if istart < n_in//2:
+                start = istart
+                end = min(n_in//2, iend)
+                rtn_state.vec.setValues(np.arange(start, end, dtype=dnm_int_t),
+                                        state.vec[start:end],
+                                        addv=True)
+            if iend > n_in//2:
+                start = max(n_in//2, istart)
+                end = iend
+                rtn_state.vec.setValues(np.arange(n_in-start-1, n_in-end-1,
+                                                  -1, dtype=dnm_int_t),
+                                        state.vec[start:end],
+                                        addv=True)
+
+        rtn_state.vec.assemble()
+        rtn_state.vec.scale(1/np.sqrt(2))
+
+        return rtn_state
+
+    @classmethod
+    def _compute_nchoosek(cls, L, k):
+        # we index over k first to hopefully make the memory access pattern
+        # slightly better. sorry :-(
+        rtn = np.ndarray((k+1, L+1), dtype=bsubspace.dnm_int_t)
+
+        # there is a more efficient algorithm where we use a combinations
+        # identity to compute the values way faster. but it's super fast anyway
+        # and this is more readable
+        for (kk, LL), _ in np.ndenumerate(rtn):
+            rtn[kk, LL] = math.comb(LL, kk)
+
+        return rtn
+
+    def _check_L(self, L):
+        if config.L is not None and L != config.L:
+            raise ValueError('attempted to set L to value different from config.L')
+
+        return validate.L(L)
+
+    def _check_k(self, k):
+        if not (0 <= k <= self.L):
+            raise ValueError('k must be between 0 and L')
+
+        if self._spinflip and not 2*k == self.L:
+            raise ValueError('L must equal 2k for spinflip symmetry')
+
+        return k
+
+    @Subspace.L.setter
+    def L(self, value):
+        if value != self.L:
+            raise AttributeError('cannot change L for SpinConserve class')
+
+    @property
+    def k(self):
+        """
+        The number of up ("0") spins.
+        """
+        return self._k
+
+    def get_dimension(self):
+        """
+        Get the dimension of the subspace.
+        """
+        return self._get_dimension(self.L, self.k, self._nchoosek, self._spinflip)
+
+    @classmethod
+    def _get_dimension(cls, L, k, nchoosek, spinflip=False):
+        return bsubspace.get_dimension_SpinConserve(cls._get_cdata(L, k, nchoosek, spinflip))
+
+    def idx_to_state(self, idx):
+        """
+        Maps an index to an integer that in binary corresponds to the spin configuration.
+        Vectorized implementation allows passing a numpy array of indices as idx.
+        """
+        idx = self._numeric_to_array(idx)
+        return self._idx_to_state(idx, self.L, self.k, self._nchoosek, self._spinflip)
+
+    def state_to_idx(self, state):
+        """
+        The inverse mapping of :meth:`idx_to_state`.
+        """
+        state = self._numeric_to_array(state)
+        return self._state_to_idx(state, self.L, self.k, self._nchoosek, self._spinflip)
+
+    @classmethod
+    def _idx_to_state(cls, idx, L, k, nchoosek, spinflip=False):
+        return bsubspace.idx_to_state_SpinConserve(idx, cls._get_cdata(L, k, nchoosek, spinflip))
+
+    @classmethod
+    def _state_to_idx(cls, state, L, k, nchoosek, spinflip=False):
+        return bsubspace.state_to_idx_SpinConserve(state, cls._get_cdata(L, k, nchoosek, spinflip))
+
+    def get_cdata(self):
+        '''
+        Returns an object containing the subspace data accessible by the C backend.
+        '''
+        return self._get_cdata(self.L, self.k, self._nchoosek, self._spinflip)
+
+    @classmethod
+    def _get_cdata(cls, L, k, nchoosek, spinflip=False):
+        return bsubspace.CSpinConserve(
+            L, k,
+            np.ascontiguousarray(nchoosek),
+            spinflip
+        )
+
+    def to_enum(self):
+        '''
+        Convert the class types used in the Python frontend to the enum values
+        used in the C backend.
+        '''
+        return bsubspace.SubspaceType.SPIN_CONSERVE
+
 
 class Auto(Subspace):
     '''

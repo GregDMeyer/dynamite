@@ -9,7 +9,7 @@ from dynamite.states import State
 from dynamite.operators import sigmax, sigmay, sigmaz
 from dynamite.operators import op_sum, op_product, index_sum
 from dynamite.extras import majorana
-from dynamite.subspaces import Full, Parity, Auto
+from dynamite.subspaces import Full, Parity, SpinConserve, Auto
 from dynamite.tools import track_memory, get_max_memory_usage
 from dynamite.computations import reduced_density_matrix
 
@@ -29,18 +29,22 @@ def parse_args(argv=None):
                         help='Make a shell matrix instead of a regular matrix.')
     parser.add_argument('--gpu', action='store_true',
                         help='Run computations on GPU instead of CPU.')
-    
+
     parser.add_argument('--slepc_args', type=str, default='',
                         help='Arguments to pass to SLEPc.')
     parser.add_argument('--track_memory', action='store_true',
                         help='Whether to compute max memory usage')
 
-    parser.add_argument('--subspace', choices=['full', 'parity', 'auto', 'nosortauto'],
+    parser.add_argument('--subspace', choices=['full', 'parity',
+                                               'spinconserve',
+                                               'spinconservespinflip',
+                                               'auto', 'nosortauto'],
                         default='full',
                         help='Which subspace to use.')
     parser.add_argument('--which_space', type=str,
                         help='The particular subspace to use. For parity, options are "even" '
-                        'and "odd", for auto supply a starting state like UUUUDDDD.')
+                        'and "odd", for spinconserve an integer number of up spins, for auto '
+                        'supply a starting state like UUUUDDDD.')
 
     parser.add_argument('--evolve', action='store_true',
                         help='Request that the Hamiltonian evolves a state.')
@@ -81,11 +85,23 @@ def build_subspace(params, hamiltonian=None):
             space = 'even'
         rtn = Parity(space)
 
-    elif params.subspace in ['auto','nosortauto']:
+    elif params.subspace in ['spinconserve', 'spinconservespinflip']:
+        if space is None:
+            space = params.L//2
+        else:
+            space = int(space)
+
+        spinflip = 'spinflip' in params.subspace
+        rtn = SpinConserve(params.L, space, spinflip=spinflip)
+
+    elif params.subspace in ['auto', 'nosortauto']:
         if space is None:
             half_length = params.L // 2
             space = 'U'*half_length + 'D'*(params.L - half_length)
         rtn = Auto(hamiltonian, space, sort=params.subspace=='auto')
+
+    else:
+        raise ValueError("invalid subspace")
 
     return rtn
 
@@ -176,7 +192,7 @@ def main():
     config.initialize(slepc_args, gpu=arg_params.gpu)
     config.L = arg_params.L
     config.shell = arg_params.shell
-    
+
     from petsc4py.PETSc import Sys
     Print = Sys.Print
 

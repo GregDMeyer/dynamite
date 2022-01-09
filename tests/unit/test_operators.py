@@ -555,6 +555,25 @@ class Properties(ut.TestCase):
         o.L = 6
         self.assertEqual(o.subspace.L, 6)
 
+    def test_subspace_fail(self):
+
+        from dynamite.subspaces import Subspace, Full
+        subspace = Mock(spec=Subspace)
+        subspace.product_state_basis = False
+
+        o = sigmaz()
+        with self.assertRaises(ValueError):
+            o.add_subspace(subspace, Full())
+
+        subspace2 = Mock(spec=Subspace)
+        subspace2.product_state_basis = False
+
+        with self.assertRaises(ValueError):
+            o.add_subspace(subspace, subspace2)
+
+        # this should be fine
+        o.add_subspace(subspace)
+
     def test_brackets(self):
         o = sigmaz()
         o.string = 'str'

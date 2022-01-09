@@ -4,12 +4,15 @@ Test the reduced density matrix and entropy computation on PETSc vectors.
 
 import numpy as np
 
+import unittest as ut
 import dynamite_test_runner as dtr
+import unittest as ut
 
 from dynamite import config
-from dynamite.subspaces import Parity, Auto
+from dynamite.subspaces import Parity, Auto, SpinConserve
 from dynamite.states import State
 from dynamite.computations import reduced_density_matrix, entanglement_entropy, renyi_entropy
+from dynamite.tools import complex_enabled
 
 class Explicit(dtr.DynamiteTestCase):
     def setUp(self):
@@ -89,6 +92,7 @@ class Explicit(dtr.DynamiteTestCase):
             dtype=np.complex128)
         self.compare(dm, correct)
 
+    @ut.skipIf(not complex_enabled(), 'complex numbers not enabled')
     def test_complex_sign(self):
         state = State(L=2)
         keep = [0]
@@ -106,6 +110,7 @@ class Explicit(dtr.DynamiteTestCase):
             dtype=np.complex128)
         self.compare(dm, correct)
 
+    @ut.skipIf(not complex_enabled(), 'complex numbers not enabled')
     def test_L4(self):
         state_vals = [
             (0.03-0.293j),(0.131+0.203j),(0.063+0.17j),(0.027+0.226j),(-0.047+0.292j),
@@ -248,6 +253,18 @@ class AutoSpace(FullSpace):
         from dynamite.operators import sigmax, sigmay, index_sum
         H = index_sum(sigmax(0)*sigmax(1) + sigmay(0)*sigmay(1))
         self.state = State(subspace=Auto(H, 'U'*(config.L//2) + 'D'*(config.L-config.L//2)))
+
+class SpinConserveSpace(FullSpace):
+    def setUp(self):
+        self.state = State(subspace=SpinConserve(config.L, config.L//2))
+
+class SpinConserveSpinFlipSpace(FullSpace):
+    def test_spinflip_fail(self):
+        if config.L % 2:
+            self.skipTest("only for even L")
+        state = State(subspace=SpinConserve(config.L, config.L//2, spinflip=True))
+        with self.assertRaises(ValueError):
+            reduced_density_matrix(state, [0])
 
 if __name__ == '__main__':
     dtr.main()

@@ -10,15 +10,19 @@ import dynamite_test_runner as dtr
 
 from dynamite import config
 from dynamite._backend.bbuild import have_gpu_shell
+from dynamite.tools import complex_enabled
 
 class Hamiltonians(dtr.DynamiteTestCase):
 
     def test_shell(self):
-        
+
         config.initialize()
         from petsc4py import PETSc
 
-        for H_name in hamiltonians.__all__:
+        for H_name, real in hamiltonians.names:
+            if not real and not complex_enabled():
+                continue
+
             with self.subTest(H = H_name):
                 H = getattr(hamiltonians, H_name)()
                 H.shell = True

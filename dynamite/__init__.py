@@ -64,7 +64,7 @@ class _Config:
                                    explain_str)
             else:
                 return
-            
+
         if bbuild.petsc_initialized():
             raise RuntimeError('PETSc has been initialized but dynamite has not. ' +\
                                explain_str)
@@ -112,7 +112,7 @@ class _Config:
     @property
     def shell(self):
         """
-        Whether to use standard PETSc matrices (``False``, default), or shell 
+        Whether to use standard PETSc matrices (``False``, default), or shell
         matrices (``True``).
         """
         return self._shell
@@ -185,7 +185,10 @@ def check_version():
             with open(filename, 'w') as f:
                 f.write(str(time()))
         remove(filename+'_lock')
-    except FileExistsError: # another process is doing this at the same time
+
+    # another process is doing this at the same time,
+    # or we don't have write permission here
+    except (FileExistsError, PermissionError):
         return
 
     # finally do the check

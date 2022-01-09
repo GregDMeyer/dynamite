@@ -1,8 +1,17 @@
-Installing
-==========
+.. _installing:
+
+**********************
+Installing from source
+**********************
+
+The easiest way to use ``dynamite`` is through the pre-built container images---see :ref:`containers`.
+If for some reason you can't use the containers, or if you want a site-specific build (for example to optimize message passing performance between nodes on a cluster), you can build from source.
+
+Building from source
+====================
 
 .. note ::
-    dynamite is written for Python >=3.6! You may need to install an appropriate
+    dynamite is written for Python >=3.8! You may need to install an appropriate
     version first if you don't already have it.
 
 Download dynamite
@@ -26,7 +35,7 @@ following. There is a configuration script that comes with dynamite which should
 
     git clone https://gitlab.com/petsc/petsc.git petsc
     cd petsc
-    git checkout tags/v3.15.0
+    git checkout tags/v3.16.1
     python <dynamite directory>/petsc_config/complex-opt.py
 
 Note that you may want to adjust some of the build options. Just take a look at
@@ -52,7 +61,7 @@ Now download and install SLEPc:
 
     git clone https://gitlab.com/slepc/slepc.git slepc
     cd slepc
-    git checkout tags/v3.15.0
+    git checkout tags/v3.16.1
     ./configure
 
 If it configures correctly, it will output a ``make`` command to run. Copy and

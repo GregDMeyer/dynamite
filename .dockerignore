@@ -1,0 +1,13 @@
+# unneeded files
+docker/
+docs/
+.git
+.gitignore
+LICENSE.txt
+README.md
+
+# other files that might be generated
+build/
+dynamite.egg-info/
+__pycache__/
+*.so

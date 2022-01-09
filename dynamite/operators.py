@@ -266,6 +266,11 @@ class Operator:
         '''
         if right is None:
             right = left
+        else:
+            if (left is not right and
+                (not left.product_state_basis or not right.product_state_basis)):
+                raise ValueError("subspaces must be the same object if either is not a "
+                                 "product state basis")
 
         left = validate.subspace(left)
         right = validate.subspace(right)

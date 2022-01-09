@@ -15,6 +15,12 @@
   #define builtin_parity __builtin_parity
 #endif
 
+#ifdef PETSC_USE_COMPLEX
+  #define DNM_PETSC_COMPLEX 1
+#else
+  #define DNM_PETSC_COMPLEX 0
+#endif
+
 #define TERM_REAL(mask, sign) (!(builtin_parity((mask) & (sign))))
 
 typedef enum _shell_impl {

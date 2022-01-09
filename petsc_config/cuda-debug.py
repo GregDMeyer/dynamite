@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 
 '''
 This file is intended to be used to configure PETSc for dynamite.
@@ -19,6 +19,9 @@ configure_options = [
     # for more information about using PETSc with GPUs.
     '--with-cuda',
 
+    # ensure correct c++ dialect
+    '--with-cxx-dialect=cxx14',
+    '--with-cuda-dialect=cxx14'
 ]
 
 if __name__ == '__main__':
