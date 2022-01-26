@@ -112,12 +112,12 @@ PetscErrorCode C(BuildPetsc,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
       }
 
       row_count++;
-      ierr = MatSetValue(*A, row_idx, col_idx, value, INSERT_VALUES);CHKERRQ(ierr);
+      ierr = MatSetValue(*A, row_idx, col_idx, value, ADD_VALUES);CHKERRQ(ierr);
     }
 
     /* workaround for a bug in PETSc that triggers if there are empty rows */
     if (row_count == 0) {
-      ierr = MatSetValue(*A, row_idx, col_start, 0, INSERT_VALUES);CHKERRQ(ierr);
+      ierr = MatSetValue(*A, row_idx, col_start, 0, ADD_VALUES);CHKERRQ(ierr);
     }
   }
 
