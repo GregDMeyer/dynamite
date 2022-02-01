@@ -68,7 +68,13 @@ void C(fill_combine_array,SUBSPACE)(
   *n_filled_p = 0;
   for (keep_state=0; keep_state<keep_dim; ++keep_state) {
     full_state = C(combine_states,SUBSPACE)(keep_state, tr_state, keep, keep_size, sub_data_p->L);
+
+#if C(SUBSPACE,SP) == SpinConserve_SP
+    idx = C(S2I,SUBSPACE)(full_state, NULL, sub_data_p);
+#else
     idx = C(S2I,SUBSPACE)(full_state, sub_data_p);
+#endif
+
     if (idx != -1) {
       state_array[*n_filled_p] = keep_state;
       combine_array[*n_filled_p] = x_array[idx];

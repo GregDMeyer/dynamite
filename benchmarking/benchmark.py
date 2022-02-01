@@ -91,7 +91,7 @@ def build_subspace(params, hamiltonian=None):
         else:
             space = int(space)
 
-        spinflip = 'spinflip' in params.subspace
+        spinflip = '+' if 'spinflip' in params.subspace else None
         rtn = SpinConserve(params.L, space, spinflip=spinflip)
 
     elif params.subspace in ['auto', 'nosortauto']:

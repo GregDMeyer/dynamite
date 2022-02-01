@@ -296,19 +296,30 @@ class SpinConserve(Subspace):
 
     k : int
         Number of up spins (0's in integer representation of state)
+
+    spinflip : str, optional
+        Sign of spinflip basis ('+' or '-'). Omit to not use Z2 symmetry.
     '''
 
     _product_state_basis = False
 
-    def __init__(self, L, k, spinflip=False):
+    def __init__(self, L, k, spinflip=None):
         Subspace.__init__(self)
         self._L = self._check_L(L)
-        self._spinflip = spinflip
-        self._product_state_basis = not spinflip
-        if spinflip:
-            self._checksum_start = 1
+
+        if spinflip is None or spinflip == 0:
+            self._spinflip = 0
+        elif spinflip in ['+', +1]:
+            self._spinflip = +1
+        elif spinflip in ['-', -1]:
+            self._spinflip = -1
         else:
-            self._checksum_start = 0
+            raise ValueError('invalid value for spinflip')
+
+        self._product_state_basis = self.spinflip == 0
+
+        # unique checksum for each value of spinflip
+        self._checksum_start = self._spinflip
 
         self._k = self._check_k(k)
 
@@ -318,23 +329,43 @@ class SpinConserve(Subspace):
     def spinflip(self):
         """
         Whether the subspace uses the additional spinflip symmetry.
+        Returns integer +1, -1, or 0 (no spinflip symmetry).
         """
         return self._spinflip
 
     @classmethod
-    def convert_spinflip(cls, state):
+    def convert_spinflip(cls, state, sign=None):
         """
         Convert a state on a subspace with one spinflip value
         to a state with opposite spinflip value
 
-        .. note::
+        Parameters
+        ----------
 
-            When setting spinflip=True, this method projects into
-            the +X subspace
+        state : State
+            The input state
+
+        sign : str, optional
+            The sign of the spinflip subspace. Required when converting from
+            non-spinflip subspace.
         """
+        if state.subspace.spinflip == 0 and sign is None:
+            raise ValueError('must provide sign when converting to spinflip')
+
+        if state.subspace.spinflip != 0 and sign is not None:
+            raise ValueError("do not provide sign when converting from "
+                             "spinflip subspace")
+
+        if sign in ['+', +1]:
+            sign = +1
+        elif sign in ['-', -1]:
+            sign = -1
+        elif sign is not None:
+            raise ValueError('invalid value of sign')
+
         new_space = SpinConserve(state.subspace.L,
                                  state.subspace.k,
-                                 spinflip=not state.subspace.spinflip)
+                                 spinflip=sign)
 
         rtn_state = states.State(subspace=new_space)
         istart, iend = state.vec.getOwnershipRange()
@@ -342,25 +373,37 @@ class SpinConserve(Subspace):
         n_in = len(state)
         n_rtn = len(rtn_state)
         if state.subspace.spinflip:  # to product state basis
-            rtn_state.vec[istart:iend] = state.vec[istart:iend]
-
             start = n_rtn-istart-1
             end = n_rtn-iend-1
             rtn_state.vec[start:end:-1] = state.vec[istart:iend]
 
+            if state.subspace.spinflip == -1:
+                # flip sign of second half of vector for - subspace
+                rtn_state.vec.assemble()
+                rtn_state.vec.scale(-1)
+
+            rtn_state.vec[istart:iend] = state.vec[istart:iend]
+
         else:  # from product state basis
-            rtn_state.vec.set(0)
+
+            # second half of vector
+            start = max(n_in//2, istart)
+            end = iend
+            if start < end:
+                # an unfortunate side effect of python slice notation
+                if n_in == end:
+                    rtn_state.vec[n_in-start-1::-1] = state.vec[start:end]
+                else:
+                    rtn_state.vec[n_in-start-1:n_in-end-1:-1] = state.vec[start:end]
+
+            rtn_state.vec.assemble()
+            if sign == -1:
+                rtn_state.vec.scale(-1)
+
             if istart < n_in//2:
                 start = istart
                 end = min(n_in//2, iend)
                 rtn_state.vec.setValues(np.arange(start, end, dtype=dnm_int_t),
-                                        state.vec[start:end],
-                                        addv=True)
-            if iend > n_in//2:
-                start = max(n_in//2, istart)
-                end = iend
-                rtn_state.vec.setValues(np.arange(n_in-start-1, n_in-end-1,
-                                                  -1, dtype=dnm_int_t),
                                         state.vec[start:end],
                                         addv=True)
 
@@ -417,7 +460,7 @@ class SpinConserve(Subspace):
         return self._get_dimension(self.L, self.k, self._nchoosek, self._spinflip)
 
     @classmethod
-    def _get_dimension(cls, L, k, nchoosek, spinflip=False):
+    def _get_dimension(cls, L, k, nchoosek, spinflip=0):
         return bsubspace.get_dimension_SpinConserve(cls._get_cdata(L, k, nchoosek, spinflip))
 
     def idx_to_state(self, idx):
@@ -436,11 +479,11 @@ class SpinConserve(Subspace):
         return self._state_to_idx(state, self.L, self.k, self._nchoosek, self._spinflip)
 
     @classmethod
-    def _idx_to_state(cls, idx, L, k, nchoosek, spinflip=False):
+    def _idx_to_state(cls, idx, L, k, nchoosek, spinflip=0):
         return bsubspace.idx_to_state_SpinConserve(idx, cls._get_cdata(L, k, nchoosek, spinflip))
 
     @classmethod
-    def _state_to_idx(cls, state, L, k, nchoosek, spinflip=False):
+    def _state_to_idx(cls, state, L, k, nchoosek, spinflip=0):
         return bsubspace.state_to_idx_SpinConserve(state, cls._get_cdata(L, k, nchoosek, spinflip))
 
     def get_cdata(self):
@@ -450,7 +493,7 @@ class SpinConserve(Subspace):
         return self._get_cdata(self.L, self.k, self._nchoosek, self._spinflip)
 
     @classmethod
-    def _get_cdata(cls, L, k, nchoosek, spinflip=False):
+    def _get_cdata(cls, L, k, nchoosek, spinflip=0):
         return bsubspace.CSpinConserve(
             L, k,
             np.ascontiguousarray(nchoosek),

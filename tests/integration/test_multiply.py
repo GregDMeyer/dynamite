@@ -134,7 +134,7 @@ class Subspaces(dtr.DynamiteTestCase):
         if extra_conversion:
             tmp = State(subspace=to_space.left_subspace)
             to_space.dot(correct_full, tmp)
-            correct_sub = SpinConserve.convert_spinflip(tmp)
+            correct_sub = SpinConserve.convert_spinflip(tmp, sign=check_subspace.spinflip)
         else:
             correct_sub = State(subspace=check_subspace)
             to_space.dot(correct_full, correct_sub)
@@ -229,8 +229,8 @@ class Subspaces(dtr.DynamiteTestCase):
     def test_spin_conserve_half_filling(self):
         H = index_sum(sigmax(0)*sigmax(1) + sigmay(0)*sigmay(1))
 
-        for spinflip in [True, False]:
-            if spinflip and config.L%2 != 0:
+        for spinflip in ['+', '-', None]:
+            if spinflip is not None and config.L%2 != 0:
                 continue
 
             with self.subTest(spinflip=spinflip):

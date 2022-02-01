@@ -150,7 +150,12 @@ class State:
             A representation of the state.
         """
 
-        idx = self.subspace.state_to_idx(self.str_to_state(s, self.L))
+        s2i_result = self.subspace.state_to_idx(self.str_to_state(s, self.L))
+        if isinstance(s2i_result, tuple):
+            idx, sign = s2i_result
+        else:
+            idx = s2i_result
+
         if idx == -1:
             raise ValueError('Provided initial state not in requested subspace.')
 
