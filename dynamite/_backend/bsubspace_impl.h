@@ -156,7 +156,7 @@ typedef struct _data_SpinConserve
 {
   PetscInt L;
   PetscInt k;
-  PetscBool spinflip;
+  PetscInt spinflip;
   PetscInt ld_nchoosek;
   PetscInt* nchoosek;
 } data_SpinConserve;
@@ -188,7 +188,7 @@ static inline PetscInt Dim_SpinConserve(const data_SpinConserve* data) {
   return data->nchoosek[data->k*data->ld_nchoosek + data->L];
 }
 
-static inline PetscInt S2I_nocheck_SpinConserve(PetscInt state, const data_SpinConserve* data) {
+static inline PetscInt S2I_nocheck_SpinConserve(PetscInt state, PetscInt* sign, const data_SpinConserve* data) {
   PetscInt n, k=0, idx=0;
 
   while (state) {
@@ -198,18 +198,25 @@ static inline PetscInt S2I_nocheck_SpinConserve(PetscInt state, const data_SpinC
     state &= state-1;  // pop least significant bit off of state
   }
 
+  if (sign != NULL) {
+    *sign = 1;
+  }
+
   if (data->spinflip && idx >= Dim_SpinConserve(data)) {
     idx = 2*Dim_SpinConserve(data) - idx - 1;
+    if (sign != NULL) {
+      *sign = data->spinflip;
+    }
   }
 
   return idx;
 }
 
-static inline PetscInt S2I_SpinConserve(PetscInt state, const data_SpinConserve* data) {
+static inline PetscInt S2I_SpinConserve(PetscInt state, PetscInt* sign, const data_SpinConserve* data) {
   if (state >> data->L) return (PetscInt)(-1);
   if (builtin_popcount(state) != data->k) return (PetscInt)(-1);
 
-  return S2I_nocheck_SpinConserve(state, data);
+  return S2I_nocheck_SpinConserve(state, sign, data);
 }
 
 static inline PetscInt I2S_SpinConserve(PetscInt idx, const data_SpinConserve* data) {
@@ -246,10 +253,17 @@ static inline PetscInt NextState_SpinConserve(
 };
 
 
-static inline void S2I_SpinConserve_array(int n, const data_SpinConserve* data, const PetscInt* states, PetscInt* idxs) {
+static inline void S2I_SpinConserve_array(int n, const data_SpinConserve* data, const PetscInt* states, PetscInt* idxs, PetscInt* signs) {
   PetscInt i;
-  for (i = 0; i < n; ++i) {
-    idxs[i] = S2I_SpinConserve(states[i], data);
+
+  if (signs) {
+    for (i = 0; i < n; ++i) {
+      idxs[i] = S2I_SpinConserve(states[i], &(signs[i]), data);
+    }
+  } else {
+    for (i = 0; i < n; ++i) {
+      idxs[i] = S2I_SpinConserve(states[i], NULL, data);
+    }
   }
 }
 

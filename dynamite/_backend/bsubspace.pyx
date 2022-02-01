@@ -8,7 +8,6 @@ from .bbuild import dnm_int_t
 cdef extern from "bsubspace_impl.h":
 
     ctypedef int PetscInt
-    ctypedef int PetscBool
 
     ctypedef struct data_Full:
         int L
@@ -47,7 +46,7 @@ cdef extern from "bsubspace_impl.h":
     void I2S_Parity_array(int n, const data_Parity* data, const PetscInt* idxs, PetscInt* states);
 
     PetscInt Dim_SpinConserve(const data_SpinConserve* data);
-    void S2I_SpinConserve_array(int n, const data_SpinConserve* data, const PetscInt* states, PetscInt* idxs);
+    void S2I_SpinConserve_array(int n, const data_SpinConserve* data, const PetscInt* states, PetscInt* idxs, PetscInt* signs);
     void I2S_SpinConserve_array(int n, const data_SpinConserve* data, const PetscInt* idxs, PetscInt* states);
 
     PetscInt Dim_Auto(const data_Auto* data);
@@ -87,7 +86,7 @@ cdef class CSpinConserve:
             PetscInt L,
             PetscInt k,
             PetscInt [:,:] nchoosek,
-            PetscBool spinflip
+            PetscInt spinflip
         ):
         self.data[0].L = L
         self.data[0].k = k
@@ -192,10 +191,19 @@ def state_to_idx_Parity(PetscInt [:] states, CParity data):
     return idxs_np
 
 def state_to_idx_SpinConserve(PetscInt [:] states, CSpinConserve data):
-    idxs_np = np.ndarray(states.size, dtype = dnm_int_t)
+    idxs_np = np.ndarray(states.size, dtype=dnm_int_t)
     cdef PetscInt [:] idxs = idxs_np
-    S2I_SpinConserve_array(states.size, data.data, &states[0], &idxs[0])
-    return idxs_np
+    cdef PetscInt [:] signs
+
+    if data.data[0].spinflip == -1:
+        signs_np = np.ndarray(states.size, dtype=dnm_int_t)
+        signs = signs_np
+        S2I_SpinConserve_array(states.size, data.data, &states[0], &idxs[0], &signs[0])
+        return idxs_np, signs_np
+
+    else:
+        S2I_SpinConserve_array(states.size, data.data, &states[0], &idxs[0], NULL)
+        return idxs_np
 
 def state_to_idx_Auto(PetscInt [:] states, CAuto data):
     idxs_np = np.ndarray(states.size, dtype = dnm_int_t)

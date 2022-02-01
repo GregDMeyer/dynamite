@@ -10,17 +10,37 @@ import dynamite_test_runner as dtr
 from dynamite import config
 from dynamite.states import State
 from dynamite.tools import complex_enabled
+from dynamite.operators import identity, sigmax, sigmay, index_sum
+from dynamite.msc_tools import msc_dtype
+from dynamite.subspaces import Auto, SpinConserve
+import hamiltonians
+
 
 def petsc_mat_to_np(mat):
+    config.initialize()
+    from petsc4py import PETSc
+    PROC_0 = PETSc.COMM_WORLD.rank == 0
+    dims = mat.getSize()
+
+    if PROC_0:
+        rtn = np.ndarray(dims, dtype=np.complex128)
+    else:
+        rtn = None
+
+    for (i, col) in enumerate(petsc_mat_columns(mat)):
+        if rtn is not None:
+            rtn[:,i] = col
+
+    return rtn
+
+
+def petsc_mat_columns(mat):
 
     config.initialize()
     from petsc4py import PETSc
     PROC_0 = PETSc.COMM_WORLD.rank == 0
 
     dims = mat.getSize()
-
-    if PROC_0:
-        rtn = np.ndarray(dims, dtype=np.complex128)
 
     select = PETSc.Vec().create()
     select.setSizes(dims[1])
@@ -41,12 +61,10 @@ def petsc_mat_to_np(mat):
         r = State._to_numpy(column)
 
         if PROC_0:
-            rtn[:,i] = r
+            yield r
+        else:
+            yield None
 
-    if PROC_0:
-        return rtn
-    else:
-        return None
 
 from dynamite.operators import sigmax, sigmay, sigmaz, sigma_plus, sigma_minus
 
@@ -96,10 +114,44 @@ class Fundamental(dtr.DynamiteTestCase):
         with self.assertRaises(ValueError):
             o.get_mat()
 
-from dynamite.operators import identity
-from dynamite.msc_tools import msc_dtype
-from dynamite.subspaces import Auto
-from hamiltonians import localized
+
+def generate_hamiltonian_tests(cls):
+    for H_name, real in hamiltonians.names:
+        if not complex_enabled() and not real:
+            continue
+        setattr(cls, 'test_'+H_name, lambda self, n=H_name: self.check_hamiltonian(n))
+    return cls
+
+@generate_hamiltonian_tests
+class Compare(dtr.DynamiteTestCase):
+    '''
+    compare numpy matrix building to the PETSc one
+    '''
+
+    def compare_matrices(self, operator):
+        np_mat = operator.to_numpy()
+        for (i, col) in enumerate(petsc_mat_columns(operator.get_mat())):
+            if col is not None:
+                np_col = np_mat[:, i].T
+                self.assertTrue(np.linalg.norm(np_col-col) < 1E-13,
+                                msg=f'difference found in column {i}:\ndiff: {np_col - col}')
+
+    def check_hamiltonian(self, H_name):
+        H = getattr(hamiltonians, H_name)()
+        self.compare_matrices(H)
+
+    def test_heisenberg_spinconserve(self):
+        if config.L % 2 != 0:
+            self.skipTest("only for even L")
+
+        op = index_sum(sigmax(0)*sigmax(1) + sigmay(0)*sigmay(1))
+
+        for spinflip in ['+', '-', None]:
+            with self.subTest(spinflip=spinflip):
+                op.subspace = SpinConserve(config.L, config.L//2, spinflip=spinflip)
+                self.compare_matrices(op)
+
+
 @ut.skipIf(msc_dtype['masks'] != np.int64,
            reason='only for builds with 64 bit integers')
 class LargeInt64(dtr.DynamiteTestCase):
@@ -109,7 +161,7 @@ class LargeInt64(dtr.DynamiteTestCase):
     def setUp(self):
         self.old_L = config.L
         config.L = 33
-        self.H = localized(33)
+        self.H = hamiltonians.localized(33)
         self.space = Auto(self.H, 'U'+'D'*32, size_guess=33)
 
     def tearDown(self):

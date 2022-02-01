@@ -5,7 +5,15 @@
  * For efficiency, we avoid going through cases of each subspace in the functions
  * defined in builmat_template.c. Instead, we just include the template multiple
  * times, using macros to define different functionality.
+
  */
+
+// defines used in the various templates
+#define Full_SP 0
+#define Parity_SP 1
+#define SpinConserve_SP 2
+#define Auto_SP 3
+
 
 #define SUBSPACE Full
   #include "bpetsc_template_1.c"

@@ -91,7 +91,7 @@ PetscErrorCode DestroySubspaceData_CUDA_SpinConserve(data_SpinConserve* data) {
   return 0;
 }
 
-__device__ PetscInt S2I_CUDA_SpinConserve(PetscInt state, const data_SpinConserve* data) {
+__device__ PetscInt S2I_CUDA_SpinConserve(PetscInt state, PetscInt* sign, const data_SpinConserve* data) {
   PetscInt n, k=0, idx=0;
 
   if (state >> data->L) return (PetscInt)(-1);
@@ -104,11 +104,13 @@ __device__ PetscInt S2I_CUDA_SpinConserve(PetscInt state, const data_SpinConserv
     state &= state-1;  // pop least significant bit off of state
   }
 
+  *sign = 1;
   PetscInt dim;
   if (data->spinflip) {
     dim = data->nchoosek[data->k*data->ld_nchoosek + data->L]/2;
     if (idx >= dim) {
       idx = 2*dim - idx - 1;
+      *sign = data->spinflip;
     }
   }
 
@@ -230,6 +232,12 @@ __device__ static __inline__ void add_imag(PetscScalar *x, PetscReal c) {
   imag_part = ((PetscReal*)x) + 1;
   (*imag_part) += c;
 }
+
+// defines used in the various templates
+#define Full_SP 0
+#define Parity_SP 1
+#define SpinConserve_SP 2
+#define Auto_SP 3
 
 #define LEFT_SUBSPACE Full
   #define RIGHT_SUBSPACE Full
