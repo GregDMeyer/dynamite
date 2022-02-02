@@ -92,9 +92,13 @@ COPY --from=build /usr/local/lib/python3.9/site-packages/ /usr/local/lib/python3
 RUN groupadd dnm && useradd --no-log-init -m -g dnm dnm
 USER dnm
 
-# make work directory and switch to it
+# include benchmarking and examples
+COPY benchmarking /home/dnm/benchmarking
+COPY examples /home/dnm/examples
+
+# make work directory for mounting local files
 RUN mkdir /home/dnm/work
-WORKDIR /home/dnm/work
+WORKDIR /home/dnm
 
 
 FROM release AS jupyter
@@ -105,5 +109,5 @@ RUN pip3 install --no-cache-dir jupyterlab
 
 # run it!
 USER dnm
-WORKDIR /home/dnm/work
+WORKDIR /home/dnm
 CMD ["jupyter", "lab", "--no-browser", "--ip=0.0.0.0"]
