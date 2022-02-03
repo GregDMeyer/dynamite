@@ -133,13 +133,13 @@ __device__ PetscInt I2S_CUDA_SpinConserve(PetscInt idx, const data_SpinConserve*
   return state;
 }
 
-PetscErrorCode CopySubspaceData_CUDA_Auto(data_Auto** out_p, const data_Auto* in) {
+PetscErrorCode CopySubspaceData_CUDA_Explicit(data_Explicit** out_p, const data_Explicit* in) {
   PetscErrorCode ierr;
   cudaError_t err;
 
-  data_Auto cpu_data;
+  data_Explicit cpu_data;
 
-  ierr = PetscMemcpy(&cpu_data, in, sizeof(data_Auto));CHKERRQ(ierr);
+  ierr = PetscMemcpy(&cpu_data, in, sizeof(data_Explicit));CHKERRQ(ierr);
 
   err = cudaMalloc(&(cpu_data.state_map), sizeof(PetscInt)*in->dim);CHKERRCUDA(err);
   err = cudaMemcpy(cpu_data.state_map, in->state_map,
@@ -153,18 +153,18 @@ PetscErrorCode CopySubspaceData_CUDA_Auto(data_Auto** out_p, const data_Auto* in
   err = cudaMemcpy(cpu_data.rmap_states, in->rmap_states,
     sizeof(PetscInt)*in->dim, cudaMemcpyHostToDevice);CHKERRCUDA(err);
 
-  err = cudaMalloc((void **) out_p, sizeof(data_Auto));CHKERRCUDA(err);
-  err = cudaMemcpy(*out_p, &cpu_data, sizeof(data_Auto), cudaMemcpyHostToDevice);CHKERRCUDA(err);
+  err = cudaMalloc((void **) out_p, sizeof(data_Explicit));CHKERRCUDA(err);
+  err = cudaMemcpy(*out_p, &cpu_data, sizeof(data_Explicit), cudaMemcpyHostToDevice);CHKERRCUDA(err);
 
   return ierr;
 }
 
-PetscErrorCode DestroySubspaceData_CUDA_Auto(data_Auto* data) {
+PetscErrorCode DestroySubspaceData_CUDA_Explicit(data_Explicit* data) {
   cudaError_t err;
 
-  data_Auto cpu_data;
+  data_Explicit cpu_data;
 
-  err = cudaMemcpy(&cpu_data, data, sizeof(data_Auto), cudaMemcpyDeviceToHost);CHKERRCUDA(err);
+  err = cudaMemcpy(&cpu_data, data, sizeof(data_Explicit), cudaMemcpyDeviceToHost);CHKERRCUDA(err);
 
   err = cudaFree(cpu_data.state_map);CHKERRCUDA(err);
   err = cudaFree(cpu_data.rmap_indices);CHKERRCUDA(err);
@@ -175,7 +175,7 @@ PetscErrorCode DestroySubspaceData_CUDA_Auto(data_Auto* data) {
 
 /* TODO: this is really not well suited for GPUs */
 /* but I bet we can do something clever! */
-__device__ PetscInt S2I_CUDA_Auto(PetscInt state, const data_Auto* data) {
+__device__ PetscInt S2I_CUDA_Explicit(PetscInt state, const data_Explicit* data) {
   PetscInt left, right, mid;
   left = 0;
   right = data->dim;
@@ -196,7 +196,7 @@ __device__ PetscInt S2I_CUDA_Auto(PetscInt state, const data_Auto* data) {
   return -1;
 }
 
-__device__ PetscInt I2S_CUDA_Auto(PetscInt idx, const data_Auto* data) {
+__device__ PetscInt I2S_CUDA_Explicit(PetscInt idx, const data_Explicit* data) {
   return data->state_map[idx];
 }
 
@@ -237,7 +237,7 @@ __device__ static __inline__ void add_imag(PetscScalar *x, PetscReal c) {
 #define Full_SP 0
 #define Parity_SP 1
 #define SpinConserve_SP 2
-#define Auto_SP 3
+#define Explicit_SP 3
 
 #define LEFT_SUBSPACE Full
   #define RIGHT_SUBSPACE Full
@@ -252,7 +252,7 @@ __device__ static __inline__ void add_imag(PetscScalar *x, PetscReal c) {
     #include "bcuda_template.cu"
   #undef RIGHT_SUBSPACE
 
-  #define RIGHT_SUBSPACE Auto
+  #define RIGHT_SUBSPACE Explicit
     #include "bcuda_template.cu"
   #undef RIGHT_SUBSPACE
 #undef LEFT_SUBSPACE
@@ -270,7 +270,7 @@ __device__ static __inline__ void add_imag(PetscScalar *x, PetscReal c) {
     #include "bcuda_template.cu"
   #undef RIGHT_SUBSPACE
 
-  #define RIGHT_SUBSPACE Auto
+  #define RIGHT_SUBSPACE Explicit
     #include "bcuda_template.cu"
   #undef RIGHT_SUBSPACE
 #undef LEFT_SUBSPACE
@@ -288,12 +288,12 @@ __device__ static __inline__ void add_imag(PetscScalar *x, PetscReal c) {
     #include "bcuda_template.cu"
   #undef RIGHT_SUBSPACE
 
-  #define RIGHT_SUBSPACE Auto
+  #define RIGHT_SUBSPACE Explicit
     #include "bcuda_template.cu"
   #undef RIGHT_SUBSPACE
 #undef LEFT_SUBSPACE
 
-#define LEFT_SUBSPACE Auto
+#define LEFT_SUBSPACE Explicit
   #define RIGHT_SUBSPACE Full
     #include "bcuda_template.cu"
   #undef RIGHT_SUBSPACE
@@ -306,7 +306,7 @@ __device__ static __inline__ void add_imag(PetscScalar *x, PetscReal c) {
     #include "bcuda_template.cu"
   #undef RIGHT_SUBSPACE
 
-  #define RIGHT_SUBSPACE Auto
+  #define RIGHT_SUBSPACE Explicit
     #include "bcuda_template.cu"
   #undef RIGHT_SUBSPACE
 #undef LEFT_SUBSPACE

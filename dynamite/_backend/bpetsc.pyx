@@ -23,7 +23,7 @@ cdef extern from "bsubspace_impl.h":
     ctypedef enum subspace_type:
         _FULL "FULL"
         _PARITY "PARITY"
-        _AUTO "AUTO"
+        _EXPLICIT "EXPLICIT"
 
 cdef extern from "bpetsc_impl.h":
 
