@@ -1,4 +1,5 @@
 
+from os import environ
 import slepc4py
 from . import validate
 from ._backend import bbuild
@@ -72,6 +73,10 @@ class _Config:
         slepc4py.init(slepc_args)
         self.initialized = True
         self._gpu = gpu
+
+        # do not run version check if we are in a container
+        if 'DNM_DOCKER' in environ:
+            version_check = False
 
         from petsc4py import PETSc
         if version_check and PETSc.COMM_WORLD.rank == 0:

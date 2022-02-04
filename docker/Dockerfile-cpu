@@ -96,6 +96,9 @@ USER dnm
 COPY benchmarking /home/dnm/benchmarking
 COPY examples /home/dnm/examples
 
+# so that we can tell we are in a container
+ENV DNM_DOCKER=1
+
 # make work directory for mounting local files
 RUN mkdir /home/dnm/work
 WORKDIR /home/dnm
