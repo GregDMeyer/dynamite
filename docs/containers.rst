@@ -116,8 +116,7 @@ automatically the first time you run the commands described above!
 Mac
 ---
 
-.. note::
-   TODO: This documentation is coming soon!
+For M1 Macs, Docker is easier to install and run. 
 
 Windows
 -------
