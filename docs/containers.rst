@@ -23,9 +23,9 @@ With ``podman`` or Docker installed (see :ref:`setup` below), run
 
 .. code:: bash
 
-    sudo podman run --rm -it -v $PWD:/home/dnm/work docker.io/gdmeyer/dynamite python your_script.py
+    sudo podman run --rm -it -w /home/dnm/work -v $PWD:/home/dnm/work docker.io/gdmeyer/dynamite python your_script.py
     # or
-    docker run --rm -it -v $PWD:/home/dnm/work gdmeyer/dynamite python your_script.py
+    docker run --rm -it -w /home/dnm/work -v $PWD:/home/dnm/work gdmeyer/dynamite python your_script.py
 
 A quick explanation of the options:
 
@@ -85,6 +85,7 @@ You can use dynamite in JupyterLab, from a container!
     docker run -p 8888:8888 -v $PWD:/home/dnm/work gdmeyer/dynamite:latest-jupyter
 
 Then follow the last link that you see (it should start with ``http://127.0.0.1:8888``).
+Your files will be in the ``work`` directory visible in JupyterLab.
 
 **On Docker Desktop:**
 

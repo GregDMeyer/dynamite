@@ -20,7 +20,7 @@ typedef enum _subspace_type
 {
   FULL,
   PARITY,
-  AUTO,
+  EXPLICIT,
   SPIN_CONSERVE
 } subspace_type;
 
@@ -274,21 +274,21 @@ static inline void I2S_SpinConserve_array(int n, const data_SpinConserve* data, 
   }
 }
 
-/***** AUTO *****/
+/***** EXPLICIT *****/
 
-typedef struct _data_Auto
+typedef struct _data_Explicit
 {
   PetscInt L;
   PetscInt dim;
   PetscInt* state_map;
   PetscInt* rmap_indices;
   PetscInt* rmap_states;
-} data_Auto;
+} data_Explicit;
 
-static inline PetscErrorCode CopySubspaceData_Auto(data_Auto** out_p, const data_Auto* in) {
+static inline PetscErrorCode CopySubspaceData_Explicit(data_Explicit** out_p, const data_Explicit* in) {
   PetscErrorCode ierr;
   ierr = PetscMalloc1(1, out_p);CHKERRQ(ierr);
-  ierr = PetscMemcpy(*out_p, in, sizeof(data_Auto));CHKERRQ(ierr);
+  ierr = PetscMemcpy(*out_p, in, sizeof(data_Explicit));CHKERRQ(ierr);
 
   ierr = PetscMalloc1(in->dim, &((*out_p)->state_map));CHKERRQ(ierr);
   ierr = PetscMemcpy((*out_p)->state_map, in->state_map, in->dim*sizeof(PetscInt));CHKERRQ(ierr);
@@ -302,7 +302,7 @@ static inline PetscErrorCode CopySubspaceData_Auto(data_Auto** out_p, const data
   return ierr;
 }
 
-static inline PetscErrorCode DestroySubspaceData_Auto(data_Auto* data) {
+static inline PetscErrorCode DestroySubspaceData_Explicit(data_Explicit* data) {
   PetscErrorCode ierr;
   ierr = PetscFree(data->state_map);CHKERRQ(ierr);
   ierr = PetscFree(data->rmap_indices);CHKERRQ(ierr);
@@ -311,11 +311,11 @@ static inline PetscErrorCode DestroySubspaceData_Auto(data_Auto* data) {
   return ierr;
 }
 
-static inline PetscInt Dim_Auto(const data_Auto* data) {
+static inline PetscInt Dim_Explicit(const data_Explicit* data) {
   return data->dim;
 }
 
-static inline PetscInt S2I_Auto(PetscInt state, const data_Auto* data) {
+static inline PetscInt S2I_Explicit(PetscInt state, const data_Explicit* data) {
   /* do a binary search on rmap_states */
   PetscInt left, right, mid;
   left = 0;
@@ -337,29 +337,29 @@ static inline PetscInt S2I_Auto(PetscInt state, const data_Auto* data) {
   return -1;
 }
 
-static inline PetscInt I2S_Auto(PetscInt idx, const data_Auto* data) {
+static inline PetscInt I2S_Explicit(PetscInt idx, const data_Explicit* data) {
   return data->state_map[idx];
 }
 
-static inline PetscInt NextState_Auto(
+static inline PetscInt NextState_Explicit(
   PetscInt prev_state,
   PetscInt idx,
-  const data_Auto* data
+  const data_Explicit* data
 )
 {
-  return I2S_Auto(idx, data);
+  return I2S_Explicit(idx, data);
 };
 
-static inline void S2I_Auto_array(int n, const data_Auto* data, const PetscInt* states, PetscInt* idxs) {
+static inline void S2I_Explicit_array(int n, const data_Explicit* data, const PetscInt* states, PetscInt* idxs) {
   PetscInt i;
   for (i = 0; i < n; ++i) {
-    idxs[i] = S2I_Auto(states[i], data);
+    idxs[i] = S2I_Explicit(states[i], data);
   }
 }
 
-static inline void I2S_Auto_array(int n, const data_Auto* data, const PetscInt* idxs, PetscInt* states) {
+static inline void I2S_Explicit_array(int n, const data_Explicit* data, const PetscInt* idxs, PetscInt* states) {
   PetscInt i;
   for (i = 0; i < n; ++i) {
-    states[i] = I2S_Auto(idxs[i], data);
+    states[i] = I2S_Explicit(idxs[i], data);
   }
 }

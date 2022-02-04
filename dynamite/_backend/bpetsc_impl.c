@@ -12,7 +12,7 @@
 #define Full_SP 0
 #define Parity_SP 1
 #define SpinConserve_SP 2
-#define Auto_SP 3
+#define Explicit_SP 3
 
 
 #define SUBSPACE Full
@@ -27,7 +27,7 @@
   #include "bpetsc_template_1.c"
 #undef SUBSPACE
 
-#define SUBSPACE Auto
+#define SUBSPACE Explicit
   #include "bpetsc_template_1.c"
 #undef SUBSPACE
 
@@ -54,8 +54,8 @@ PetscErrorCode ReducedDensityMatrix(
     case SPIN_CONSERVE:
       ierr = rdm_SpinConserve(vec, sub_data_p, keep_size, keep, triang, rtn_dim, rtn);CHKERRQ(ierr);
       break;
-    case AUTO:
-      ierr = rdm_Auto(vec, sub_data_p, keep_size, keep, triang, rtn_dim, rtn);CHKERRQ(ierr);
+    case EXPLICIT:
+      ierr = rdm_Explicit(vec, sub_data_p, keep_size, keep, triang, rtn_dim, rtn);CHKERRQ(ierr);
       break;
     default: // shouldn't happen, but give ierr some (nonzero) value for consistency
       ierr = 1;
@@ -77,7 +77,7 @@ PetscErrorCode ReducedDensityMatrix(
     #include "bpetsc_template_2.c"
   #undef RIGHT_SUBSPACE
 
-  #define RIGHT_SUBSPACE Auto
+  #define RIGHT_SUBSPACE Explicit
     #include "bpetsc_template_2.c"
   #undef RIGHT_SUBSPACE
 #undef LEFT_SUBSPACE
@@ -95,7 +95,7 @@ PetscErrorCode ReducedDensityMatrix(
     #include "bpetsc_template_2.c"
   #undef RIGHT_SUBSPACE
 
-  #define RIGHT_SUBSPACE Auto
+  #define RIGHT_SUBSPACE Explicit
     #include "bpetsc_template_2.c"
   #undef RIGHT_SUBSPACE
 #undef LEFT_SUBSPACE
@@ -113,12 +113,12 @@ PetscErrorCode ReducedDensityMatrix(
     #include "bpetsc_template_2.c"
   #undef RIGHT_SUBSPACE
 
-  #define RIGHT_SUBSPACE Auto
+  #define RIGHT_SUBSPACE Explicit
     #include "bpetsc_template_2.c"
   #undef RIGHT_SUBSPACE
 #undef LEFT_SUBSPACE
 
-#define LEFT_SUBSPACE Auto
+#define LEFT_SUBSPACE Explicit
   #define RIGHT_SUBSPACE Full
     #include "bpetsc_template_2.c"
   #undef RIGHT_SUBSPACE
@@ -131,7 +131,7 @@ PetscErrorCode ReducedDensityMatrix(
     #include "bpetsc_template_2.c"
   #undef RIGHT_SUBSPACE
 
-  #define RIGHT_SUBSPACE Auto
+  #define RIGHT_SUBSPACE Explicit
     #include "bpetsc_template_2.c"
   #undef RIGHT_SUBSPACE
 #undef LEFT_SUBSPACE
@@ -157,8 +157,8 @@ PetscErrorCode BuildMat(const msc_t *msc, subspaces_t *subspaces, shell_impl she
           ierr = BuildMat_Full_SpinConserve(msc, subspaces->left_data, subspaces->right_data, shell, A);
           break;
 
-        case AUTO:
-          ierr = BuildMat_Full_Auto(msc, subspaces->left_data, subspaces->right_data, shell, A);
+        case EXPLICIT:
+          ierr = BuildMat_Full_Explicit(msc, subspaces->left_data, subspaces->right_data, shell, A);
           break;
       }
       break;
@@ -177,8 +177,8 @@ PetscErrorCode BuildMat(const msc_t *msc, subspaces_t *subspaces, shell_impl she
           ierr = BuildMat_Parity_SpinConserve(msc, subspaces->left_data, subspaces->right_data, shell, A);
           break;
 
-        case AUTO:
-          ierr = BuildMat_Parity_Auto(msc, subspaces->left_data, subspaces->right_data, shell, A);
+        case EXPLICIT:
+          ierr = BuildMat_Parity_Explicit(msc, subspaces->left_data, subspaces->right_data, shell, A);
           break;
       }
       break;
@@ -197,28 +197,28 @@ PetscErrorCode BuildMat(const msc_t *msc, subspaces_t *subspaces, shell_impl she
           ierr = BuildMat_SpinConserve_SpinConserve(msc, subspaces->left_data, subspaces->right_data, shell, A);
           break;
 
-        case AUTO:
-          ierr = BuildMat_SpinConserve_Auto(msc, subspaces->left_data, subspaces->right_data, shell, A);
+        case EXPLICIT:
+          ierr = BuildMat_SpinConserve_Explicit(msc, subspaces->left_data, subspaces->right_data, shell, A);
           break;
       }
       break;
 
-    case AUTO:
+    case EXPLICIT:
       switch (subspaces->right_type) {
         case FULL:
-          ierr = BuildMat_Auto_Full(msc, subspaces->left_data, subspaces->right_data, shell, A);
+          ierr = BuildMat_Explicit_Full(msc, subspaces->left_data, subspaces->right_data, shell, A);
           break;
 
         case PARITY:
-          ierr = BuildMat_Auto_Parity(msc, subspaces->left_data, subspaces->right_data, shell, A);
+          ierr = BuildMat_Explicit_Parity(msc, subspaces->left_data, subspaces->right_data, shell, A);
           break;
 
       case SPIN_CONSERVE:
-          ierr = BuildMat_Auto_SpinConserve(msc, subspaces->left_data, subspaces->right_data, shell, A);
+          ierr = BuildMat_Explicit_SpinConserve(msc, subspaces->left_data, subspaces->right_data, shell, A);
           break;
 
-        case AUTO:
-          ierr = BuildMat_Auto_Auto(msc, subspaces->left_data, subspaces->right_data, shell, A);
+        case EXPLICIT:
+          ierr = BuildMat_Explicit_Explicit(msc, subspaces->left_data, subspaces->right_data, shell, A);
           break;
       }
       break;

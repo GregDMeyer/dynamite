@@ -23,7 +23,7 @@ cdef extern from "bsubspace_impl.h":
         int ld_nchoosek
         int* nchoosek
 
-    ctypedef struct data_Auto:
+    ctypedef struct data_Explicit:
         int L
         int dim
         int rdim
@@ -34,7 +34,7 @@ cdef extern from "bsubspace_impl.h":
     ctypedef enum subspace_type:
         _FULL "FULL"
         _PARITY "PARITY"
-        _AUTO "AUTO"
+        _EXPLICIT "EXPLICIT"
         _SPIN_CONSERVE "SPIN_CONSERVE"
 
     PetscInt Dim_Full(data_Full* data);
@@ -49,16 +49,16 @@ cdef extern from "bsubspace_impl.h":
     void S2I_SpinConserve_array(int n, const data_SpinConserve* data, const PetscInt* states, PetscInt* idxs, PetscInt* signs);
     void I2S_SpinConserve_array(int n, const data_SpinConserve* data, const PetscInt* idxs, PetscInt* states);
 
-    PetscInt Dim_Auto(const data_Auto* data);
-    void S2I_Auto_array(int n, const data_Auto* data, const PetscInt* states, PetscInt* idxs);
-    void I2S_Auto_array(int n, const data_Auto* data, const PetscInt* idxs, PetscInt* states);
+    PetscInt Dim_Explicit(const data_Explicit* data);
+    void S2I_Explicit_array(int n, const data_Explicit* data, const PetscInt* states, PetscInt* idxs);
+    void I2S_Explicit_array(int n, const data_Explicit* data, const PetscInt* idxs, PetscInt* states);
 
 #####
 
 class SubspaceType:
     FULL = _FULL
     PARITY = _PARITY
-    AUTO = _AUTO
+    EXPLICIT = _EXPLICIT
     SPIN_CONSERVE = _SPIN_CONSERVE
 
 #####
@@ -76,7 +76,7 @@ cdef class CParity:
         self.data[0].L = L
         self.data[0].space = space
 
-# need to be careful in SpinConserve and Auto that the numpy arrays don't get freed
+# need to be careful in SpinConserve and Explicit that the numpy arrays don't get freed
 # if we will use this class in shell matrices, should copy maps
 cdef class CSpinConserve:
     cdef data_SpinConserve data[1]
@@ -94,8 +94,8 @@ cdef class CSpinConserve:
         self.data[0].ld_nchoosek = nchoosek.shape[1]
         self.data[0].nchoosek = &nchoosek[0, 0]
 
-cdef class CAuto:
-    cdef data_Auto data[1]
+cdef class CExplicit:
+    cdef data_Explicit data[1]
 
     def __init__(
             self,
@@ -119,8 +119,8 @@ cdef void set_data_pointer(int sub_type, object data, void** ptr):
         set_data_pointer_Parity(data, ptr)
     elif sub_type == _SPIN_CONSERVE:
         set_data_pointer_SpinConserve(data, ptr)
-    elif sub_type == _AUTO:
-        set_data_pointer_Auto(data, ptr)
+    elif sub_type == _EXPLICIT:
+        set_data_pointer_Explicit(data, ptr)
     else:
         raise ValueError('Invalid data type %s' % str(type(data)))
 
@@ -133,7 +133,7 @@ cdef void set_data_pointer_Parity(CParity data, void** ptr):
 cdef void set_data_pointer_SpinConserve(CSpinConserve data, void** ptr):
     ptr[0] = data.data
 
-cdef void set_data_pointer_Auto(CAuto data, void** ptr):
+cdef void set_data_pointer_Explicit(CExplicit data, void** ptr):
     ptr[0] = data.data
 
 #####
@@ -147,8 +147,8 @@ def get_dimension_Parity(CParity data):
 def get_dimension_SpinConserve(CSpinConserve data):
     return Dim_SpinConserve(data.data)
 
-def get_dimension_Auto(CAuto data):
-    return Dim_Auto(data.data)
+def get_dimension_Explicit(CExplicit data):
+    return Dim_Explicit(data.data)
 
 #####
 
@@ -170,10 +170,10 @@ def idx_to_state_SpinConserve(PetscInt [:] idxs, CSpinConserve data):
     I2S_SpinConserve_array(idxs.size, data.data, &idxs[0], &states[0])
     return states_np
 
-def idx_to_state_Auto(PetscInt [:] idxs, CAuto data):
+def idx_to_state_Explicit(PetscInt [:] idxs, CExplicit data):
     states_np = np.ndarray(idxs.size, dtype = dnm_int_t)
     cdef PetscInt [:] states = states_np
-    I2S_Auto_array(idxs.size, data.data, &idxs[0], &states[0])
+    I2S_Explicit_array(idxs.size, data.data, &idxs[0], &states[0])
     return states_np
 
 #####
@@ -205,10 +205,10 @@ def state_to_idx_SpinConserve(PetscInt [:] states, CSpinConserve data):
         S2I_SpinConserve_array(states.size, data.data, &states[0], &idxs[0], NULL)
         return idxs_np
 
-def state_to_idx_Auto(PetscInt [:] states, CAuto data):
+def state_to_idx_Explicit(PetscInt [:] states, CExplicit data):
     idxs_np = np.ndarray(states.size, dtype = dnm_int_t)
     cdef PetscInt [:] idxs = idxs_np
-    S2I_Auto_array(states.size, data.data, &states[0], &idxs[0])
+    S2I_Explicit_array(states.size, data.data, &states[0], &idxs[0])
     return idxs_np
 
 #####

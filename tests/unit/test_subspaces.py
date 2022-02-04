@@ -7,7 +7,7 @@ These tests should NOT require MPI.
 
 import unittest as ut
 import numpy as np
-from dynamite.subspaces import Full, Parity, Auto, SpinConserve
+from dynamite.subspaces import Full, Parity, Explicit, Auto, SpinConserve
 from dynamite._backend.bsubspace import compute_rcm
 from dynamite._backend.bbuild import dnm_int_t
 
@@ -389,6 +389,96 @@ class TestRCM(ut.TestCase):
         dim = compute_rcm(self.masks, self.signs, self.coeffs, state_map, 0, 4)
 
         self.assertEqual(dim, 1)
+
+
+class TestExplicit(ut.TestCase):
+
+    def setUp(self):
+        self.test_states = {
+            'unsorted': [
+                0b01110,
+                0b11110,
+                0b10101,
+                0b10011,
+                0b00011,
+                0b01101,
+                0b00101,
+                0b11101,
+            ]
+        }
+        self.test_states['sorted'] = sorted(
+            self.test_states['unsorted']
+        )
+
+    def test_L_error(self):
+        for name, states in self.test_states.items():
+            with self.subTest(which=name):
+                s = Explicit(states)
+                with self.assertRaises(ValueError):
+                    s.L = 4
+
+    def test_dimension(self):
+        for name, states in self.test_states.items():
+            with self.subTest(which=name):
+                s = Explicit(states)
+                s.L = 5
+                self.assertEqual(s.get_dimension(), len(states))
+
+    def test_s2i(self):
+        for name, states in self.test_states.items():
+            with self.subTest(which=name):
+                s = Explicit(states)
+                s.L = 5
+
+                for state in states:
+                    with self.subTest(state=bin(state)[2:]):
+                        self.assertEqual(s.state_to_idx(state),
+                                         states.index(state))
+
+                # an array of states
+                self.assertTrue(np.all(
+                    s.state_to_idx(states) == np.arange(len(states))
+                ))
+
+                # a state not in the list
+                bad_state = 0b11111
+                self.assertEqual(s.state_to_idx(bad_state), -1)
+
+    def test_i2s(self):
+        for name, states in self.test_states.items():
+            with self.subTest(which=name):
+                s = Explicit(states)
+                s.L = 5
+
+                for idx in range(len(states)):
+                    with self.subTest(idx=idx):
+                        self.assertEqual(s.idx_to_state(idx),
+                                         states[idx])
+
+                # an array of states
+                self.assertTrue(np.all(
+                    s.idx_to_state(np.arange(len(states))) == np.array(states)
+                ))
+
+                # TODO: test index out of range
+
+    def test_compare_parity(self):
+        p = Parity('even')
+        p.L = 5
+
+        s = Explicit(p.idx_to_state(np.arange(p.get_dimension())))
+        s.L = 5
+
+        self.assertEqual(p, s)
+
+    def test_compare_spinconserve(self):
+        p = SpinConserve(L=6, k=3)
+
+        s = Explicit(p.idx_to_state(np.arange(p.get_dimension())))
+        s.L = 6
+
+        self.assertEqual(p, s)
+
 
 class TestAuto(ut.TestCase):
 
