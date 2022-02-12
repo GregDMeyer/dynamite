@@ -98,7 +98,7 @@ COPY examples /home/dnm/examples
 ENV DNM_DOCKER=1
 
 # make work directory for mounting local files
-RUN mkdir /home/dnm/work
+VOLUME /home/dnm/work
 WORKDIR /home/dnm
 
 
@@ -111,4 +111,5 @@ RUN pip3 install --no-cache-dir jupyterlab
 # run it!
 USER dnm
 WORKDIR /home/dnm
+EXPOSE 8888
 CMD ["jupyter", "lab", "--no-browser", "--ip=0.0.0.0"]
