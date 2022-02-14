@@ -171,7 +171,7 @@ WORKDIR /home/dnm
 FROM release AS jupyter
 
 # install jupyter
-RUN pip3 install --user --no-cache-dir jupyterlab
+RUN pip3 install --user --no-cache-dir jupyterlab matplotlib
 
 # run it!
 WORKDIR /home/dnm
