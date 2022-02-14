@@ -34,11 +34,6 @@ def parse_args(argv=None):
 def main():
     args = parse_args()
 
-    git_branch = run(["git", "rev-parse", "--abbrev-ref", "HEAD"],
-                     capture_output=True, text=True, check=True).stdout.strip()
-    git_commit = run(["git", "describe", "--always"],
-                     capture_output=True, text=True, check=True).stdout.strip()
-
     # checkout a clean version to build from
     git_root = run(["git", "rev-parse", "--show-toplevel"],
                    capture_output=True, text=True, check=True).stdout.strip()
@@ -54,8 +49,6 @@ def main():
     # run builds
     for target in args.targets:
         for hardware in args.hardware:
-
-            dockerfile = f"Dockerfile-{hardware}"
             tag = "latest"
 
             if hardware == 'gpu':
@@ -66,9 +59,8 @@ def main():
 
             cmd = [
                 "docker", "build",
-                "--build-arg", f"GIT_BRANCH={git_branch}",
-                "--build-arg", f"GIT_COMMIT={git_commit}",
-                "-f", f"docker/{dockerfile}",
+                "--build-arg", f"HARDWARE={hardware}",
+                "-f", "docker/Dockerfile",
                 "--target", target,
                 "-t", f"gdmeyer/dynamite:{tag}",
                 "."

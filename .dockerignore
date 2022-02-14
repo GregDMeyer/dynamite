@@ -1,7 +1,6 @@
 # unneeded files
 docker/
 docs/
-.git
 .gitignore
 LICENSE.txt
 README.md
