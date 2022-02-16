@@ -705,12 +705,18 @@ class Operator:
 
     def __add__(self, x):
         if not isinstance(x, Operator):
-            x = x*identity()
+            if x == 0:
+                return self.copy()
+            else:
+                x = x*identity()
         return self._op_add(x)
 
-    def __radd__(self,x):
+    def __radd__(self, x):
         if not isinstance(x, Operator):
-            x = x*identity()
+            if x == 0:
+                return self.copy()
+            else:
+                x = x*identity()
         return x + self
 
     def __sub__(self, x):
