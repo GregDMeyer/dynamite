@@ -1,8 +1,8 @@
 .. _containers:
 
-************************************************
-Running dynamite from a container (experimental)
-************************************************
+*********************************
+Running dynamite from a container
+*********************************
 
 These instructions describe how to run ``dynamite`` from a pre-built container image.
 If you wish to instead install ``dynamite`` directly, see :ref:`installing`.
@@ -93,12 +93,6 @@ If you are on a node with an Nvidia GPU, running the CUDA-accelerated version of
     If your cluster has a "scratch" filesystem, consider adding a line like the following to your ``.bashrc``
     or equivalent, to move the storage location: ``export SINGULARITY_CACHEDIR=<path to scratch>/.singularity``
 
-You can also run the Jupyter notebook containers described below on a compute cluster, via singularity!
-It may take some tweaking for your specific compute cluster, but the basic steps are:
-
-.. note::
-   TODO!
-
 Jupyter containers
 ==================
 
@@ -124,6 +118,22 @@ Also, perform the following extra steps:
  - During the setup phase, in "Optional Settings" type ``8888`` in "Local Host" to bind port 8888 in the container to port 8888 on your host machine
  - The first time, you may need to allow Docker through the Windows firewall
  - Once the container is running, click on it (anywhere) to view "Logs", and then follow the last link in the output (the one that starts with ``http://127.0.0.1:8888``). You can also click the "Open in Browser", but you will need to find the access token in the logs.
+
+On a compute cluster
+--------------------
+
+You can also run the Jupyter notebook containers on a compute cluster, via singularity!
+This can allow you to leverage the power of the cluster (including GPUs) in a notebook.
+It may take some tweaking for your specific compute cluster, but the basic steps are:
+
+ 1. Login, and allocate a compute node for yourself on the cluster (e.g. with ``salloc`` in SLURM).
+ 2. In a separate terminal, tunnel port 8888 to your local machine through ssh:
+    - Run ``ssh -NL 8888:<hostname of compute node from step 1>:8888 <username>@<cluster login url>``
+    - The above command should not generate any output
+ 3. On the compute node from Step 1, run ``singularity run docker://gdmeyer/dynamite:latest-jupyter``
+ 4. Follow the last link in the output (the one with ``127.0.0.1``)
+
+If you have a GPU on your compute node, you can add the ``--nv`` flag to the singularity command and use the ``gdmeyer/dynamite:latest-cuda-jupyter`` container (see :ref:`singularity-usage` section above).
 
 .. _setup:
 
