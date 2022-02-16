@@ -138,18 +138,12 @@ You can either `install podman <https://podman.io/getting-started/installation>`
 Once you have that, you don't need to do anything else---the dynamite image will be downloaded
 automatically the first time you run the commands described above!
 
-Mac
----
+Mac + Windows
+-------------
 
-.. note::
-   TODO: This documentation is coming soon!
+It is easiest to install Docker via Docker Desktop. Simply `install Docker Desktop <https://www.docker.com/products/docker-desktop>`_. With that installed, just run the commands above using the Mac terminal or Windows command line.
 
-Windows
--------
-
-It is easiest to install Docker on Windows via Docker Desktop. Simply `install Docker Desktop <https://www.docker.com/products/docker-desktop>`_. With that installed, just run the commands above using the Windows command line.
-
-During the installation, you may need to install some Windows Subsystem for Linux components---Docker should guide you through it.
+On Windows, you may need to install some Windows Subsystem for Linux components---Docker should guide you through it.
 
 If you are particularly inclined towards open source, you may want to run the containers `using podman instead <https://podman.io/getting-started/installation#windows>`_.
 
