@@ -2,10 +2,14 @@
 #include "bcuda_impl.h"
 
 #ifdef PETSC_USE_64BIT_INDICES
-  #define CUDA_PARITY(x) (__popcll(x)&1)
+  #define CUDA_POPCOUNT(x) (__popcll(x))
+  #define CUDA_CTZ(x) (__ffsll(x)-1)
 #else
-  #define CUDA_PARITY(x) (__popc(x)&1)
+  #define CUDA_POPCOUNT(x) (__popc(x))
+  #define CUDA_CTZ(x) (__ffs(x)-1)
 #endif
+
+#define CUDA_PARITY(x) (CUDA_POPCOUNT(x)&1)
 
 #define TERM_REAL_CUDA(mask, sign) (!CUDA_PARITY((mask) & (sign)))
 
@@ -56,13 +60,86 @@ __device__ PetscInt I2S_CUDA_Parity(PetscInt idx, const data_Parity* data) {
   return (idx<<1) | (CUDA_PARITY(idx) ^ data->space);
 }
 
-PetscErrorCode CopySubspaceData_CUDA_Auto(data_Auto** out_p, const data_Auto* in) {
+PetscErrorCode CopySubspaceData_CUDA_SpinConserve(data_SpinConserve** out_p, const data_SpinConserve* in) {
+  PetscErrorCode ierr;
+  cudaError_t err;
+  PetscInt len_nchoosek = (in->k+1)*in->ld_nchoosek;
+
+  data_SpinConserve cpu_data;
+
+  ierr = PetscMemcpy(&cpu_data, in, sizeof(data_SpinConserve));CHKERRQ(ierr);
+
+  err = cudaMalloc(&(cpu_data.nchoosek), sizeof(PetscInt)*len_nchoosek);CHKERRCUDA(err);
+  err = cudaMemcpy(cpu_data.nchoosek, in->nchoosek,
+		   sizeof(PetscInt)*len_nchoosek, cudaMemcpyHostToDevice);CHKERRCUDA(err);
+
+  err = cudaMalloc((void **) out_p, sizeof(data_SpinConserve));CHKERRCUDA(err);
+  err = cudaMemcpy(*out_p, &cpu_data, sizeof(data_SpinConserve), cudaMemcpyHostToDevice);CHKERRCUDA(err);
+
+  return ierr;
+}
+
+PetscErrorCode DestroySubspaceData_CUDA_SpinConserve(data_SpinConserve* data) {
+  cudaError_t err;
+
+  data_SpinConserve cpu_data;
+
+  err = cudaMemcpy(&cpu_data, data, sizeof(data_SpinConserve), cudaMemcpyDeviceToHost);CHKERRCUDA(err);
+
+  err = cudaFree(cpu_data.nchoosek);CHKERRCUDA(err);
+  err = cudaFree(data);CHKERRCUDA(err);
+  return 0;
+}
+
+__device__ PetscInt S2I_CUDA_SpinConserve(PetscInt state, PetscInt* sign, const data_SpinConserve* data) {
+  PetscInt n, k=0, idx=0;
+
+  if (state >> data->L) return (PetscInt)(-1);
+  if (CUDA_POPCOUNT(state) != data->k) return (PetscInt)(-1);
+
+  while (state) {
+    n = CUDA_CTZ(state);
+    k++;
+    if (k <= n) idx += data->nchoosek[k*data->ld_nchoosek + n];
+    state &= state-1;  // pop least significant bit off of state
+  }
+
+  *sign = 1;
+  PetscInt dim;
+  if (data->spinflip) {
+    dim = data->nchoosek[data->k*data->ld_nchoosek + data->L]/2;
+    if (idx >= dim) {
+      idx = 2*dim - idx - 1;
+      *sign = data->spinflip;
+    }
+  }
+
+  return idx;
+}
+
+__device__ PetscInt I2S_CUDA_SpinConserve(PetscInt idx, const data_SpinConserve* data) {
+  PetscInt state = 0;
+  PetscInt k = data->k;
+  PetscInt current;
+  for (PetscInt n=data->L; n>0; --n) {
+    state <<= 1;
+    current = (k > n-1) ? 0 : data->nchoosek[k*data->ld_nchoosek + n-1];
+    if (idx >= current) {
+        idx -= current;
+        k--;
+        state |= 1 ;
+    }
+  }
+  return state;
+}
+
+PetscErrorCode CopySubspaceData_CUDA_Explicit(data_Explicit** out_p, const data_Explicit* in) {
   PetscErrorCode ierr;
   cudaError_t err;
 
-  data_Auto cpu_data;
+  data_Explicit cpu_data;
 
-  ierr = PetscMemcpy(&cpu_data, in, sizeof(data_Auto));CHKERRQ(ierr);
+  ierr = PetscMemcpy(&cpu_data, in, sizeof(data_Explicit));CHKERRQ(ierr);
 
   err = cudaMalloc(&(cpu_data.state_map), sizeof(PetscInt)*in->dim);CHKERRCUDA(err);
   err = cudaMemcpy(cpu_data.state_map, in->state_map,
@@ -76,18 +153,18 @@ PetscErrorCode CopySubspaceData_CUDA_Auto(data_Auto** out_p, const data_Auto* in
   err = cudaMemcpy(cpu_data.rmap_states, in->rmap_states,
     sizeof(PetscInt)*in->dim, cudaMemcpyHostToDevice);CHKERRCUDA(err);
 
-  err = cudaMalloc((void **) out_p, sizeof(data_Auto));CHKERRCUDA(err);
-  err = cudaMemcpy(*out_p, &cpu_data, sizeof(data_Auto), cudaMemcpyHostToDevice);CHKERRCUDA(err);
+  err = cudaMalloc((void **) out_p, sizeof(data_Explicit));CHKERRCUDA(err);
+  err = cudaMemcpy(*out_p, &cpu_data, sizeof(data_Explicit), cudaMemcpyHostToDevice);CHKERRCUDA(err);
 
   return ierr;
 }
 
-PetscErrorCode DestroySubspaceData_CUDA_Auto(data_Auto* data) {
+PetscErrorCode DestroySubspaceData_CUDA_Explicit(data_Explicit* data) {
   cudaError_t err;
 
-  data_Auto cpu_data;
+  data_Explicit cpu_data;
 
-  err = cudaMemcpy(&cpu_data, data, sizeof(data_Auto), cudaMemcpyDeviceToHost);CHKERRCUDA(err);
+  err = cudaMemcpy(&cpu_data, data, sizeof(data_Explicit), cudaMemcpyDeviceToHost);CHKERRCUDA(err);
 
   err = cudaFree(cpu_data.state_map);CHKERRCUDA(err);
   err = cudaFree(cpu_data.rmap_indices);CHKERRCUDA(err);
@@ -98,7 +175,7 @@ PetscErrorCode DestroySubspaceData_CUDA_Auto(data_Auto* data) {
 
 /* TODO: this is really not well suited for GPUs */
 /* but I bet we can do something clever! */
-__device__ PetscInt S2I_CUDA_Auto(PetscInt state, const data_Auto* data) {
+__device__ PetscInt S2I_CUDA_Explicit(PetscInt state, const data_Explicit* data) {
   PetscInt left, right, mid;
   left = 0;
   right = data->dim;
@@ -119,7 +196,7 @@ __device__ PetscInt S2I_CUDA_Auto(PetscInt state, const data_Auto* data) {
   return -1;
 }
 
-__device__ PetscInt I2S_CUDA_Auto(PetscInt idx, const data_Auto* data) {
+__device__ PetscInt I2S_CUDA_Explicit(PetscInt idx, const data_Explicit* data) {
   return data->state_map[idx];
 }
 
@@ -156,6 +233,12 @@ __device__ static __inline__ void add_imag(PetscScalar *x, PetscReal c) {
   (*imag_part) += c;
 }
 
+// defines used in the various templates
+#define Full_SP 0
+#define Parity_SP 1
+#define SpinConserve_SP 2
+#define Explicit_SP 3
+
 #define LEFT_SUBSPACE Full
   #define RIGHT_SUBSPACE Full
     #include "bcuda_template.cu"
@@ -165,7 +248,11 @@ __device__ static __inline__ void add_imag(PetscScalar *x, PetscReal c) {
     #include "bcuda_template.cu"
   #undef RIGHT_SUBSPACE
 
-  #define RIGHT_SUBSPACE Auto
+  #define RIGHT_SUBSPACE SpinConserve
+    #include "bcuda_template.cu"
+  #undef RIGHT_SUBSPACE
+
+  #define RIGHT_SUBSPACE Explicit
     #include "bcuda_template.cu"
   #undef RIGHT_SUBSPACE
 #undef LEFT_SUBSPACE
@@ -179,12 +266,16 @@ __device__ static __inline__ void add_imag(PetscScalar *x, PetscReal c) {
     #include "bcuda_template.cu"
   #undef RIGHT_SUBSPACE
 
-  #define RIGHT_SUBSPACE Auto
+  #define RIGHT_SUBSPACE SpinConserve
+    #include "bcuda_template.cu"
+  #undef RIGHT_SUBSPACE
+
+  #define RIGHT_SUBSPACE Explicit
     #include "bcuda_template.cu"
   #undef RIGHT_SUBSPACE
 #undef LEFT_SUBSPACE
 
-#define LEFT_SUBSPACE Auto
+#define LEFT_SUBSPACE SpinConserve
   #define RIGHT_SUBSPACE Full
     #include "bcuda_template.cu"
   #undef RIGHT_SUBSPACE
@@ -193,7 +284,29 @@ __device__ static __inline__ void add_imag(PetscScalar *x, PetscReal c) {
     #include "bcuda_template.cu"
   #undef RIGHT_SUBSPACE
 
-  #define RIGHT_SUBSPACE Auto
+  #define RIGHT_SUBSPACE SpinConserve
+    #include "bcuda_template.cu"
+  #undef RIGHT_SUBSPACE
+
+  #define RIGHT_SUBSPACE Explicit
+    #include "bcuda_template.cu"
+  #undef RIGHT_SUBSPACE
+#undef LEFT_SUBSPACE
+
+#define LEFT_SUBSPACE Explicit
+  #define RIGHT_SUBSPACE Full
+    #include "bcuda_template.cu"
+  #undef RIGHT_SUBSPACE
+
+  #define RIGHT_SUBSPACE Parity
+    #include "bcuda_template.cu"
+  #undef RIGHT_SUBSPACE
+
+  #define RIGHT_SUBSPACE SpinConserve
+    #include "bcuda_template.cu"
+  #undef RIGHT_SUBSPACE
+
+  #define RIGHT_SUBSPACE Explicit
     #include "bcuda_template.cu"
   #undef RIGHT_SUBSPACE
 #undef LEFT_SUBSPACE

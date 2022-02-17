@@ -266,6 +266,11 @@ class Operator:
         '''
         if right is None:
             right = left
+        else:
+            if (left is not right and
+                (not left.product_state_basis or not right.product_state_basis)):
+                raise ValueError("subspaces must be the same object if either is not a "
+                                 "product state basis")
 
         left = validate.subspace(left)
         right = validate.subspace(right)
@@ -700,16 +705,25 @@ class Operator:
 
     def __add__(self, x):
         if not isinstance(x, Operator):
-            x = x*identity()
+            if x == 0:
+                return self.copy()
+            else:
+                x = x*identity()
         return self._op_add(x)
 
-    def __radd__(self,x):
+    def __radd__(self, x):
         if not isinstance(x, Operator):
-            x = x*identity()
+            if x == 0:
+                return self.copy()
+            else:
+                x = x*identity()
         return x + self
 
     def __sub__(self, x):
         return self + -x
+
+    def __rsub__(self, x):
+        return x + -self
 
     def __neg__(self):
         return -1*self
@@ -728,6 +742,12 @@ class Operator:
                              'supported.')
         else:
             return self._num_mul(x)
+
+    def __truediv__(self, x):
+        if isinstance(x, Operator):
+            raise TypeError('Dividing by Operators not supported.')
+
+        return (1/x) * self
 
     def __eq__(self, x):
         if isinstance(x, Operator):

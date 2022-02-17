@@ -1,4 +1,5 @@
 
+from os import environ
 import slepc4py
 from . import validate
 from ._backend import bbuild
@@ -64,7 +65,7 @@ class _Config:
                                    explain_str)
             else:
                 return
-            
+
         if bbuild.petsc_initialized():
             raise RuntimeError('PETSc has been initialized but dynamite has not. ' +\
                                explain_str)
@@ -72,6 +73,10 @@ class _Config:
         slepc4py.init(slepc_args)
         self.initialized = True
         self._gpu = gpu
+
+        # do not run version check if we are in a container
+        if 'DNM_DOCKER' in environ:
+            version_check = False
 
         from petsc4py import PETSc
         if version_check and PETSc.COMM_WORLD.rank == 0:
@@ -112,7 +117,7 @@ class _Config:
     @property
     def shell(self):
         """
-        Whether to use standard PETSc matrices (``False``, default), or shell 
+        Whether to use standard PETSc matrices (``False``, default), or shell
         matrices (``True``).
         """
         return self._shell
@@ -185,7 +190,10 @@ def check_version():
             with open(filename, 'w') as f:
                 f.write(str(time()))
         remove(filename+'_lock')
-    except FileExistsError: # another process is doing this at the same time
+
+    # another process is doing this at the same time,
+    # or we don't have write permission here
+    except (FileExistsError, PermissionError):
         return
 
     # finally do the check

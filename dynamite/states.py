@@ -1,5 +1,6 @@
 
 from . import config, validate, subspaces
+from .tools import complex_enabled
 
 import numpy as np
 from os import urandom
@@ -149,7 +150,12 @@ class State:
             A representation of the state.
         """
 
-        idx = self.subspace.state_to_idx(self.str_to_state(s, self.L))
+        s2i_result = self.subspace.state_to_idx(self.str_to_state(s, self.L))
+        if isinstance(s2i_result, tuple):
+            idx, sign = s2i_result
+        else:
+            idx = s2i_result
+
         if idx == -1:
             raise ValueError('Provided initial state not in requested subspace.')
 
@@ -214,8 +220,12 @@ class State:
         R.seed((seed + PETSc.COMM_WORLD.rank) % 2**32)
 
         local_size = iend-istart
-        self.vec[istart:iend] =    R.standard_normal(local_size) + \
-                                1j*R.standard_normal(local_size)
+
+        if complex_enabled():
+            self.vec[istart:iend] =    R.standard_normal(local_size) + \
+                                    1j*R.standard_normal(local_size)
+        else:
+            self.vec[istart:iend] = R.standard_normal(local_size)
 
         self.vec.assemblyBegin()
         self.vec.assemblyEnd()
@@ -291,6 +301,10 @@ class State:
     def __itruediv__(self, x):
         self.vec.scale(1/x)
         return self
+
+    def __len__(self):
+        return self.vec.getSize()
+
 
 auto_wrap = ['norm', 'normalize']
 for petsc_func in auto_wrap:

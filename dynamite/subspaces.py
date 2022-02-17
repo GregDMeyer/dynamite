@@ -8,14 +8,20 @@ one implementation of each of the functions.
 import numpy as np
 from copy import deepcopy
 from zlib import crc32
+import math
 
-from . import validate, states
+from . import validate, states, config
 from ._backend import bsubspace
+from .msc_tools import dnm_int_t
 
 class Subspace:
     '''
     Base subspace class.
     '''
+
+    # subclasses should set to False if they need
+    _product_state_basis = True
+    _checksum_start = 0
 
     def __init__(self):
         self._L = None
@@ -26,8 +32,14 @@ class Subspace:
         Returns true if the two subspaces correspond to the same mapping, even if they
         are different classes.
         '''
+        if s is self:
+            return True
+
         if not isinstance(s, Subspace):
             raise ValueError('Cannot compare Subspace to non-Subspace type')
+
+        if self._L is None:
+            raise ValueError('Cannot compare subspaces before setting L')
 
         if self.get_dimension() != s.get_dimension():
             return False
@@ -62,6 +74,14 @@ class Subspace:
         """
         raise NotImplementedError()
 
+    @property
+    def product_state_basis(self):
+        """
+        A boolean value indicating whether the given subspace's basis
+        states are product states.
+        """
+        return self._product_state_basis
+
     @classmethod
     def _numeric_to_array(cls, x):
         '''
@@ -94,7 +114,7 @@ class Subspace:
         '''
         if self._chksum is None:
             BLOCK = 2**14
-            chksum = 0
+            chksum = self._checksum_start
             for start in range(0, self.get_dimension(), BLOCK):
                 stop = min(start+BLOCK, self.get_dimension())
                 smap = self.idx_to_state(np.arange(start, stop))
@@ -184,6 +204,7 @@ class Full(Subspace):
         '''
         return bsubspace.SubspaceType.FULL
 
+
 class Parity(Subspace):
     '''
     The subspaces of states in which the number of up spins is even or odd.
@@ -262,7 +283,301 @@ class Parity(Subspace):
         '''
         return bsubspace.SubspaceType.PARITY
 
-class Auto(Subspace):
+
+class SpinConserve(Subspace):
+    '''
+    The subspaces of states in which conserve total magnetization (total
+    number of up spins).
+
+    Parameters
+    ----------
+    L : int
+        Length of spin chain (constant for this class)
+
+    k : int
+        Number of up spins (0's in integer representation of state)
+
+    spinflip : str, optional
+        Sign of spinflip basis ('+' or '-'). Omit to not use Z2 symmetry.
+    '''
+
+    _product_state_basis = False
+
+    def __init__(self, L, k, spinflip=None):
+        Subspace.__init__(self)
+        self._L = self._check_L(L)
+
+        if spinflip is None or spinflip == 0:
+            self._spinflip = 0
+        elif spinflip in ['+', +1]:
+            self._spinflip = +1
+        elif spinflip in ['-', -1]:
+            self._spinflip = -1
+        else:
+            raise ValueError('invalid value for spinflip')
+
+        self._product_state_basis = self.spinflip == 0
+
+        # unique checksum for each value of spinflip
+        self._checksum_start = self._spinflip
+
+        self._k = self._check_k(k)
+
+        self._nchoosek = self._compute_nchoosek(L, k)
+
+    @property
+    def spinflip(self):
+        """
+        Whether the subspace uses the additional spinflip symmetry.
+        Returns integer +1, -1, or 0 (no spinflip symmetry).
+        """
+        return self._spinflip
+
+    @classmethod
+    def convert_spinflip(cls, state, sign=None):
+        """
+        Convert a state on a subspace with one spinflip value
+        to a state with opposite spinflip value
+
+        Parameters
+        ----------
+
+        state : State
+            The input state
+
+        sign : str, optional
+            The sign of the spinflip subspace. Required when converting from
+            non-spinflip subspace.
+        """
+        if state.subspace.spinflip == 0 and sign is None:
+            raise ValueError('must provide sign when converting to spinflip')
+
+        if state.subspace.spinflip != 0 and sign is not None:
+            raise ValueError("do not provide sign when converting from "
+                             "spinflip subspace")
+
+        if sign in ['+', +1]:
+            sign = +1
+        elif sign in ['-', -1]:
+            sign = -1
+        elif sign is not None:
+            raise ValueError('invalid value of sign')
+
+        new_space = SpinConserve(state.subspace.L,
+                                 state.subspace.k,
+                                 spinflip=sign)
+
+        rtn_state = states.State(subspace=new_space)
+        istart, iend = state.vec.getOwnershipRange()
+
+        n_in = len(state)
+        n_rtn = len(rtn_state)
+        if state.subspace.spinflip:  # to product state basis
+            start = n_rtn-istart-1
+            end = n_rtn-iend-1
+            rtn_state.vec[start:end:-1] = state.vec[istart:iend]
+
+            if state.subspace.spinflip == -1:
+                # flip sign of second half of vector for - subspace
+                rtn_state.vec.assemble()
+                rtn_state.vec.scale(-1)
+
+            rtn_state.vec[istart:iend] = state.vec[istart:iend]
+
+        else:  # from product state basis
+
+            # second half of vector
+            start = max(n_in//2, istart)
+            end = iend
+            if start < end:
+                # an unfortunate side effect of python slice notation
+                if n_in == end:
+                    rtn_state.vec[n_in-start-1::-1] = state.vec[start:end]
+                else:
+                    rtn_state.vec[n_in-start-1:n_in-end-1:-1] = state.vec[start:end]
+
+            rtn_state.vec.assemble()
+            if sign == -1:
+                rtn_state.vec.scale(-1)
+
+            if istart < n_in//2:
+                start = istart
+                end = min(n_in//2, iend)
+                rtn_state.vec.setValues(np.arange(start, end, dtype=dnm_int_t),
+                                        state.vec[start:end],
+                                        addv=True)
+
+        rtn_state.vec.assemble()
+        rtn_state.vec.scale(1/np.sqrt(2))
+
+        return rtn_state
+
+    @classmethod
+    def _compute_nchoosek(cls, L, k):
+        # we index over k first to hopefully make the memory access pattern
+        # slightly better. sorry :-(
+        rtn = np.ndarray((k+1, L+1), dtype=bsubspace.dnm_int_t)
+
+        # there is a more efficient algorithm where we use a combinations
+        # identity to compute the values way faster. but it's super fast anyway
+        # and this is more readable
+        for (kk, LL), _ in np.ndenumerate(rtn):
+            rtn[kk, LL] = math.comb(LL, kk)
+
+        return rtn
+
+    def _check_L(self, L):
+        if config.L is not None and L != config.L:
+            raise ValueError('attempted to set L to value different from config.L')
+
+        return validate.L(L)
+
+    def _check_k(self, k):
+        if not (0 <= k <= self.L):
+            raise ValueError('k must be between 0 and L')
+
+        if self._spinflip and not 2*k == self.L:
+            raise ValueError('L must equal 2k for spinflip symmetry')
+
+        return k
+
+    @Subspace.L.setter
+    def L(self, value):
+        if value != self.L:
+            raise AttributeError('cannot change L for SpinConserve class')
+
+    @property
+    def k(self):
+        """
+        The number of up ("0") spins.
+        """
+        return self._k
+
+    def get_dimension(self):
+        """
+        Get the dimension of the subspace.
+        """
+        return self._get_dimension(self.L, self.k, self._nchoosek, self._spinflip)
+
+    @classmethod
+    def _get_dimension(cls, L, k, nchoosek, spinflip=0):
+        return bsubspace.get_dimension_SpinConserve(cls._get_cdata(L, k, nchoosek, spinflip))
+
+    def idx_to_state(self, idx):
+        """
+        Maps an index to an integer that in binary corresponds to the spin configuration.
+        Vectorized implementation allows passing a numpy array of indices as idx.
+        """
+        idx = self._numeric_to_array(idx)
+        return self._idx_to_state(idx, self.L, self.k, self._nchoosek, self._spinflip)
+
+    def state_to_idx(self, state):
+        """
+        The inverse mapping of :meth:`idx_to_state`.
+        """
+        state = self._numeric_to_array(state)
+        return self._state_to_idx(state, self.L, self.k, self._nchoosek, self._spinflip)
+
+    @classmethod
+    def _idx_to_state(cls, idx, L, k, nchoosek, spinflip=0):
+        return bsubspace.idx_to_state_SpinConserve(idx, cls._get_cdata(L, k, nchoosek, spinflip))
+
+    @classmethod
+    def _state_to_idx(cls, state, L, k, nchoosek, spinflip=0):
+        return bsubspace.state_to_idx_SpinConserve(state, cls._get_cdata(L, k, nchoosek, spinflip))
+
+    def get_cdata(self):
+        '''
+        Returns an object containing the subspace data accessible by the C backend.
+        '''
+        return self._get_cdata(self.L, self.k, self._nchoosek, self._spinflip)
+
+    @classmethod
+    def _get_cdata(cls, L, k, nchoosek, spinflip=0):
+        return bsubspace.CSpinConserve(
+            L, k,
+            np.ascontiguousarray(nchoosek),
+            spinflip
+        )
+
+    def to_enum(self):
+        '''
+        Convert the class types used in the Python frontend to the enum values
+        used in the C backend.
+        '''
+        return bsubspace.SubspaceType.SPIN_CONSERVE
+
+
+class Explicit(Subspace):
+    '''
+    A subspace generated by explicitly passing a list of product states.
+
+    Parameters
+    ----------
+    state_list : array-like
+        An array of integers representing the states (in binary).
+    '''
+
+    def __init__(self, state_list):
+        Subspace.__init__(self)
+        self.state_map = np.asarray(state_list, dtype=bsubspace.dnm_int_t)
+
+        map_sorted = np.all(self.state_map[:-1] <= self.state_map[1:])
+
+        if map_sorted:
+            self.rmap_indices = np.arange(self.state_map.size, dtype=bsubspace.dnm_int_t)
+            self.rmap_states = self.state_map
+        else:
+            self.rmap_indices = np.argsort(self.state_map).astype(bsubspace.dnm_int_t, copy=False)
+            self.rmap_states = self.state_map[self.rmap_indices]
+
+    def check_L(self, value):
+        # last value of rmap_states is the lexicographically largest one
+        if self.rmap_states[-1] >> value != 0:
+            raise ValueError('State in subspace has more spins than provided')
+        return value
+
+    def get_dimension(self):
+        """
+        Get the dimension of the subspace.
+        """
+        return bsubspace.get_dimension_Explicit(self.get_cdata())
+
+    def idx_to_state(self, idx):
+        """
+        Maps an index to an integer that in binary corresponds to the spin configuration.
+        Vectorized implementation allows passing a numpy array of indices as idx.
+        """
+        idx = self._numeric_to_array(idx)
+        return bsubspace.idx_to_state_Explicit(idx, self.get_cdata())
+
+    def state_to_idx(self, state):
+        """
+        The inverse mapping of :meth:`idx_to_state`.
+        """
+        state = self._numeric_to_array(state)
+        return bsubspace.state_to_idx_Explicit(state, self.get_cdata())
+
+    def get_cdata(self):
+        '''
+        Returns an object containing the subspace data accessible by the C backend.
+        '''
+        return bsubspace.CExplicit(
+            self.L,
+            np.ascontiguousarray(self.state_map),
+            np.ascontiguousarray(self.rmap_indices),
+            np.ascontiguousarray(self.rmap_states)
+        )
+
+    def to_enum(self):
+        '''
+        Convert the class types used in the Python frontend to the enum values
+        used in the C backend.
+        '''
+        return bsubspace.SubspaceType.EXPLICIT
+
+
+class Auto(Explicit):
     '''
     Automatically generate a mapping that takes advantage of any possible spin conservation
     law, by performing a breadth-first search of the graph of possible states using the operator
@@ -293,70 +608,28 @@ class Auto(Subspace):
 
     def __init__(self, H, state, size_guess=None, sort=True):
 
-        Subspace.__init__(self)
-
-        self._L = H.get_length()
-
-        self.state = states.State.str_to_state(state, self.L)
+        self.state = states.State.str_to_state(state, H.get_length())
 
         if size_guess is None:
             size_guess = 2**H.get_length()
 
-        self.state_map = np.ndarray((size_guess,), dtype=bsubspace.dnm_int_t)
+        state_map = np.ndarray((size_guess,), dtype=bsubspace.dnm_int_t)
 
         H.reduce_msc()
 
         dim = bsubspace.compute_rcm(H.msc['masks'], H.msc['signs'], H.msc['coeffs'],
-                                    self.state_map, self.state, H.get_length())
+                                    state_map, self.state, H.get_length())
 
-        self.state_map = self.state_map[:dim]
+        state_map = state_map[:dim]
 
-        self.rmap_indices = np.argsort(self.state_map).astype(bsubspace.dnm_int_t, copy=False)
-        self.rmap_states = self.state_map[self.rmap_indices]
         if sort:
-            self.state_map = self.rmap_states
-            self.rmap_indices = np.arange(self.state_map.size, dtype=bsubspace.dnm_int_t)
+            state_map.sort()
+
+        Explicit.__init__(self, state_map)
+
+        self._L = H.get_length()
 
     def check_L(self, value):
         if value != self.L:
             raise TypeError('Cannot change L for Auto subspace type.')
         return value
-
-    def get_dimension(self):
-        """
-        Get the dimension of the subspace.
-        """
-        return bsubspace.get_dimension_Auto(self.get_cdata())
-
-    def idx_to_state(self, idx):
-        """
-        Maps an index to an integer that in binary corresponds to the spin configuration.
-        Vectorized implementation allows passing a numpy array of indices as idx.
-        """
-        idx = self._numeric_to_array(idx)
-        return bsubspace.idx_to_state_Auto(idx, self.get_cdata())
-
-    def state_to_idx(self, state):
-        """
-        The inverse mapping of :meth:`idx_to_state`.
-        """
-        state = self._numeric_to_array(state)
-        return bsubspace.state_to_idx_Auto(state, self.get_cdata())
-
-    def get_cdata(self):
-        '''
-        Returns an object containing the subspace data accessible by the C backend.
-        '''
-        return bsubspace.CAuto(
-            self.L,
-            np.ascontiguousarray(self.state_map),
-            np.ascontiguousarray(self.rmap_indices),
-            np.ascontiguousarray(self.rmap_states)
-        )
-
-    def to_enum(self):
-        '''
-        Convert the class types used in the Python frontend to the enum values
-        used in the C backend.
-        '''
-        return bsubspace.SubspaceType.AUTO

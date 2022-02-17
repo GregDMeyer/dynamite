@@ -56,7 +56,11 @@ PetscErrorCode C(BuildPetsc,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
   PetscInt row_idx, ket, col_idx, bra, sign;
   PetscScalar value;
 
-  MPI_Comm_size(PETSC_COMM_WORLD, &mpi_size);
+#if C(RIGHT_SUBSPACE,SP) == SpinConserve_SP
+  PetscInt s2i_sign;
+#endif
+
+  ierr = MPI_Comm_size(PETSC_COMM_WORLD, &mpi_size);CHKERRMPI(ierr);
 
   /* N is dimension of right subspace, M of left */
   M = C(Dim,LEFT_SUBSPACE)(left_subspace_data);
@@ -99,7 +103,11 @@ PetscErrorCode C(BuildPetsc,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
     for (mask_idx = 0; mask_idx < msc->nmasks; mask_idx++) {
       bra = ket ^ msc->masks[mask_idx];
 
+#if C(RIGHT_SUBSPACE,SP) == SpinConserve_SP
+      col_idx = C(S2I,RIGHT_SUBSPACE)(bra, &s2i_sign, right_subspace_data);
+#else
       col_idx = C(S2I,RIGHT_SUBSPACE)(bra, right_subspace_data);
+#endif
       if (col_idx == -1) {
         continue;
       }
@@ -111,13 +119,17 @@ PetscErrorCode C(BuildPetsc,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
         value += sign * msc->coeffs[term_idx];
       }
 
+#if C(RIGHT_SUBSPACE,SP) == SpinConserve_SP
+      value *= s2i_sign;
+#endif
+
       row_count++;
-      ierr = MatSetValue(*A, row_idx, col_idx, value, INSERT_VALUES);CHKERRQ(ierr);
+      ierr = MatSetValue(*A, row_idx, col_idx, value, ADD_VALUES);CHKERRQ(ierr);
     }
 
     /* workaround for a bug in PETSc that triggers if there are empty rows */
     if (row_count == 0) {
-      ierr = MatSetValue(*A, row_idx, col_start, 0, INSERT_VALUES);CHKERRQ(ierr);
+      ierr = MatSetValue(*A, row_idx, col_start, 0, ADD_VALUES);CHKERRQ(ierr);
     }
   }
 
@@ -147,8 +159,8 @@ PetscErrorCode C(ComputeNonzeros,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))
   ierr = PetscSplitOwnership(PETSC_COMM_WORLD, &local_cols, &N);CHKERRQ(ierr);
 
   /* prefix sum to get the start indices on each process */
-  MPI_Scan(&local_rows, &row_start, 1, MPIU_INT, MPI_SUM, PETSC_COMM_WORLD);
-  MPI_Scan(&local_cols, &col_start, 1, MPIU_INT, MPI_SUM, PETSC_COMM_WORLD);
+  ierr = MPI_Scan(&local_rows, &row_start, 1, MPIU_INT, MPI_SUM, PETSC_COMM_WORLD);CHKERRMPI(ierr);
+  ierr = MPI_Scan(&local_cols, &col_start, 1, MPIU_INT, MPI_SUM, PETSC_COMM_WORLD);CHKERRMPI(ierr);
 
   /* MPI_Scan includes current value in the sum */
   row_start -= local_rows;
@@ -161,7 +173,13 @@ PetscErrorCode C(ComputeNonzeros,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))
   for (row_idx = 0; row_idx < local_rows; row_idx++) {
     state = C(I2S,LEFT_SUBSPACE)(row_idx+row_start, left_subspace_data);
     for (mask_idx = 0; mask_idx < msc->nmasks; ++mask_idx) {
+
+#if C(RIGHT_SUBSPACE,SP) == SpinConserve_SP
+      col_idx = C(S2I,RIGHT_SUBSPACE)(state^msc->masks[mask_idx], NULL, right_subspace_data);
+#else
       col_idx = C(S2I,RIGHT_SUBSPACE)(state^msc->masks[mask_idx], right_subspace_data);
+#endif
+
       if (col_idx == -1) {
         /* this term is outside the subspace */
         continue;
@@ -290,6 +308,14 @@ PetscErrorCode C(MatDestroyCtx_CPU,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A)
 
 #undef  __FUNCT__
 #define __FUNCT__ "MatMult_CPU_General"
+
+#undef VECSET_CACHE_SIZE
+#ifdef PETSC_USE_DEBUG
+  #define VECSET_CACHE_SIZE (1<<7)
+#else
+  #define VECSET_CACHE_SIZE (1<<15)
+#endif
+
 /*
  * MatMult for CPU shell matrices.
  */
@@ -297,18 +323,26 @@ PetscErrorCode C(MatMult_CPU_General,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, Vec
 {
   PetscErrorCode ierr;
   int mpi_size, mpi_rank;
-  MPI_Request send_request, recv_request;
-  PetscInt x_size, x_local_size, max_proc_size, *x_local_sizes, *x_local_starts;
-  PetscInt block_start, row_start, row_end, col_start, col_end;
-  PetscInt proc_shift, proc_idx, send_count, recv_idx, recv_start, recv_end, recv_count;
-  const PetscScalar* local_x_array;
-  const PetscScalar* source_array;
-  PetscScalar* x_array[2];
-  PetscScalar* b_array;
+  PetscBool assembling;
+
+  PetscInt row_start, row_end, col_start, col_end, col_idx;
+  PetscInt ket, bra, sign, row_idx, cache_idx, mask_idx, term_idx;
+
+#if C(LEFT_SUBSPACE,SP) == SpinConserve_SP
+  PetscInt s2i_sign;
+#endif
+
+  PetscInt *row_idxs;
+  PetscScalar value;
+  const PetscScalar *local_x_array;
+  PetscScalar *b_array, *to_send;
+
+  int im_done, done_communicating;
+
   shell_context *ctx;
 
-  MPI_Comm_size(PETSC_COMM_WORLD, &mpi_size);
-  MPI_Comm_rank(PETSC_COMM_WORLD, &mpi_rank);
+  ierr = MPI_Comm_size(PETSC_COMM_WORLD, &mpi_size);CHKERRMPI(ierr);
+  ierr = MPI_Comm_rank(PETSC_COMM_WORLD, &mpi_rank);CHKERRMPI(ierr);
 
   /* TODO: check that vectors are of correct type */
 
@@ -317,122 +351,113 @@ PetscErrorCode C(MatMult_CPU_General,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, Vec
   ierr = VecSet(b, 0);CHKERRQ(ierr);
 
   ierr = VecGetArrayRead(x, &(local_x_array));CHKERRQ(ierr);
-  ierr = VecGetArray(b, &(b_array));CHKERRQ(ierr);
+
+  ierr = VecGetOwnershipRange(x, &col_start, &col_end);CHKERRQ(ierr);
+  ierr = VecGetOwnershipRange(b, &row_start, &row_end);CHKERRQ(ierr);
 
   /* if there is only one process, just do one call to the kernel */
   if (mpi_size == 1) {
-
-    ierr = VecGetOwnershipRange(x, &col_start, &col_end);CHKERRQ(ierr);
-    ierr = VecGetOwnershipRange(b, &row_start, &row_end);CHKERRQ(ierr);
+    ierr = VecGetArray(b, &(b_array));CHKERRQ(ierr);
 
     C(MatMult_CPU_kernel,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
       local_x_array, b_array, ctx, row_start, row_end, col_start, col_end);CHKERRQ(ierr);
+
+    ierr = VecRestoreArray(b, &b_array);CHKERRQ(ierr);
   }
   else {
 
-    /* find the local sizes of all processors */
-    ierr = VecGetSize(x, &x_size);CHKERRQ(ierr);
-    ierr = VecGetLocalSize(x, &x_local_size);CHKERRQ(ierr);
-    ierr = PetscMalloc1(mpi_size, &x_local_sizes);CHKERRQ(ierr);
-    ierr = MPI_Allgather(&x_local_size, 1, MPIU_INT, x_local_sizes, 1, MPIU_INT, PETSC_COMM_WORLD);
+    /* allocate for cache */
+    ierr = PetscMalloc1(VECSET_CACHE_SIZE, &row_idxs);CHKERRQ(ierr);
+    ierr = PetscMalloc1(VECSET_CACHE_SIZE, &to_send);CHKERRQ(ierr);
 
-    /* see if any processes have no data */
-    for (proc_idx = mpi_size; proc_idx > 0; --proc_idx) {
-      if (x_local_sizes[proc_idx-1] != 0) break;
-    }
-    mpi_size = proc_idx;
+    /* we are not already sending values to another processor */
+    assembling = PETSC_FALSE;
 
-    if (mpi_rank < mpi_size) {
+    cache_idx = 0;
 
-      ierr = PetscMalloc1(BLOCK_SIZE, &(x_array[0]));CHKERRQ(ierr);
-      ierr = PetscMalloc1(BLOCK_SIZE, &(x_array[1]));CHKERRQ(ierr);
+    ket = 0;
+    for (col_idx=col_start; col_idx<col_end; ++col_idx) {
 
-      /* compute the starting indices, and largest size on any processor */
-      ierr = PetscMalloc1(mpi_size+1, &x_local_starts);CHKERRQ(ierr);
-      max_proc_size = 0;
-      x_local_starts[0] = 0;
-      for (proc_idx = 0; proc_idx < mpi_size; ++proc_idx) {
-        if (max_proc_size < x_local_sizes[proc_idx]) max_proc_size = x_local_sizes[proc_idx];
-        x_local_starts[proc_idx+1] = x_local_starts[proc_idx] + x_local_sizes[proc_idx];
+      if (col_idx==col_start) {
+	ket = C(I2S,RIGHT_SUBSPACE)(col_idx, ctx->right_subspace_data);
+      } else {
+	ket = C(NextState,RIGHT_SUBSPACE)(ket, col_idx, ctx->right_subspace_data);
       }
 
-      ierr = VecGetOwnershipRange(b, &row_start, &row_end);CHKERRQ(ierr);
+      for (mask_idx=0; mask_idx<ctx->nmasks; mask_idx++) {
+	bra = ket ^ ctx->masks[mask_idx];
 
-      /* iterate through blocks on our process */
-      for (block_start = 0; block_start < max_proc_size; block_start += BLOCK_SIZE) {
+#if C(LEFT_SUBSPACE,SP) == SpinConserve_SP
+	row_idx = C(S2I,LEFT_SUBSPACE)(bra, &s2i_sign, ctx->left_subspace_data);
+#else
+  	row_idx = C(S2I,LEFT_SUBSPACE)(bra, ctx->left_subspace_data);
+#endif
 
-        for (proc_shift = 0; proc_shift < mpi_size; ++proc_shift) {
-          /* do a round-robin of the data */
-          /* eventually, skip the ones we don't need */
-          proc_idx = (mpi_rank+proc_shift) % mpi_size;
+	if (row_idx == -1) continue;
 
-          col_start = block_start + x_local_starts[proc_idx];
-          col_end = PetscMin(col_start + BLOCK_SIZE, x_local_starts[proc_idx + 1]);
+	/* sum all terms for this matrix element */
+	value = 0;
+	for (term_idx=ctx->mask_offsets[mask_idx]; term_idx<ctx->mask_offsets[mask_idx+1]; ++term_idx) {
+	  sign = 1 - 2*(builtin_parity(ket&ctx->signs[term_idx]));
+	  if (TERM_REAL(ctx->masks[mask_idx], ctx->signs[term_idx])) {
+	    value += sign * ctx->real_coeffs[term_idx];
+	  } else {
+	    value += I * sign * ctx->real_coeffs[term_idx];
+	  }
+	}
+	if (cache_idx >= VECSET_CACHE_SIZE) {
+	  SETERRQ1(MPI_COMM_SELF, PETSC_ERR_MEMC, "cache out of bounds, value %d", cache_idx);
+	}
 
-          /* self to self */
-          if (proc_shift == 0) {
-            source_array = local_x_array + block_start;
-          }
-          else {
-            source_array = x_array[proc_shift%2];
-	    ierr = MPI_Wait(&recv_request, MPI_STATUS_IGNORE);CHKERRQ(ierr);
+#if C(LEFT_SUBSPACE,SP) == SpinConserve_SP
+	value *= s2i_sign;
+#endif
+
+	row_idxs[cache_idx] = row_idx;
+	to_send[cache_idx] = value * local_x_array[col_idx-col_start];
+	++cache_idx;
+
+	if (cache_idx == VECSET_CACHE_SIZE) {
+	  if (assembling) {
+	    ierr = VecAssemblyEnd(b);CHKERRQ(ierr);
+	    im_done = 0;
+	    ierr = MPI_Allreduce(&im_done, &done_communicating, 1, MPI_INT, MPI_BAND, MPI_COMM_WORLD);CHKERRMPI(ierr);
+	    assembling = PETSC_FALSE;
 	  }
 
-          if (proc_shift < mpi_size - 1) {
+	  ierr = VecSetValues(b, VECSET_CACHE_SIZE, row_idxs, to_send, ADD_VALUES);CHKERRQ(ierr);
 
-            // TODO: put this stuff into a different function
+	  ierr = VecAssemblyBegin(b);CHKERRQ(ierr);
+	  assembling = PETSC_TRUE;
 
-            /* prepare to receive */
-	    recv_idx = (mpi_rank+proc_shift+1)%mpi_size;
-            recv_start = x_local_starts[recv_idx] + block_start;
-            recv_end = PetscMin(recv_start + BLOCK_SIZE, x_local_starts[recv_idx+1]);
-	    recv_count = recv_end - recv_start;
-            if (recv_count > 0) {
-              if (proc_shift > 0) {
-                /* make sure we completed the previous send operation already */
-                ierr = MPI_Wait(&send_request, MPI_STATUS_IGNORE);CHKERRQ(ierr);
-              }
-              /* TODO: is this the right way to catch MPI errors with PETSc? */
-              ierr = MPI_Irecv(x_array[(proc_shift+1)%2], recv_count, MPIU_SCALAR,
-			       (mpi_rank+1)%mpi_size, 0,
-			       PETSC_COMM_WORLD, &recv_request);CHKERRQ(ierr);
-            }
-
-            /* you guys silly I'm still gonna send it */
-            send_count = col_end - col_start;
-            if (send_count > 0) {
-              /* TODO: is this the right way to catch MPI errors with PETSc? */
-	      ierr = MPI_Isend(source_array, send_count, MPIU_SCALAR,
-			       (mpi_size+mpi_rank-1)%mpi_size, 0,
-			       PETSC_COMM_WORLD, &send_request);CHKERRQ(ierr);
-            }
-
-          }
-
-          /* finally actually do the computation */
-          C(MatMult_CPU_kernel,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
-            source_array, b_array, ctx, row_start, row_end, col_start, col_end);CHKERRQ(ierr);
-
-        }
+	  cache_idx = 0;
+	}
       }
-
-      /* complete the final send before deallocating the arrays */
-      if (mpi_size > 1) {
-	ierr = MPI_Wait(&send_request, MPI_STATUS_IGNORE);CHKERRQ(ierr);
-      }
-
-      ierr = PetscFree(x_local_starts);CHKERRQ(ierr);
-      ierr = PetscFree(x_array[0]);CHKERRQ(ierr);
-      ierr = PetscFree(x_array[1]);CHKERRQ(ierr);
-
     }
 
-    ierr = PetscFree(x_local_sizes);CHKERRQ(ierr);
+    im_done = cache_idx==0;
+    done_communicating = PETSC_FALSE;
+    if (assembling) {
+      ierr = VecAssemblyEnd(b);CHKERRQ(ierr);
+      ierr = MPI_Allreduce(&im_done, &done_communicating, 1, MPI_INT, MPI_BAND, MPI_COMM_WORLD);CHKERRMPI(ierr);
+    }
 
+    if (!im_done) {
+      ierr = VecSetValues(b, cache_idx, row_idxs, to_send, ADD_VALUES);CHKERRQ(ierr);
+    }
+
+    while (!done_communicating) {
+      ierr = VecAssemblyBegin(b);CHKERRQ(ierr);
+      ierr = VecAssemblyEnd(b);CHKERRQ(ierr);
+      im_done = 1;
+      ierr = MPI_Allreduce(&im_done, &done_communicating, 1, MPI_INT, MPI_BAND, MPI_COMM_WORLD);CHKERRMPI(ierr);
+    }
+
+    ierr = PetscFree(row_idxs);CHKERRQ(ierr);
+    ierr = PetscFree(to_send);CHKERRQ(ierr);
   }
 
-  ierr = VecRestoreArrayRead(x, &(local_x_array));CHKERRQ(ierr);
-  ierr = VecRestoreArray(b, (&b_array));CHKERRQ(ierr);
+  ierr = VecRestoreArrayRead(x, &local_x_array);CHKERRQ(ierr);
 
   return ierr;
 }
@@ -449,6 +474,9 @@ void C(MatMult_CPU_kernel,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
   PetscInt row_idx, ket, col_idx, bra;
   PetscInt mask_idx, term_idx;
   PetscInt sign;
+#if C(RIGHT_SUBSPACE,SP) == SpinConserve_SP
+  PetscInt s2i_sign=0;
+#endif
   PetscScalar value;
 
   for (row_idx = row_start; row_idx < row_end; ++row_idx) {
@@ -456,7 +484,12 @@ void C(MatMult_CPU_kernel,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
 
     for (mask_idx = 0; mask_idx < ctx->nmasks; mask_idx++) {
       bra = ket ^ ctx->masks[mask_idx];
+
+#if C(RIGHT_SUBSPACE,SP) == SpinConserve_SP
+      col_idx = C(S2I,RIGHT_SUBSPACE)(bra, &s2i_sign, ctx->right_subspace_data);
+#else
       col_idx = C(S2I,RIGHT_SUBSPACE)(bra, ctx->right_subspace_data);
+#endif
 
       /* yikes */
       if (col_idx < col_start || col_idx >= col_end) continue;
@@ -471,27 +504,22 @@ void C(MatMult_CPU_kernel,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
           value += I * sign * ctx->real_coeffs[term_idx];
         }
       }
+#if C(RIGHT_SUBSPACE,SP) == SpinConserve_SP
+      value *= s2i_sign;
+#endif
       b_array[row_idx - row_start] += value * x_array[col_idx - col_start];
     }
   }
 }
 
-#define Full_SP 0
-#define Parity_SP 1
-#define Auto_SP 2
-
-/* if subspaces are different, or both are Auto, use this kernel */
-#if (C(LEFT_SUBSPACE,SP) == Auto_SP || C(LEFT_SUBSPACE,SP) != C(RIGHT_SUBSPACE,SP))
-
-PetscErrorCode C(MatMult_CPU,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, Vec x, Vec b)
-{
-  PetscErrorCode ierr;
-  ierr = C(MatMult_CPU_General,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(A,x,b);CHKERRQ(ierr);
-  return ierr;
-}
-
-#else
 /* use the hand-tuned kernel for parity and full subspaces, if we can */
+/* if subspaces are the same, and are both Full or Parity, use the fancy fast matvec */
+#if C(LEFT_SUBSPACE,SP) == C(RIGHT_SUBSPACE,SP) && (C(LEFT_SUBSPACE,SP) == Full_SP || C(LEFT_SUBSPACE,SP) == Parity_SP)
+
+#define ITER_CUTOFF 8
+#define LKP_MASK (LKP_SIZE-1)
+
+#undef VECSET_CACHE_SIZE
 
 #ifdef PETSC_USE_DEBUG
   #define VECSET_CACHE_SIZE (1<<7)
@@ -500,9 +528,6 @@ PetscErrorCode C(MatMult_CPU,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, Vec x, Vec 
   #define VECSET_CACHE_SIZE (1<<11)
   #define LKP_SIZE (1<<6)
 #endif
-
-#define ITER_CUTOFF 8
-#define LKP_MASK (LKP_SIZE-1)
 
 PetscErrorCode C(MatMult_CPU_Fast,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, Vec x, Vec b);
 
@@ -513,7 +538,7 @@ PetscErrorCode C(MatMult_CPU,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, Vec x, Vec 
   PetscInt local_size;
   shell_context *ctx;
   int mpi_size;
-  MPI_Comm_size(PETSC_COMM_WORLD,&mpi_size);
+  ierr = MPI_Comm_size(PETSC_COMM_WORLD,&mpi_size);CHKERRMPI(ierr);
 
   ierr = VecGetLocalSize(b, &local_size);CHKERRQ(ierr);
 
@@ -720,8 +745,8 @@ PetscErrorCode C(MatMult_CPU_Fast,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, Vec x,
   PetscInt cache_idx;
 
   int mpi_rank,mpi_size;
-  MPI_Comm_rank(PETSC_COMM_WORLD,&mpi_rank);
-  MPI_Comm_size(PETSC_COMM_WORLD,&mpi_size);
+  ierr = MPI_Comm_rank(PETSC_COMM_WORLD,&mpi_rank);CHKERRMPI(ierr);
+  ierr = MPI_Comm_size(PETSC_COMM_WORLD,&mpi_size);CHKERRMPI(ierr);
 
   /* check if number of processors is a multiple of 2 */
   if ((mpi_size & (mpi_size-1)) != 0) {
@@ -856,6 +881,15 @@ PetscErrorCode C(MatMult_CPU_Fast,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, Vec x,
   return ierr;
 }
 
+#else
+
+PetscErrorCode C(MatMult_CPU,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, Vec x, Vec b)
+{
+  PetscErrorCode ierr;
+  ierr = C(MatMult_CPU_General,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(A,x,b);CHKERRQ(ierr);
+  return ierr;
+}
+
 #endif
 
 #undef  __FUNCT__
@@ -918,6 +952,10 @@ PetscErrorCode C(MatNorm_CPU,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
         }
       }
 
+      // extra s2i sign of csum doesn't matter because we are
+      // immediately taking the absolute value
+      // TODO: handle the extreme edge case in which two different terms collide
+      // onto the same matrix element.
       comp = PetscAbsComplex(csum) - sum_err;
       total = sum + comp;
       sum_err = (total - sum) - comp;

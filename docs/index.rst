@@ -42,6 +42,7 @@ Features
    :maxdepth: 2
    :caption: Contents:
 
+   containers.rst
    install.rst
    tips.rst
    FAQ.rst

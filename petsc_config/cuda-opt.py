@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 
 '''
 This file is intended to be used to configure PETSc for dynamite.
@@ -19,7 +19,6 @@ configure_options = [
     '--CXXOPTFLAGS=-O3',
     '--FOPTFLAGS=-O3',
     '--CUDAOPTFLAGS=-O3',
-    '--CUDAFLAGS=-arch=sm_35',
 
     # use native complex numbers for scalars. currently required for dynamite.
     '--with-scalar-type=complex',
@@ -30,6 +29,13 @@ configure_options = [
     # for more information about using PETSc with GPUs.
     '--with-cuda',
 
+    # may need/want to adjust to match your hardware's compute capability,
+    # e.g. '80' for compute capability 8.0
+    '--with-cuda-arch=75',
+
+    # ensure correct c++ dialect
+    '--with-cxx-dialect=cxx14',
+    '--with-cuda-dialect=cxx14'
 ]
 
 if __name__ == '__main__':

@@ -7,7 +7,7 @@ These tests should NOT require MPI.
 
 import unittest as ut
 import numpy as np
-from dynamite.subspaces import Full, Parity, Auto
+from dynamite.subspaces import Full, Parity, Explicit, Auto, SpinConserve
 from dynamite._backend.bsubspace import compute_rcm
 from dynamite._backend.bbuild import dnm_int_t
 
@@ -37,6 +37,10 @@ class TestFull(ut.TestCase):
             self.assertEqual(state, i)
             self.assertEqual(idx, i)
 
+    def test_product_state_basis(self):
+        self.assertTrue(Full._product_state_basis)
+
+
 class TestParity(ut.TestCase):
 
     def test_dimension(self):
@@ -49,6 +53,9 @@ class TestParity(ut.TestCase):
             with self.subTest(L = L):
                 self.assertEqual(Parity._get_dimension(L, 0), dim)
                 self.assertEqual(Parity._get_dimension(L, 1), dim)
+
+    def test_product_state_basis(self):
+        self.assertTrue(Parity._product_state_basis)
 
     def test_mapping_single(self):
         s = Parity._idx_to_state(np.array([5], dtype=dnm_int_t), 5, 0)
@@ -118,6 +125,221 @@ class TestParity(ut.TestCase):
                 idxs = Parity._state_to_idx(correct, L, p)
                 self.assertEqual(idxs[2], -1)
 
+
+class TestSpinConserve(ut.TestCase):
+
+    #TODO: test validation functions for L and k
+
+    def test_dimension(self):
+        # each tuple is (L, k, dim)
+        test_cases = [
+            (2, 1, 2),
+            (10, 2, 45),
+            (10, 5, 252),
+        ]
+        for L, k, dim in test_cases:
+            with self.subTest(L=L, k=k):
+                nchoosek = SpinConserve._compute_nchoosek(L, k)
+                self.assertEqual(SpinConserve._get_dimension(L, k, nchoosek), dim)
+                self.assertEqual(SpinConserve._get_dimension(L, k, nchoosek), dim)
+
+    def test_product_state_basis_generic(self):
+        self.assertFalse(SpinConserve._product_state_basis)
+
+    def test_product_state_basis_spinflip(self):
+        for sign in '+-':
+            with self.subTest(sign=sign):
+                self.assertFalse(SpinConserve(4, 2, spinflip=sign).product_state_basis)
+
+    def test_product_state_basis_no_spinflip(self):
+        self.assertTrue(SpinConserve(4, 2).product_state_basis)
+
+    def test_dimension_spinflip(self):
+        # each tuple is (L, k, dim)
+        test_cases = [
+            (2, 1, 1),
+            (10, 5, 126),
+        ]
+        for L, k, dim in test_cases:
+            for sign in [+1, -1]:
+                with self.subTest(L=L, k=k, sign=sign):
+                    nchoosek = SpinConserve._compute_nchoosek(L, k)
+                    self.assertEqual(SpinConserve._get_dimension(L, k, nchoosek,
+                                                                 spinflip=sign), dim)
+                    self.assertEqual(SpinConserve._get_dimension(L, k, nchoosek,
+                                                                 spinflip=sign), dim)
+
+    def test_parameter_exceptions(self):
+        # test cases are (L, k)
+        test_cases = [
+            (-1, 1),
+            (5, -1),
+            (5, 6),
+        ]
+        for L, k in test_cases:
+            with self.subTest(L=L, k=k):
+                with self.assertRaises(ValueError):
+                    SpinConserve(L, k)
+
+    def test_static_L(self):
+        s = SpinConserve(10, 5)
+        s.L = 10
+
+        with self.assertRaises(AttributeError):
+            s.L = 9
+
+    def test_mapping_single(self):
+        # arguments: index, L, k
+        L = 6
+        k = 3
+        nchoosek = SpinConserve._compute_nchoosek(L, k)
+
+        s = SpinConserve._idx_to_state(np.array([5], dtype=dnm_int_t), L, k, nchoosek)
+        self.assertEqual(s, int('010101', 2))
+
+        i = SpinConserve._state_to_idx(s, L, k, nchoosek)
+        self.assertEqual(i, 5)
+
+    def test_mapping_invalid_s2i(self):
+        i = SpinConserve._state_to_idx(np.array([int('01011', 2)], dtype=dnm_int_t), 5, 1, SpinConserve._compute_nchoosek(5, 1))
+        self.assertEqual(i, -1)
+
+        i = SpinConserve._state_to_idx(np.array([int('01011', 2)], dtype=dnm_int_t), 5, 2, SpinConserve._compute_nchoosek(5, 2))
+        self.assertEqual(i, -1)
+
+        i = SpinConserve._state_to_idx(np.array([int('01010', 2)], dtype=dnm_int_t), 5, 3, SpinConserve._compute_nchoosek(5, 3))
+        self.assertEqual(i, -1)
+
+    def test_mapping_array(self):
+        L = 4
+        ks = [1, 2]
+
+        corrects = [
+            np.array([
+                0b0001,
+                0b0010,
+                0b0100,
+                0b1000
+            ], dtype=dnm_int_t),
+            np.array([
+                0b0011,
+                0b0101,
+                0b0110,
+                0b1001,
+                0b1010,
+                0b1100,
+            ], dtype=dnm_int_t),
+        ]
+
+        bad_state = 0b0111
+
+        for k, correct in zip(ks, corrects):
+            with self.subTest(k=k):
+                nchoosek = SpinConserve._compute_nchoosek(L, k)
+
+                states = SpinConserve._idx_to_state(
+                    np.arange(len(correct), dtype=dnm_int_t), L, k, nchoosek
+                )
+                idxs = SpinConserve._state_to_idx(correct, L, k, nchoosek)
+
+                for s, c in zip(states, correct):
+                    self.assertEqual(s, c)
+
+                for i, idx in enumerate(idxs):
+                    self.assertEqual(i, idx)
+
+                correct[2] = bad_state
+                idxs = SpinConserve._state_to_idx(correct, L, k, nchoosek)
+                self.assertEqual(idxs[2], -1)
+
+    def test_mapping_array_spinflip_plus(self):
+        L = 4
+        k = L//2
+
+        correct = np.array([
+            0b0011,
+            0b0101,
+            0b0110,
+            0b1001,
+            0b1010,
+            0b1100,
+        ], dtype=dnm_int_t)
+
+        bad_state = 0b0111
+
+        nchoosek = SpinConserve._compute_nchoosek(L, k)
+
+        # TODO: implement this bounds checking
+        # space_size = len(correct)//2
+        # states = SpinConserve._idx_to_state(
+        #     np.arange(space_size, 2*space_size, dtype=dnm_int_t), L, k, nchoosek, spinflip=True
+        # )
+        # for s in states:
+        #     self.assertEqual(s, -1)
+
+        idxs = SpinConserve._state_to_idx(correct, L, k, nchoosek, spinflip=+1)
+        for i, idx in enumerate(idxs):
+            if i < len(correct)//2:
+                self.assertEqual(i, idx)
+            else:
+                self.assertEqual(len(correct)-i-1, idx)
+
+        correct[2] = bad_state
+        idxs = SpinConserve._state_to_idx(correct, L, k, nchoosek, spinflip=+1)
+        self.assertEqual(idxs[2], -1)
+
+    def test_mapping_array_spinflip_minus(self):
+        L = 4
+        k = L//2
+
+        correct = np.array([
+            0b0011,
+            0b0101,
+            0b0110,
+            0b1001,
+            0b1010,
+            0b1100,
+        ], dtype=dnm_int_t)
+
+        bad_state = 0b0111
+
+        nchoosek = SpinConserve._compute_nchoosek(L, k)
+
+        idxs, signs = SpinConserve._state_to_idx(correct, L, k, nchoosek, spinflip=-1)
+        for i, (idx, sign) in enumerate(zip(idxs, signs)):
+            if i < len(correct)//2:
+                self.assertEqual(i, idx)
+                self.assertEqual(sign, +1)
+            else:
+                self.assertEqual(len(correct)-i-1, idx)
+                self.assertEqual(sign, -1)
+
+        correct[2] = bad_state
+        idxs, signs = SpinConserve._state_to_idx(correct, L, k, nchoosek, spinflip=-1)
+        self.assertEqual(idxs[2], -1)
+
+    def test_spinflip_exception(self):
+        for sign in '+-':
+            with self.subTest(sign=sign):
+                with self.assertRaises(ValueError):
+                    SpinConserve(5, 2, spinflip=sign)
+
+    def test_compare_to_auto(self):
+        test_cases = [
+            'DDUUUUUU',
+            'DDDDUUUU',
+        ]
+
+        from dynamite.operators import sigmax, sigmay, index_sum
+        H = index_sum(sigmax(0)*sigmax(1) + sigmay(0)*sigmay(1), size=8)
+
+        for state in test_cases:
+            with self.subTest(state=state):
+                sp1 = Auto(H, state, sort=True)
+                sp2 = SpinConserve(len(state), state.count('D'))
+                self.assertEqual(sp1, sp2)
+
+
 # TODO: see if we can enfore state_map being correct
 class TestRCM(ut.TestCase):
 
@@ -167,6 +389,96 @@ class TestRCM(ut.TestCase):
         dim = compute_rcm(self.masks, self.signs, self.coeffs, state_map, 0, 4)
 
         self.assertEqual(dim, 1)
+
+
+class TestExplicit(ut.TestCase):
+
+    def setUp(self):
+        self.test_states = {
+            'unsorted': [
+                0b01110,
+                0b11110,
+                0b10101,
+                0b10011,
+                0b00011,
+                0b01101,
+                0b00101,
+                0b11101,
+            ]
+        }
+        self.test_states['sorted'] = sorted(
+            self.test_states['unsorted']
+        )
+
+    def test_L_error(self):
+        for name, states in self.test_states.items():
+            with self.subTest(which=name):
+                s = Explicit(states)
+                with self.assertRaises(ValueError):
+                    s.L = 4
+
+    def test_dimension(self):
+        for name, states in self.test_states.items():
+            with self.subTest(which=name):
+                s = Explicit(states)
+                s.L = 5
+                self.assertEqual(s.get_dimension(), len(states))
+
+    def test_s2i(self):
+        for name, states in self.test_states.items():
+            with self.subTest(which=name):
+                s = Explicit(states)
+                s.L = 5
+
+                for state in states:
+                    with self.subTest(state=bin(state)[2:]):
+                        self.assertEqual(s.state_to_idx(state),
+                                         states.index(state))
+
+                # an array of states
+                self.assertTrue(np.all(
+                    s.state_to_idx(states) == np.arange(len(states))
+                ))
+
+                # a state not in the list
+                bad_state = 0b11111
+                self.assertEqual(s.state_to_idx(bad_state), -1)
+
+    def test_i2s(self):
+        for name, states in self.test_states.items():
+            with self.subTest(which=name):
+                s = Explicit(states)
+                s.L = 5
+
+                for idx in range(len(states)):
+                    with self.subTest(idx=idx):
+                        self.assertEqual(s.idx_to_state(idx),
+                                         states[idx])
+
+                # an array of states
+                self.assertTrue(np.all(
+                    s.idx_to_state(np.arange(len(states))) == np.array(states)
+                ))
+
+                # TODO: test index out of range
+
+    def test_compare_parity(self):
+        p = Parity('even')
+        p.L = 5
+
+        s = Explicit(p.idx_to_state(np.arange(p.get_dimension())))
+        s.L = 5
+
+        self.assertEqual(p, s)
+
+    def test_compare_spinconserve(self):
+        p = SpinConserve(L=6, k=3)
+
+        s = Explicit(p.idx_to_state(np.arange(p.get_dimension())))
+        s.L = 6
+
+        self.assertEqual(p, s)
+
 
 class TestAuto(ut.TestCase):
 
