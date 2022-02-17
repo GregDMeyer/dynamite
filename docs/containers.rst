@@ -43,6 +43,7 @@ A quick explanation of the options:
    If you want to run with multiple processes using MPI, you can simply add ``mpirun -n <np>``
    before ``python`` in the command above. Note that on a cluster, to achieve the best MPI performance
    you should instead build from source (see :ref:`installing`) and use the cluster's native MPI.
+   Also, with Docker you may get errors unless you add the flag ``--cap-add=SYS_PTRACE``.
 
 .. _desktop_script:
 
