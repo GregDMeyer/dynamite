@@ -1,26 +1,12 @@
 
-### Using dynamite with docker
+### Building dynamite for Docker
 
-To build the docker image, in the root directory of the dynamite git repository run:
-
-```
-docker build --build-arg GIT_BRANCH=(git rev-parse --abbrev-ref HEAD) --build-arg GIT_COMMIT=(git describe --always) -t gdmeyer/dynamite:0.1.0-jupyter -f docker/Dockerfile-cpu .
-```
-
-To build an image without jupyter, run
-```
-docker build --target=build --build-arg GIT_BRANCH=(git rev-parse --abbrev-ref HEAD) --build-arg GIT_COMMIT=(git describe --always) -t gdmeyer/dynamite:0.1.0-jupyter -f docker/Dockerfile-cpu .
-```
-
-To run a Python script in the current directory with dynamite, do:
+To build the generic dynamite image, in the root directory of the dynamite git repository run:
 
 ```
-docker run -it --rm -v "$PWD":/home/dnm/src gdmeyer/dynamite:0.1.0 python your_script.py
+docker build --build-arg HARDWARE=cpu -f docker/Dockerfile --target release -t gdmeyer/dynamite:latest .
 ```
 
-For example, to run the unit tests in the docker container, you can do
+For the Jupyter version, just change the target to ``jupyter``, and to include GPU support change HARDWARE to "gpu".
 
-```
-cd tests/unit/
-docker run -it --rm -v "$PWD":/home/dnm/src gdmeyer/dynamite:0.1.0 python -m unittest discover .
-```
+To build all relevant images (with and without Jupyter, and cpu/gpu), and with a clean checkout of the git (to avoid including any extraneous files), you can also just run the script ``build.py`` in this directory.
