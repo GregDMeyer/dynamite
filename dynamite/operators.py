@@ -722,6 +722,9 @@ class Operator:
     def __sub__(self, x):
         return self + -x
 
+    def __rsub__(self, x):
+        return x + -self
+
     def __neg__(self):
         return -1*self
 
@@ -739,6 +742,12 @@ class Operator:
                              'supported.')
         else:
             return self._num_mul(x)
+
+    def __truediv__(self, x):
+        if isinstance(x, Operator):
+            raise TypeError('Dividing by Operators not supported.')
+
+        return (1/x) * self
 
     def __eq__(self, x):
         if isinstance(x, Operator):
