@@ -3,11 +3,9 @@ from sys import version
 if version[0] != '3':
     raise RuntimeError('Dynamite is written for Python 3. Please install'
                        'for that version of Python.')
-# TODO: do we need a particular sub-version?
 
 from setuptools import setup
 
-# TODO: package the C files along with the pyx for non-development users?
 from Cython.Build import cythonize
 
 import petsc4py
@@ -19,9 +17,9 @@ write_build_headers()
 
 setup(
     name            = "dynamite",
-    version         = "0.1.0",
-    author          = "Greg Meyer",
-    author_email    = "gregory.meyer@berkeley.edu",
+    version         = open('VERSION').read().strip(),
+    author          = "Greg Kahanamoku-Meyer",
+    author_email    = "gkm@berkeley.edu",
     description     = "Fast numerics for large quantum spin chains.",
     packages        = ['dynamite'],
     classifiers = [
