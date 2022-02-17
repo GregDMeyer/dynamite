@@ -25,7 +25,8 @@ With Docker or podman installed (see :ref:`setup` below), run
 .. code:: bash
 
     docker run --rm -it -w /home/dnm/work -v $PWD:/home/dnm/work gdmeyer/dynamite python your_script.py
-    # or replace 'docker' with 'sudo podman' if you are using that
+    # or replace 'docker' with 'podman' if you are using that
+    # for podman you may need to add "docker.io/" in front of "gdmeyer" in the command
 
 A quick explanation of the options:
 
