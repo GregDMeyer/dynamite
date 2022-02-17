@@ -110,6 +110,14 @@ class UnaryBinary(ut.TestCase):
         dnm = sigmax() + 2
         self.check_same_msc(dnm.msc, [(0, 0, 2), (1, 0, 1)])
 
+    def test_subtract_number(self):
+        dnm = sigmax() - 1
+        self.check_same_msc(dnm.msc, [(0, 0, -1), (1, 0, 1)])
+
+    def test_rsubtract_number(self):
+        dnm = 1 - sigmax()
+        self.check_same_msc(dnm.msc, [(0, 0, 1), (1, 0, -1)])
+
     def test_product_same(self):
         dnm = sigmay() * sigmay()
         self.check_same_msc(dnm.msc, [(0, 0, 1)])
@@ -152,6 +160,19 @@ class UnaryBinary(ut.TestCase):
         ladder = 0.5*(sigma_plus(0)*sigma_minus(1) + sigma_minus(0)*sigma_plus(1))
         pauli  = sigmax(0)*sigmax(1) + sigmay(0)*sigmay(1)
         self.check_same_msc(ladder.msc, pauli.msc)
+
+    def test_divide_op_op(self):
+        with self.assertRaises(TypeError):
+            sigmax() / sigmay()
+
+    def test_divide_number_op(self):
+        with self.assertRaises(TypeError):
+            1 / sigmay()
+
+    def test_divide_op_number(self):
+        dnm = sigmax() / 2
+        self.check_same_msc(dnm.msc, [(1, 0, 0.5)])
+
 
 from dynamite.operators import op_sum, op_product
 
