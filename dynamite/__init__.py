@@ -74,10 +74,6 @@ class _Config:
         self.initialized = True
         self._gpu = gpu
 
-        # do not run version check if we are in a container
-        if 'DNM_DOCKER' in environ:
-            version_check = False
-
         from petsc4py import PETSc
         if version_check and PETSc.COMM_WORLD.rank == 0:
             check_version()
@@ -213,8 +209,13 @@ def check_version():
 
         build_commit = bbuild.get_build_version()
         if not commit.startswith(build_commit):
-            print('Changes have been pushed to GitHub since dynamite was installed. '
-                  'Please update!', file=stderr)
+            if 'DNM_DOCKER' in environ:
+                update_msg = 'Please pull the latest image from DockerHub.'
+            else:
+                update_msg = 'Please update!'
+
+            print('Changes have been pushed to GitHub since dynamite was '
+                  'installed.\n' + update_msg, file=stderr)
 
     # in general, catching all exceptions is a bad idea. but here, no matter
     # what happens we just want to give up on the check
