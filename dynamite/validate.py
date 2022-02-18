@@ -22,8 +22,8 @@ def L(x):
 
 def subspace(s):
     from .subspaces import Subspace
-    if not isinstance(s,Subspace):
-        raise ValueError('subspace can only be set to objects of Subspace type, or None')
+    if not isinstance(s, Subspace):
+        raise ValueError('subspace can only be set to objects of Subspace type')
     return s
 
 def msc(x):

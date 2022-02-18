@@ -139,8 +139,11 @@ class _Config:
         return self._subspace
 
     @subspace.setter
-    def subspace(self,value):
-        self._subspace = validate.subspace(value)
+    def subspace(self, value):
+        if value is None:
+            self._subspace = None
+        else:
+            self._subspace = validate.subspace(value)
 
     @property
     def gpu(self):
