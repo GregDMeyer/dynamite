@@ -105,8 +105,8 @@ Command line
 
 .. code:: bash
 
-    docker run --rm -p 8888:8888 -v $PWD:/home/dnm/work gdmeyer/dynamite:latest-jupyter
-    # or replace 'docker' with 'sudo podman'
+    docker run --rm -p 8888:8888 -w /home/dnm/work -v $PWD:/home/dnm/work gdmeyer/dynamite:latest-jupyter
+    # or replace 'docker' with 'podman'
 
 Then follow the last link that you see (it should start with ``http://127.0.0.1:8888``).
 Your files will be in the ``work`` directory visible in JupyterLab.
