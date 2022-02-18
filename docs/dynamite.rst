@@ -1,5 +1,5 @@
-Full API documentation
-======================
+Documentation
+=============
 
 .. toctree::
 
