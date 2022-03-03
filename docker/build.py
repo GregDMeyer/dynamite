@@ -28,6 +28,9 @@ def parse_args(argv=None):
     parser.add_argument("-v", "--verbose", action='store_true',
                         help='Show build output.')
 
+    parser.add_argument("--fresh", action='store_true',
+                        help='Update cached images.')
+
     return parser.parse_args()
 
 
@@ -66,6 +69,9 @@ def main():
                 "-f", "docker/Dockerfile",
                 "--target", target
             ]
+
+            if args.fresh and (target == 'release' or 'release' not in args.targets):
+                cmd += ["--no-cache", "--pull"]
 
             this_build_tags = []
             for tag_base in tags:
