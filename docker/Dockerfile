@@ -34,7 +34,7 @@ ONBUILD RUN apt-get update && \
     DEBIAN_FRONTEND="noninteractive" \
     apt-get install -y --no-install-recommends \
     python3-dev \
-    python3-pip \
+    python3-venv \
     gfortran \
     curl \
     ca-certificates \
@@ -73,24 +73,31 @@ WORKDIR /opt/slepc-$SLEPC_VERSION
 ENV SLEPC_DIR=/opt/slepc-$SLEPC_VERSION
 RUN ./configure && make
 
+# add virtualenvironment to install python packages
+RUN python3 -m venv /venv
+
 # switch to non-privileged user
 RUN groupadd dnm && useradd --no-log-init -m -g dnm dnm
+RUN chown -R dnm:dnm /venv
 USER dnm
-ENV PATH=/home/dnm/.local/bin:${PATH}
+
+# activate venv
+ENV VIRTUAL_ENV=/venv
+ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 
 # install python packages
-RUN pip3 install --user --no-cache-dir --upgrade pip
+RUN pip3 install --no-cache-dir --upgrade pip
 
 # they need to be installed in order, so we can't do pip install -r requirements.txt....
 COPY requirements.txt requirements.txt
 RUN while read PACKAGE; \
-        do pip3 install --user --no-cache-dir $PACKAGE; \
+        do pip3 install --no-cache-dir $PACKAGE; \
     done <requirements.txt
 
 # mpi4py is useful and required for the tests
 # but we don't include it in GPU builds
 ARG HARDWARE
-RUN if [ "$HARDWARE" = "cpu" ] ; then pip3 install --user --no-cache-dir mpi4py ; fi
+RUN if [ "$HARDWARE" = "cpu" ] ; then pip3 install --no-cache-dir mpi4py ; fi
 
 # install dynamite!
 
@@ -99,7 +106,7 @@ WORKDIR /home/dnm/dynamite
 
 COPY --chown=dnm:dnm . .
 
-RUN pip3 install --user ./
+RUN pip3 install ./
 
 
 FROM python:3.9-slim-bullseye as release-base-cpu
@@ -148,12 +155,11 @@ COPY --from=build /opt/slepc-$SLEPC_VERSION/$PETSC_ARCH/lib /opt/slepc-$SLEPC_VE
 # switch to non-privileged user
 RUN groupadd dnm && useradd --no-log-init -m -g dnm dnm
 USER dnm
-ENV PATH=/home/dnm/.local/bin:${PATH}
 
-# get all the python packages---it's the only thing in .local/lib
-RUN mkdir -p /home/dnm/.local  # for permissions
-COPY --from=build --chown=dnm:dnm /home/dnm/.local/bin/pip* /home/dnm/.local/bin/
-COPY --from=build --chown=dnm:dnm /home/dnm/.local/lib/ /home/dnm/.local/lib/
+# get all the python packages
+COPY --from=build --chown=dnm:dnm /venv /venv
+ENV VIRTUAL_ENV=/venv
+ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 
 # include benchmarking and examples
 COPY --chown=dnm:dnm benchmarking /home/dnm/benchmarking
@@ -171,7 +177,7 @@ WORKDIR /home/dnm
 FROM release AS jupyter
 
 # install jupyter
-RUN pip3 install --user --no-cache-dir jupyterlab matplotlib
+RUN pip3 install --no-cache-dir jupyterlab matplotlib
 
 # run it!
 WORKDIR /home/dnm

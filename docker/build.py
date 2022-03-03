@@ -44,33 +44,43 @@ def main():
 
     run(["git", "clone", git_root, build_dir], check=True)
 
+    version = open(path.join(build_dir, 'VERSION')).read().strip()
+
     completed = []
 
     # run builds
     for target in args.targets:
         for hardware in args.hardware:
-            tag = "latest"
+            tags = ["latest", version]
 
+            tag_append = ""
             if hardware == 'gpu':
-                tag += '-cuda'
+                tag_append += '-cuda'
 
             if target == 'jupyter':
-                tag += '-jupyter'
+                tag_append += '-jupyter'
 
             cmd = [
                 "docker", "build",
                 "--build-arg", f"HARDWARE={hardware}",
                 "-f", "docker/Dockerfile",
-                "--target", target,
-                "-t", f"gdmeyer/dynamite:{tag}",
-                "."
+                "--target", target
             ]
 
-            print(f"Building '{tag}'...", end="")
+            this_build_tags = []
+            for tag_base in tags:
+                tag = tag_base+tag_append
+                cmd += ["-t", f"gdmeyer/dynamite:{tag}"]
+                this_build_tags.append(tag)
+
+            cmd += ["."]
+
+            print(f"Building {', '.join(this_build_tags)}...", end="")
 
             if args.verbose:
                 print()
                 print()
+                print("$ "+" ".join(cmd))
 
             build_output = ""
             prev_time = 0
@@ -96,7 +106,7 @@ def main():
                 sys.exit()
 
             else:
-                completed.append(tag)
+                completed += this_build_tags
 
     print("Removing build files...")
     if not build_dir.startswith("/tmp"):
