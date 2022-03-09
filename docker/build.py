@@ -4,7 +4,7 @@ parameters. Should be run from inside the git tree.
 """
 
 import sys
-from os import path
+from os import path, mkdir
 from argparse import ArgumentParser
 from subprocess import run, PIPE, Popen
 from time import time
@@ -32,11 +32,14 @@ def parse_args(argv=None):
                         help='Update cached images.')
 
     parser.add_argument("--cuda-archs", type=lambda x: x.split(','),
-                        default=['35', '70', '80'],
+                        default=['70', '80'],
                         help='CUDA compute capabilities.')
 
     parser.add_argument("--dry-run", action="store_true",
                         help="Print build commands but do not run them.")
+
+    parser.add_argument("--save-logs", action="store_true",
+                        help="Save build output to /tmp/dnm_build.")
 
     return parser.parse_args()
 
@@ -51,6 +54,10 @@ def main():
     build_dir = "/tmp/dnm_docker_build"
     if path.exists(build_dir):
         build_dir += '_'+str(int(time()))
+
+    log_dir = "/tmp/dnm_build"
+    if not path.exists(log_dir):
+        mkdir(log_dir)
 
     run(["git", "clone", git_root, build_dir], check=True)
 
@@ -102,9 +109,17 @@ def main():
 
                 print(f"Building {', '.join(tags)}...", end="")
 
+                cmd_string = "$ "+" ".join(cmd)
+
+                if args.save_logs:
+                    log_file = path.join(log_dir, tags[0]+'.log')
+                    with open(log_file, 'w') as f:
+                        f.write(cmd_string)
+                        f.write("\n\n")
+
                 if args.verbose or args.dry_run:
                     print()
-                    print("$ "+" ".join(cmd))
+                    print(cmd_string)
                     print()
 
                 if not args.dry_run:
@@ -113,6 +128,9 @@ def main():
 
                     with Popen(cmd, cwd=build_dir, stdout=PIPE, bufsize=1, text=True) as sp:
                         for line in sp.stdout:
+                            if args.save_logs:
+                                with open(log_file, 'a') as f:
+                                    f.write(line)
                             if args.verbose:
                                 print(line, end="")
                             else:
