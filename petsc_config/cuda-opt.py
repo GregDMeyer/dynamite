@@ -8,41 +8,51 @@ To see all possible options, run "./configure --help" in the PETSc root director
 You may want to pipe to "less"; it is a big help page ;)
 '''
 
-configure_options = [
+from os import environ
 
-    # some optimization flags
-    '--with-debugging=0',
-    '--with-fortran-kernels=1',
-
-    # compiler optimization flags
-    '--COPTFLAGS=-O3',
-    '--CXXOPTFLAGS=-O3',
-    '--FOPTFLAGS=-O3',
-    '--CUDAOPTFLAGS=-O3',
+configure_option_dict = {
 
     # use native complex numbers for scalars. currently required for dynamite.
-    '--with-scalar-type=complex',
+    '--with-scalar-type': 'complex',
 
     # GPU support
-    # dynamite's GPU support is experimental! see
-    # http://www.mcs.anl.gov/petsc/features/gpus.html
-    # for more information about using PETSc with GPUs.
-    '--with-cuda',
+    '--with-cuda': None,  # none just means no value for this arg
+
+    # ensure correct c++ dialect
+    '--with-cxx-dialect': 'cxx14',
+    '--with-cuda-dialect': 'cxx14',
+
+    # some PETSc optimization flags
+    '--with-debugging': '0',
+    '--with-fortran-kernels': '1',
+
+    # compiler optimization flags
+    '--COPTFLAGS': '-O3',
+    '--CXXOPTFLAGS': '-O3',
+    '--FOPTFLAGS': '-O3',
+    '--CUDAOPTFLAGS': '-O3',
 
     # may need/want to adjust to match your hardware's compute capability,
     # e.g. '80' for compute capability 8.0
-    '--with-cuda-arch=75',
+    # can also adjust with DNM_CUDA_ARCH environment variable (see below)
+    '--with-cuda-arch': '75',
+}
 
-    # ensure correct c++ dialect
-    '--with-cxx-dialect=cxx14',
-    '--with-cuda-dialect=cxx14'
-]
+if 'DNM_CUDA_ARCH' in environ:
+    configure_option_dict['--with-cuda-arch'] = environ['DNM_CUDA_ARCH']
 
 if __name__ == '__main__':
     import sys
     import os
     sys.path.insert(0, os.path.abspath('config'))
     import configure
+
+    configure_options = []
+    for key, val in configure_option_dict.items():
+        if val is None:
+            configure_options.append(key)
+        else:
+            configure_options.append(key+'='+val)
 
     configure_options += sys.argv[1:]
     configure.petsc_configure(configure_options)

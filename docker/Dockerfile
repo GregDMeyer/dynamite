@@ -55,6 +55,7 @@ LABEL org.opencontainers.image.authors="Greg Meyer <gregory.meyer@gmail.com>"
 
 ARG PETSC_VERSION
 ARG SLEPC_VERSION
+ARG CUDA_ARCH=70
 
 # install PETSc
 WORKDIR /opt
@@ -63,7 +64,7 @@ WORKDIR /opt/petsc-$PETSC_VERSION
 ENV PETSC_DIR=/opt/petsc-$PETSC_VERSION
 
 COPY petsc_config/$PETSC_ARCH.py .
-RUN ./$PETSC_ARCH.py ${PETSC_CONFIG_FLAGS} && \
+RUN DNM_CUDA_ARCH=$CUDA_ARCH ./$PETSC_ARCH.py ${PETSC_CONFIG_FLAGS} && \
     make all
 
 # install SLEPc

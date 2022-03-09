@@ -31,6 +31,13 @@ def parse_args(argv=None):
     parser.add_argument("--fresh", action='store_true',
                         help='Update cached images.')
 
+    parser.add_argument("--cuda-archs", type=lambda x: x.split(','),
+                        default=['35', '70', '80'],
+                        help='CUDA compute capabilities.')
+
+    parser.add_argument("--dry-run", action="store_true",
+                        help="Print build commands but do not run them.")
+
     return parser.parse_args()
 
 
@@ -54,65 +61,78 @@ def main():
     # run builds
     for target in args.targets:
         for hardware in args.hardware:
-            tags = ["latest", version]
-
-            tag_append = ""
             if hardware == 'gpu':
-                tag_append += '-cuda'
-
-            if target == 'jupyter':
-                tag_append += '-jupyter'
-
-            cmd = [
-                "docker", "build",
-                "--build-arg", f"HARDWARE={hardware}",
-                "-f", "docker/Dockerfile",
-                "--target", target
-            ]
-
-            if args.fresh and (target == 'release' or 'release' not in args.targets):
-                cmd += ["--no-cache", "--pull"]
-
-            this_build_tags = []
-            for tag_base in tags:
-                tag = tag_base+tag_append
-                cmd += ["-t", f"gdmeyer/dynamite:{tag}"]
-                this_build_tags.append(tag)
-
-            cmd += ["."]
-
-            print(f"Building {', '.join(this_build_tags)}...", end="")
-
-            if args.verbose:
-                print()
-                print()
-                print("$ "+" ".join(cmd))
-
-            build_output = ""
-            prev_time = 0
-
-            with Popen(cmd, cwd=build_dir, stdout=PIPE, bufsize=1, text=True) as sp:
-                for line in sp.stdout:
-                    if args.verbose:
-                        print(line, end="")
-                    else:
-                        build_output += line
-                        if time() - prev_time > 1:
-                            print('.', end="", flush=True)
-                            prev_time = time()
-
-            print()
-
-            if sp.returncode != 0:
-                print("Build failed!")
-                if not args.verbose:
-                    print("Output:")
-                    print()
-                    print(build_output)
-                sys.exit()
-
+                cuda_archs = args.cuda_archs
             else:
-                completed += this_build_tags
+                cuda_archs = [None]
+
+            for cuda_arch in cuda_archs:
+
+                tags = ["latest", version]
+
+                if hardware == 'gpu':
+                    tags = [tag+'-cuda' for tag in tags]
+                    no_cc_tags = tags.copy()
+                    tags = [tag+'.cc'+cuda_arch for tag in tags]
+
+                    # default is cc 7.0
+                    if cuda_arch == '70':
+                        tags += no_cc_tags
+
+                if target == 'jupyter':
+                    tags = [tag+'-jupyter' for tag in tags]
+
+                cmd = [
+                    "docker", "build",
+                    "--build-arg", f"HARDWARE={hardware}",
+                    "-f", "docker/Dockerfile",
+                    "--target", target
+                ]
+
+                if cuda_arch is not None:
+                    cmd += ["--build-arg", f"CUDA_ARCH={cuda_arch}"]
+
+                if args.fresh and (target == 'release' or 'release' not in args.targets):
+                    cmd += ["--no-cache", "--pull"]
+
+                for tag in tags:
+                    cmd += ["-t", f"gdmeyer/dynamite:{tag}"]
+
+                cmd += ["."]
+
+                print(f"Building {', '.join(tags)}...", end="")
+
+                if args.verbose or args.dry_run:
+                    print()
+                    print("$ "+" ".join(cmd))
+                    print()
+
+                if not args.dry_run:
+                    build_output = ""
+                    prev_time = 0
+
+                    with Popen(cmd, cwd=build_dir, stdout=PIPE, bufsize=1, text=True) as sp:
+                        for line in sp.stdout:
+                            if args.verbose:
+                                print(line, end="")
+                            else:
+                                build_output += line
+                                if time() - prev_time > 1:
+                                    print('.', end="", flush=True)
+                                    prev_time = time()
+
+                    print()
+
+                    if sp.returncode != 0:
+                        print("Build failed!")
+                        if not args.verbose:
+                            print("Output:")
+                            print()
+                            print(build_output)
+                        sys.exit()
+
+                    else:
+                        completed += tags
 
     print("Removing build files...")
     if not build_dir.startswith("/tmp"):
@@ -121,7 +141,8 @@ def main():
     else:
         shutil.rmtree(build_dir)
 
-    print("Successfully completed builds", ", ".join(completed))
+    if completed:
+        print("Successfully completed builds", ", ".join(completed))
 
 
 if __name__ == '__main__':

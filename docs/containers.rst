@@ -87,6 +87,10 @@ If you are on a node with an Nvidia GPU, running the CUDA-accelerated version of
     # or
     singularity shell --nv docker://gdmeyer/dynamite:latest-cuda  # to start a shell with dynamite installed
 
+The default version is compiled for GPUs with compute capability >= 7.0; there are images on DockerHub compiled
+with other compute capabilities (e.g. ``docker://gdmeyer/dynamite:latest-cuda.cc35`` for compute capability 3.5).
+You can see a list of all available images `on DockerHub <https://hub.docker.com/repository/docker/gdmeyer/dynamite/tags>`_.
+
 .. note ::
    dynamite with CUDA requires Nvidia driver >= 450.80.02
 
