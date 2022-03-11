@@ -11,6 +11,7 @@ from contextlib import ExitStack
 from time import time, sleep
 from datetime import timedelta
 import shutil
+import atexit
 
 
 def parse_args(argv=None):
@@ -28,7 +29,8 @@ def parse_args(argv=None):
                         help='Whether to build the CPU and/or GPU versions.')
 
     parser.add_argument("-v", "--verbose", action='store_true',
-                        help='Show build output.')
+                        help='Show build output in terminal. '
+                        'Turns off parallel builds.')
 
     parser.add_argument("--fresh", action='store_true',
                         help='Update cached images.')
@@ -40,19 +42,13 @@ def parse_args(argv=None):
     parser.add_argument("--dry-run", action="store_true",
                         help="Print build commands but do not run them.")
 
-    parser.add_argument("--save-logs", action="store_true",
-                        help="Save build output to /tmp/dnm_build.")
-
-    parser.add_argument("-p", "--parallel", action="store_true",
-                        help="Build independent images in parallel.")
+    parser.add_argument("--no-parallel", action="store_true",
+                        help="Turn off parallel builds.")
 
     args = parser.parse_args()
 
-    if args.verbose and args.parallel:
-        raise ValueError("Cannot run verbose build in parallel.")
-
-    if args.dry_run:
-        args.parallel = False
+    if args.verbose or args.dry_run:
+        args.no_parallel = True
 
     # I don't know if we actually need a flag for this
     args.log_dir = "/tmp/dnm_build_logs"
@@ -70,6 +66,12 @@ def main():
     build_dir = "/tmp/dnm_docker_build"
     if path.exists(build_dir):
         build_dir += '_'+str(int(time()))
+
+    # remove build files whether we're successful or not
+    def remove_build_files(dir_to_remove):
+        print("Removing build files...")
+        shutil.rmtree(dir_to_remove)
+    atexit.register(remove_build_files, build_dir)
 
     if not path.exists(args.log_dir):
         mkdir(args.log_dir)
@@ -130,7 +132,7 @@ def main():
 
                 builds.append(build_dict)
 
-        if args.parallel:
+        if not args.no_parallel:
             build_parallel(builds, build_dir, args)
         else:
             build_sequential(builds, build_dir, args)
@@ -138,14 +140,7 @@ def main():
         first_target = False
 
     elapsed = time() - start_time
-    print(f"Builds completed in {timedelta(seconds=int(elapsed))}")
-
-    print("Removing build files...")
-    if not build_dir.startswith("/tmp"):
-        # something has gone horribly wrong
-        print("not removing build files, not in /tmp")
-    else:
-        shutil.rmtree(build_dir)
+    print(f"Elapsed wall time {timedelta(seconds=int(elapsed))}")
 
 
 def build_sequential(builds, build_dir, args):
@@ -156,11 +151,10 @@ def build_sequential(builds, build_dir, args):
 
         cmd_string = "$ "+" ".join(bd['cmd'])
 
-        if args.save_logs:
-            log_file = path.join(args.log_dir, bd['tags'][0]+'.log')
-            with open(log_file, 'w') as f:
-                f.write(cmd_string)
-                f.write("\n\n")
+        log_file = path.join(args.log_dir, bd['tags'][0]+'.log')
+        with open(log_file, 'w') as f:
+            f.write(cmd_string)
+            f.write("\n\n")
 
         if args.verbose or args.dry_run:
             print()
@@ -171,11 +165,15 @@ def build_sequential(builds, build_dir, args):
             build_output = ""
             prev_time = 0
 
-            with Popen(bd['cmd'], cwd=build_dir, stdout=PIPE, bufsize=1, text=True) as sp:
+            with Popen(bd['cmd'],
+                       cwd=build_dir,
+                       stdout=PIPE,
+                       bufsize=1,
+                       text=True) as sp:
                 for line in sp.stdout:
-                    if args.save_logs:
-                        with open(log_file, 'a') as f:
-                            f.write(line)
+                    with open(log_file, 'a') as f:
+                        f.write(line)
+
                     if args.verbose:
                         print(line, end="")
                     else:
@@ -198,7 +196,8 @@ def build_sequential(builds, build_dir, args):
                 completed.append(bd['tags'])
 
     if completed:
-        print("Successfully completed builds", ", ".join("("+", ".join(tags)+")" for tags in completed))
+        print("Successfully completed builds",
+              ", ".join("("+", ".join(tags)+")" for tags in completed))
         print()
 
 
@@ -209,21 +208,22 @@ def build_parallel(builds, build_dir, args):
         for bd in builds:
             print(f"Building {', '.join(bd['tags'])}...")
 
-            if args.save_logs:
-                bd['log_file'] = path.join(args.log_dir, bd['tags'][0]+'.log')
-                with open(bd['log_file'], 'w') as f:
-                    cmd_string = "$ "+" ".join(bd['cmd'])
-                    f.write(cmd_string)
-                    f.write("\n\n")
+            bd['log_file'] = path.join(args.log_dir, bd['tags'][0]+'.log')
+            with open(bd['log_file'], 'w') as f:
+                cmd_string = "$ "+" ".join(bd['cmd'])
+                f.write(cmd_string)
+                f.write("\n\n")
 
             bd['proc'] = Popen(bd['cmd'],
                                cwd=build_dir,
                                stdout=PIPE,
+                               stderr=PIPE,
                                bufsize=1,
                                text=True)
 
-            # allow non-blocking stdout reads
+            # allow non-blocking output reads
             set_blocking(bd['proc'].stdout.fileno(), False)
+            set_blocking(bd['proc'].stderr.fileno(), False)
 
             bd['completed'] = False
 
@@ -239,7 +239,8 @@ def build_parallel(builds, build_dir, args):
                     bd['completed'] = True
                     if returncode == 0:
                         print()
-                        print(f"Successfully completed {', '.join(bd['tags'])}")
+                        print("Successfully completed "
+                              f"{', '.join(bd['tags'])}")
                     else:
                         print()
                         print(f"Build failed for {', '.join(bd['tags'])}")
@@ -254,9 +255,16 @@ def build_parallel(builds, build_dir, args):
                     if new_output is None:
                         new_output = True
 
-                    if args.save_logs:
-                        with open(bd['log_file'], 'a') as f:
-                            f.write(line)
+                    with open(bd['log_file'], 'a') as f:
+                        f.write(line)
+
+                for line in bd['proc'].stderr:
+                    if not line:
+                        break
+
+                    with open(bd['log_file'], 'a') as f:
+                        # write it bold and red
+                        f.write("\033[1;31m"+line.rstrip('\n')+"\033[0m\n")
 
             if new_output is True:
                 print('.', end="", flush=True)
