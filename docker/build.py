@@ -4,7 +4,7 @@ parameters. Should be run from inside the git tree.
 """
 
 import sys
-from os import path, mkdir, set_blocking
+from os import path, mkdir, set_blocking, remove
 from argparse import ArgumentParser
 from subprocess import run, PIPE, Popen
 from contextlib import ExitStack
@@ -59,10 +59,6 @@ def parse_args(argv=None):
 def main():
     args = parse_args()
 
-    # checkout a clean version to build from
-    git_root = run(["git", "rev-parse", "--show-toplevel"],
-                   capture_output=True, text=True, check=True).stdout.strip()
-
     build_dir = "/tmp/dnm_docker_build"
     if path.exists(build_dir):
         build_dir += '_'+str(int(time()))
@@ -76,7 +72,17 @@ def main():
     if not path.exists(args.log_dir):
         mkdir(args.log_dir)
 
-    run(["git", "clone", git_root, build_dir], check=True)
+    # checkout a clean version to build from
+    git_root = run(["git", "rev-parse", "--show-toplevel"],
+                   capture_output=True, text=True, check=True).stdout.strip()
+    mkdir(build_dir)
+    run(["git", "init"], capture_output=True, cwd=build_dir, check=True)
+    run(["git", "pull", git_root], capture_output=True,
+        cwd=build_dir, check=True)
+
+    # remove git logs and index so they don't invalidate the build cache
+    shutil.rmtree(path.join(build_dir, '.git/logs'))
+    remove(path.join(build_dir, '.git/index'))
 
     version = open(path.join(build_dir, 'VERSION')).read().strip()
 
