@@ -24,7 +24,7 @@ def parse_args(argv=None):
                         default=['release', 'jupyter'],
                         help='Targets to build, delimited by commas.')
 
-    parser.add_argument("--hardware", type=lambda x: x.split(','),
+    parser.add_argument("--platform", type=lambda x: x.split(','),
                         default=['cpu', 'gpu'],
                         help='Whether to build the CPU and/or GPU versions.')
 
@@ -86,8 +86,8 @@ def main():
     first_target = True
     for target in args.targets:
         builds = []
-        for hardware in args.hardware:
-            if hardware == 'gpu':
+        for platform in args.platform:
+            if platform == 'gpu':
                 cuda_archs = args.cuda_archs
             else:
                 cuda_archs = [None]
@@ -96,7 +96,7 @@ def main():
 
                 tags = ["latest", version]
 
-                if hardware == 'gpu':
+                if platform == 'gpu':
                     tags = [tag+'-cuda' for tag in tags]
                     no_cc_tags = tags.copy()
                     tags = [tag+'.cc'+cuda_arch for tag in tags]
@@ -110,7 +110,7 @@ def main():
 
                 cmd = [
                     "docker", "build",
-                    "--build-arg", f"HARDWARE={hardware}",
+                    "--build-arg", f"PLATFORM={platform}",
                     "-f", "docker/Dockerfile",
                     "--target", target
                 ]

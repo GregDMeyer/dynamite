@@ -1,5 +1,5 @@
 
-ARG HARDWARE=cpu
+ARG PLATFORM=cpu
 ARG PETSC_VERSION=3.16.4
 ARG SLEPC_VERSION=3.16.2
 
@@ -49,13 +49,12 @@ ENV PETSC_ARCH=$PETSC_ARCH
 ENV PETSC_CONFIG_FLAGS=--with-mpi=0
 
 
-FROM base-${HARDWARE} as build
+FROM base-${PLATFORM} as build
 
 LABEL org.opencontainers.image.authors="Greg Meyer <gregory.meyer@gmail.com>"
 
 ARG PETSC_VERSION
 ARG SLEPC_VERSION
-ARG CUDA_ARCH=70
 
 # install PETSc
 WORKDIR /opt
@@ -64,6 +63,8 @@ WORKDIR /opt/petsc-$PETSC_VERSION
 ENV PETSC_DIR=/opt/petsc-$PETSC_VERSION
 
 COPY petsc_config/$PETSC_ARCH.py .
+
+ARG CUDA_ARCH=70
 RUN DNM_CUDA_ARCH=$CUDA_ARCH ./$PETSC_ARCH.py ${PETSC_CONFIG_FLAGS} && \
     make all
 
@@ -97,8 +98,8 @@ RUN while read PACKAGE; \
 
 # mpi4py is useful and required for the tests
 # but we don't include it in GPU builds
-ARG HARDWARE
-RUN if [ "$HARDWARE" = "cpu" ] ; then pip3 install --no-cache-dir mpi4py ; fi
+ARG PLATFORM
+RUN if [ "$PLATFORM" = "cpu" ] ; then pip3 install --no-cache-dir mpi4py ; fi
 
 # install dynamite!
 
@@ -144,7 +145,7 @@ ARG PETSC_ARCH=cuda-opt
 ENV PETSC_ARCH=$PETSC_ARCH
 
 
-FROM release-base-${HARDWARE} as release
+FROM release-base-${PLATFORM} as release
 
 # get petsc and slepc libraries
 ARG PETSC_VERSION
