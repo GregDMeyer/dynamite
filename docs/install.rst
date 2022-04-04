@@ -38,7 +38,7 @@ following. There is a configuration script that comes with dynamite which should
 
     git clone https://gitlab.com/petsc/petsc.git petsc
     cd petsc
-    git checkout tags/v3.16.5
+    git checkout tags/v3.17.0
     python <dynamite directory>/petsc_config/complex-opt.py
 
 Note that you may want to adjust some of the build options. Just take a look at
@@ -64,7 +64,7 @@ Now download and install SLEPc:
 
     git clone https://gitlab.com/slepc/slepc.git slepc
     cd slepc
-    git checkout tags/v3.16.2
+    git checkout tags/v3.17.0
     ./configure
 
 If it configures correctly, it will output a ``make`` command to run. Copy and
@@ -75,36 +75,31 @@ Building dynamite
 -----------------
 
 Dynamite requires Python 3, as well as some packages you can install with pip.
-These are listed in ``requirements.txt`` in the dynamite root directory. Two of
-the packages, ``petsc4py`` and ``slepc4py``, are Python wrappers for PETSc and
-SLEPc. Before you install them, make sure ``PETSC_DIR`` and ``PETSC_ARCH``
+Before you install them, make sure ``PETSC_DIR`` and ``PETSC_ARCH``
 environment variables are still set from the above exports (or re-set them). You
-should also set ``SLEPC_DIR`` with
-``export SLEPC_DIR=<your_slepc_installation_directory>``. Then, you can install
-everything by just running
+should also set ``SLEPC_DIR``:
 
 .. code:: bash
 
+    export SLEPC_DIR=<your_slepc_installation_directory>
+
+I also suggest using a `virtual environment <https://docs.python.org/3/library/venv.html>`_,
+to keep all of the packages tidy.
+
+Now, you can install everything by running
+
+.. code:: bash
+
+    pip install $PETSC_DIR/src/binding/petsc4py
+    pip install $SLEPC_DIR/src/binding/slepc4py
     cd dynamite
     pip install -r requirements.txt
-
-.. note::
-   For some reason, this step sometimes fails because pip tries to install ``petsc4py``
-   before ``cython``, even though ``cython`` is required by ``petsc4py``.
-   To fix this, simply run ``pip install cython`` and then try again with ``requirements.txt``.
-
-.. note::
-    When using ``pip`` with ``sudo``, you need to pass the ``-E`` flag to
-    ``sudo`` to preserve the environment variables (``PETSC_DIR`` etc.).
-
-I suggest using a `virtual environment <https://docs.python.org/3/library/venv.html>`_,
-to keep all of the packages tidy.
 
 Finally, install dynamite:
 
 .. code:: bash
 
-    pip install ./  # you may want sudo with pip
+    pip install ./
 
 Now you should be all set to use dynamite! If you want to work on the dynamite
 source code, or just easily pull updates from GitHub, you might want to do

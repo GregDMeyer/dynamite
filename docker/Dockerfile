@@ -1,7 +1,7 @@
 
 ARG PLATFORM=cpu
-ARG PETSC_VERSION=3.16.5
-ARG SLEPC_VERSION=3.16.2
+ARG PETSC_VERSION=3.17.0
+ARG SLEPC_VERSION=3.17.0
 
 
 FROM python:3.9-bullseye AS base-cpu
@@ -13,6 +13,7 @@ ONBUILD RUN apt-get update && \
     DEBIAN_FRONTEND="noninteractive" \
     apt-get install -y --no-install-recommends \
     gfortran \
+    cmake \
     mpi-default-dev \
     libopenblas-dev \
     libmumps-dev \
@@ -36,6 +37,7 @@ ONBUILD RUN apt-get update && \
     python3-dev \
     python3-venv \
     gfortran \
+    cmake \
     curl \
     ca-certificates \
     libopenblas-dev \
@@ -56,6 +58,14 @@ LABEL org.opencontainers.image.authors="Greg Meyer <gregory.meyer@gmail.com>"
 ARG PETSC_VERSION
 ARG SLEPC_VERSION
 
+# add virtualenvironment to install python packages
+RUN python3 -m venv /venv
+
+# activate venv
+ENV VIRTUAL_ENV=/venv
+ENV PATH="$VIRTUAL_ENV/bin:$PATH"
+RUN pip3 install --no-cache-dir --upgrade pip
+
 # install PETSc
 WORKDIR /opt
 RUN curl --no-progress-meter https://ftp.mcs.anl.gov/pub/petsc/release-snapshots/petsc-$PETSC_VERSION.tar.gz | tar xzf -
@@ -68,6 +78,9 @@ ARG CUDA_ARCH=70
 RUN DNM_CUDA_ARCH=$CUDA_ARCH ./$PETSC_ARCH.py ${PETSC_CONFIG_FLAGS} && \
     make all
 
+# install petsc4py
+RUN pip3 install --no-cache-dir $PETSC_DIR/src/binding/petsc4py
+
 # install SLEPc
 WORKDIR /opt
 RUN curl --no-progress-meter https://slepc.upv.es/download/distrib/slepc-$SLEPC_VERSION.tar.gz | tar xzf -
@@ -75,21 +88,14 @@ WORKDIR /opt/slepc-$SLEPC_VERSION
 ENV SLEPC_DIR=/opt/slepc-$SLEPC_VERSION
 RUN ./configure && make
 
-# add virtualenvironment to install python packages
-RUN python3 -m venv /venv
+RUN pip3 install --no-cache-dir $SLEPC_DIR/src/binding/slepc4py
 
 # switch to non-privileged user
 RUN groupadd dnm && useradd --no-log-init -m -g dnm dnm
 RUN chown -R dnm:dnm /venv
 USER dnm
 
-# activate venv
-ENV VIRTUAL_ENV=/venv
-ENV PATH="$VIRTUAL_ENV/bin:$PATH"
-
 # install python packages
-RUN pip3 install --no-cache-dir --upgrade pip
-
 # they need to be installed in order, so we can't do pip install -r requirements.txt....
 COPY requirements.txt requirements.txt
 RUN while read PACKAGE; \
