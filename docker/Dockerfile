@@ -27,7 +27,7 @@ ENV PETSC_ARCH=$PETSC_ARCH
 ENV PETSC_CONFIG_FLAGS=--download-scalapack=1 --with-mumps=1
 
 
-FROM nvidia/cuda:11.4.1-devel-ubuntu20.04 AS base-gpu
+FROM nvidia/cuda:11.6.0-devel-ubuntu20.04 AS base-gpu
 
 # install dependencies
 ONBUILD RUN apt-get update && \
@@ -53,62 +53,78 @@ ENV PETSC_CONFIG_FLAGS=--with-mpi=0
 
 FROM base-${PLATFORM} as build
 
-LABEL org.opencontainers.image.authors="Greg Meyer <gregory.meyer@gmail.com>"
-
 ARG PETSC_VERSION
 ARG SLEPC_VERSION
 
 # add virtualenvironment to install python packages
 RUN python3 -m venv /venv
 
-# activate venv
-ENV VIRTUAL_ENV=/venv
-ENV PATH="$VIRTUAL_ENV/bin:$PATH"
-RUN pip3 install --no-cache-dir --upgrade pip
-
-# install PETSc
-WORKDIR /opt
-RUN curl --no-progress-meter https://ftp.mcs.anl.gov/pub/petsc/release-snapshots/petsc-$PETSC_VERSION.tar.gz | tar xzf -
-WORKDIR /opt/petsc-$PETSC_VERSION
-ENV PETSC_DIR=/opt/petsc-$PETSC_VERSION
-
-COPY petsc_config/$PETSC_ARCH.py .
-
-ARG CUDA_ARCH=70
-RUN DNM_CUDA_ARCH=$CUDA_ARCH ./$PETSC_ARCH.py ${PETSC_CONFIG_FLAGS} && \
-    make all
-
-# install petsc4py
-RUN pip3 install --no-cache-dir $PETSC_DIR/src/binding/petsc4py
-
-# install SLEPc
-WORKDIR /opt
-RUN curl --no-progress-meter https://slepc.upv.es/download/distrib/slepc-$SLEPC_VERSION.tar.gz | tar xzf -
-WORKDIR /opt/slepc-$SLEPC_VERSION
-ENV SLEPC_DIR=/opt/slepc-$SLEPC_VERSION
-RUN ./configure && make
-
-RUN pip3 install --no-cache-dir $SLEPC_DIR/src/binding/slepc4py
-
 # switch to non-privileged user
 RUN groupadd dnm && useradd --no-log-init -m -g dnm dnm
 RUN chown -R dnm:dnm /venv
 USER dnm
 
-# install python packages
-# they need to be installed in order, so we can't do pip install -r requirements.txt....
-COPY requirements.txt requirements.txt
-RUN while read PACKAGE; \
-        do pip3 install --no-cache-dir $PACKAGE; \
-    done <requirements.txt
+# activate venv
+ENV VIRTUAL_ENV=/venv
+ENV PATH="$VIRTUAL_ENV/bin:$PATH"
+RUN pip3 install --no-cache-dir --upgrade pip
+
+
+from build as petsc
+
+# install PETSc
+USER root
+WORKDIR /opt
+RUN curl --no-progress-meter https://ftp.mcs.anl.gov/pub/petsc/release-snapshots/petsc-$PETSC_VERSION.tar.gz | tar xzf -
+RUN mv petsc-$PETSC_VERSION petsc
+RUN chown -R dnm:dnm petsc
+USER dnm
+
+WORKDIR /opt/petsc
+ENV PETSC_DIR=/opt/petsc
+COPY --chown=dnm:dnm petsc_config/$PETSC_ARCH.py .
+ARG CUDA_ARCH=70
+RUN DNM_CUDA_ARCH=$CUDA_ARCH ./$PETSC_ARCH.py ${PETSC_CONFIG_FLAGS} && \
+    make all
+
+
+from build as mpi4py
 
 # mpi4py is useful and required for the tests
 # but we don't include it in GPU builds
 ARG PLATFORM
 RUN if [ "$PLATFORM" = "cpu" ] ; then pip3 install --no-cache-dir mpi4py ; fi
 
-# install dynamite!
 
+from petsc as slepc
+
+USER root
+WORKDIR /opt
+RUN curl --no-progress-meter https://slepc.upv.es/download/distrib/slepc-$SLEPC_VERSION.tar.gz | tar xzf -
+RUN mv slepc-$SLEPC_VERSION slepc
+RUN chown -R dnm:dnm slepc
+USER dnm
+
+# install SLEPc
+WORKDIR /opt/slepc
+ENV SLEPC_DIR=/opt/slepc
+RUN ./configure && make
+
+
+from petsc as dynamite-build
+
+# install python packages
+WORKDIR /home/dnm
+COPY requirements.txt requirements.txt
+RUN pip3 install --no-cache-dir -r requirements.txt
+
+RUN pip3 install --no-cache-dir $PETSC_DIR/src/binding/petsc4py
+
+COPY --from=slepc /opt/slepc /opt/slepc
+ENV SLEPC_DIR=/opt/slepc
+RUN pip3 install --no-cache-dir $SLEPC_DIR/src/binding/slepc4py
+
+# install dynamite!
 RUN mkdir /home/dnm/dynamite
 WORKDIR /home/dnm/dynamite
 
@@ -134,7 +150,7 @@ ARG PETSC_ARCH=complex-opt
 ENV PETSC_ARCH=$PETSC_ARCH
 
 
-FROM nvidia/cuda:11.4.1-runtime-ubuntu20.04 AS release-base-gpu
+FROM nvidia/cuda:11.6.0-runtime-ubuntu20.04 AS release-base-gpu
 
 ONBUILD RUN apt-get update && \
     \
@@ -153,21 +169,23 @@ ENV PETSC_ARCH=$PETSC_ARCH
 
 FROM release-base-${PLATFORM} as release
 
-# get petsc and slepc libraries
-ARG PETSC_VERSION
-ARG SLEPC_VERSION
+LABEL org.opencontainers.image.authors="Greg Kahanamoku-Meyer <gregory.meyer@gmail.com>"
 
-COPY --from=build /opt/petsc-$PETSC_VERSION/$PETSC_ARCH/lib /opt/petsc-$PETSC_VERSION/$PETSC_ARCH/lib
-COPY --from=build /opt/slepc-$SLEPC_VERSION/$PETSC_ARCH/lib /opt/slepc-$SLEPC_VERSION/$PETSC_ARCH/lib
+# get petsc and slepc libraries
+COPY --from=petsc /opt/petsc/$PETSC_ARCH/lib /opt/petsc/$PETSC_ARCH/lib
+COPY --from=slepc /opt/slepc/$PETSC_ARCH/lib /opt/slepc/$PETSC_ARCH/lib
 
 # switch to non-privileged user
 RUN groupadd dnm && useradd --no-log-init -m -g dnm dnm
 USER dnm
 
 # get all the python packages
-COPY --from=build --chown=dnm:dnm /venv /venv
+COPY --from=dynamite-build --chown=dnm:dnm /venv /venv
 ENV VIRTUAL_ENV=/venv
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
+
+# merge in the mpi4py files
+COPY --from=mpi4py --chown=dnm:dnm /venv /venv
 
 # include benchmarking and examples
 COPY --chown=dnm:dnm benchmarking /home/dnm/benchmarking
@@ -183,6 +201,8 @@ WORKDIR /home/dnm
 
 
 FROM release AS jupyter
+
+LABEL org.opencontainers.image.authors="Greg Kahanamoku-Meyer <gregory.meyer@gmail.com>"
 
 # install jupyter
 RUN pip3 install --no-cache-dir jupyterlab matplotlib

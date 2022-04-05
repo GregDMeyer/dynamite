@@ -21,7 +21,7 @@ def parse_args(argv=None):
     parser = ArgumentParser(argv)
 
     parser.add_argument("--targets", type=lambda x: x.split(','),
-                        default=['release', 'jupyter'],
+                        default=['jupyter', 'release'],
                         help='Targets to build, delimited by commas.')
 
     parser.add_argument("--platform", type=lambda x: x.split(','),
@@ -254,28 +254,29 @@ def build_parallel(builds, build_dir, args):
 
                     new_output = False
 
-                for line in bd['proc'].stdout:
-                    if not line:  # we've gone through all the new input
-                        break
-
+                for line in combine_stdout_stderr(bd['proc']):
                     if new_output is None:
                         new_output = True
 
                     with open(bd['log_file'], 'a') as f:
                         f.write(line)
 
-                for line in bd['proc'].stderr:
-                    if not line:
-                        break
-
-                    with open(bd['log_file'], 'a') as f:
-                        # write it bold and red
-                        f.write("\033[1;31m"+line.rstrip('\n')+"\033[0m\n")
-
             if new_output is True:
                 print('.', end="", flush=True)
 
     print()
+
+
+def combine_stdout_stderr(p):
+    for line in p.stdout:
+        if not line:  # we've gone through all the new input
+            break
+        yield line
+
+    for line in p.stderr:
+        if not line:
+            break
+        yield line
 
 
 if __name__ == '__main__':
