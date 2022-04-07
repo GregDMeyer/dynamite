@@ -15,10 +15,18 @@
   #define builtin_parity __builtin_parity
 #endif
 
+// the following two are to pass to the python side
+
 #ifdef PETSC_USE_COMPLEX
   #define DNM_PETSC_COMPLEX 1
 #else
   #define DNM_PETSC_COMPLEX 0
+#endif
+
+#ifdef PETSC_HAVE_CUDA
+  #define DNM_PETSC_CUDA 1
+#else
+  #define DNM_PETSC_CUDA 0
 #endif
 
 #define TERM_REAL(mask, sign) (!(builtin_parity((mask) & (sign))))

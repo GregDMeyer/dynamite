@@ -17,9 +17,10 @@ cdef extern from "petsc.h":
 
 cdef extern from "bpetsc_impl.h":
     int DNM_PETSC_COMPLEX
+    int DNM_PETSC_CUDA
 
 def have_gpu_shell():
-    return bool(USE_CUDA)
+    return bool(DNM_PETSC_CUDA)
 
 if sizeof(PetscInt) == 4:
     dnm_int_t = np.int32
