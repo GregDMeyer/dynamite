@@ -19,7 +19,7 @@ class _Config:
     _subspace = None
     _gpu = False
 
-    def initialize(self, slepc_args=None, version_check=True, gpu=False):
+    def initialize(self, slepc_args=None, version_check=True, gpu=None):
         """
         Initialize PETSc/SLEPc with various arguments (which would be
         passed on the command line for a C program).
@@ -45,7 +45,15 @@ class _Config:
         if slepc_args is None:
             slepc_args = []
 
+        if gpu is None:
+            gpu = bbuild.have_gpu_shell()
+
         if gpu:
+            if not bbuild.have_gpu_shell():
+                raise RuntimeError('Cannot initialize for GPU; this build of '
+                                   'dynamite/petsc was not configured with '
+                                   'GPU functionality')
+
             slepc_args += [
                 '-vec_type', 'cuda',
                 '-mat_type', 'aijcusparse',
