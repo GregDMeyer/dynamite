@@ -128,15 +128,7 @@ class _Config:
 
     @shell.setter
     def shell(self,value):
-
-        value = validate.shell(value)
-
-        if value == 'gpu':
-            if not bbuild.have_gpu_shell():
-                raise RuntimeError('GPU shell matrices not enabled (could not find nvcc '
-                                   'during build)')
-
-        self._shell = value
+        self._shell = validate.shell(value)
 
     @property
     def subspace(self):
