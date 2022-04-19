@@ -17,7 +17,7 @@ class RandomSeed(dtr.DynamiteTestCase):
         '''
 
         from dynamite import config
-        config.initialize()
+        config._initialize()
         from petsc4py import PETSc
         comm = PETSc.COMM_WORLD.tompi4py()
         seed = State.generate_time_seed()

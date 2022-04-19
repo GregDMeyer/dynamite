@@ -32,7 +32,7 @@ class State:
 
     def __init__(self, L = None, subspace = None, state = None, seed = None):
 
-        config.initialize()
+        config._initialize()
         from petsc4py import PETSc
 
         if L is None:
@@ -171,7 +171,7 @@ class State:
     @classmethod
     def generate_time_seed(cls):
 
-        config.initialize()
+        config._initialize()
         from petsc4py import PETSc
 
         CW = PETSc.COMM_WORLD.tompi4py()
@@ -202,7 +202,7 @@ class State:
             Whether to rescale the random state to have norm 1.
         """
 
-        config.initialize()
+        config._initialize()
         from petsc4py import PETSc
 
         istart, iend = self.vec.getOwnershipRange()

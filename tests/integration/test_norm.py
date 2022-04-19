@@ -16,7 +16,7 @@ class Hamiltonians(dtr.DynamiteTestCase):
 
     def test_shell(self):
 
-        config.initialize()
+        config._initialize()
         from petsc4py import PETSc
 
         for H_name, real in hamiltonians.names:

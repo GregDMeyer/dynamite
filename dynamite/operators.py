@@ -508,7 +508,7 @@ class Operator:
             raise ValueError('Attempted to build matrix for a subspace that has not '
                              'been added to the operator.')
 
-        config.initialize()
+        config._initialize()
         from ._backend import bpetsc
 
         self.reduce_msc()

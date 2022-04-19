@@ -10,7 +10,7 @@ def mpi_print(*args, rank=0, **kwargs):
     as Python 3's ``print()`` function.
     '''
     from . import config
-    config.initialize()
+    config._initialize()
     from petsc4py import PETSc
 
     if PETSc.COMM_WORLD.rank == rank:
@@ -31,7 +31,7 @@ def get_version():
     from ._backend import bbuild
 
     from . import config
-    config.initialize()
+    config._initialize()
     from petsc4py import PETSc
     from slepc4py import SLEPc
 
@@ -72,7 +72,7 @@ def track_memory():
     Begin tracking memory usage for a later call to :meth:`get_max_memory_usage`.
     '''
     from . import config
-    config.initialize()
+    config._initialize()
     from ._backend import bpetsc
     return bpetsc.track_memory()
 
@@ -98,7 +98,7 @@ def get_max_memory_usage(which='all'):
         The max memory usage in bytes
     '''
     from . import config
-    config.initialize()
+    config._initialize()
     from ._backend import bpetsc
     return bpetsc.get_max_memory_usage(which=which)
 
@@ -118,7 +118,7 @@ def get_cur_memory_usage(which='all'):
         The max memory usage in bytes
     '''
     from . import config
-    config.initialize()
+    config._initialize()
     from ._backend import bpetsc
     return bpetsc.get_cur_memory_usage(which=which)
 

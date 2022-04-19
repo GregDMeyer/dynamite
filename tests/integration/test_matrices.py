@@ -17,7 +17,7 @@ import hamiltonians
 
 
 def petsc_mat_to_np(mat):
-    config.initialize()
+    config._initialize()
     from petsc4py import PETSc
     PROC_0 = PETSc.COMM_WORLD.rank == 0
     dims = mat.getSize()
@@ -36,7 +36,7 @@ def petsc_mat_to_np(mat):
 
 def petsc_mat_columns(mat):
 
-    config.initialize()
+    config._initialize()
     from petsc4py import PETSc
     PROC_0 = PETSc.COMM_WORLD.rank == 0
 
@@ -177,7 +177,7 @@ class LargeInt64(dtr.DynamiteTestCase):
                             msg=str(o_np))
 
     def test_localized(self):
-        config.initialize()
+        config._initialize()
         from petsc4py import PETSc
 
         self.H.subspace = self.space

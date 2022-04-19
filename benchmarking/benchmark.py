@@ -144,7 +144,7 @@ def build_hamiltonian(params):
     return rtn
 
 def compute_norm(hamiltonian):
-    config.initialize()
+    config._initialize()
     from petsc4py.PETSc import NormType
     return hamiltonian.get_mat().norm(NormType.INFINITY)
 
@@ -163,7 +163,7 @@ def do_rdm(state, keep):
 
 # this decorator keeps track of and times function calls
 def log_call(function, stat_dict):
-    config.initialize()
+    config._initialize()
     from petsc4py.PETSc import Sys
     Print = Sys.Print
 

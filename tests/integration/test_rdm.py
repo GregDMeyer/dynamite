@@ -31,7 +31,7 @@ class Explicit(dtr.DynamiteTestCase):
 
     def check_entropy(self, state, keep, ent_entropy):
         from dynamite import config
-        config.initialize()
+        config._initialize()
         from petsc4py import PETSc
 
         check = entanglement_entropy(state, keep)

@@ -57,7 +57,7 @@ def evolve(H, state, t, result=None, **kwargs):
         The result state
     """
 
-    config.initialize()
+    config._initialize()
     from slepc4py import SLEPc
 
     if (state.subspace, state.subspace) not in H.get_subspace_list():
@@ -185,7 +185,7 @@ def eigsolve(H, getvecs=False, nev=1, which='smallest', target=None, tol=None, s
     elif (subspace, subspace) not in H.get_subspace_list():
         raise ValueError('Requested subspace has not been added to operator.')
 
-    config.initialize()
+    config._initialize()
     from slepc4py import SLEPc
 
     eps = SLEPc.EPS().create()
@@ -267,7 +267,7 @@ def reduced_density_matrix(state, keep):
         The density matrix
     """
 
-    config.initialize()
+    config._initialize()
     from ._backend import bpetsc
 
     if not state.subspace.product_state_basis:
