@@ -53,9 +53,6 @@ ENV PETSC_CONFIG_FLAGS=--with-mpi=0
 
 FROM base-${PLATFORM} as build
 
-ARG PETSC_VERSION
-ARG SLEPC_VERSION
-
 # add virtualenvironment to install python packages
 RUN python3 -m venv /venv
 
@@ -71,6 +68,8 @@ RUN pip3 install --no-cache-dir --upgrade pip
 
 
 from build as petsc
+
+ARG PETSC_VERSION
 
 # install PETSc
 USER root
@@ -97,6 +96,8 @@ RUN if [ "$PLATFORM" = "cpu" ] ; then pip3 install --no-cache-dir mpi4py ; fi
 
 
 from petsc as slepc
+
+ARG SLEPC_VERSION
 
 USER root
 WORKDIR /opt
