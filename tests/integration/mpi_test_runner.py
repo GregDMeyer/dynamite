@@ -138,9 +138,13 @@ class MPITestResult(ut.TestResult):
                 if not self.cur_failures:
                     self._print('.', end=' ', verbose=[1,2])
                 else:
-                    self._print(self.cur_failures[0][0][0], end=' ', verbose=[1,2])
+                    self._print(color_error_string(self.cur_failures[0][0][0]),
+                                end=' ', verbose=[1, 2])
                     for problem, fail_test, fail_msg in self.cur_failures:
-                        msg += "Rank {} {}:".format(self.comm.rank, problem)
+                        msg += "Rank {} {}:".format(
+                            self.comm.rank,
+                            color_error_string(problem)
+                        )
 
                         if hasattr(fail_test, '_subDescription'):
                             msg += " {}".format(fail_test._subDescription())
@@ -170,7 +174,8 @@ class MPITestResult(ut.TestResult):
             if self.failfast:
                 self.stop()
 
-            self._print(real_problems[0][0], end='', rank=0, verbose=0)
+            self._print(color_error_string(real_problems[0][0]),
+                        end='', rank=0, verbose=0)
         else:
             self._print('.', end='', rank=0, verbose=0)
 
@@ -210,6 +215,30 @@ class MPITestResult(ut.TestResult):
 
     def addUnexpectedSuccess(self, test):
         self.cur_failures.append(('UNEXPECTSUCCESS', test, ''))
+
+
+def color_error_string(s):
+
+    if not sys.stdout.isatty():
+        return s
+
+    colors = {
+        'ERROR': ('\N{ESC}[31;1m', '\N{ESC}[m'),
+        'FAILED': ('\N{ESC}[33;1m', '\N{ESC}[m'),
+        'SKIPPED': ('\N{ESC}[34;1m', '\N{ESC}[m'),
+    }
+
+    single_letters = {k[0]: v for k, v in colors.items()}
+    if s in single_letters:
+        pre, post = single_letters[s]
+        return pre + s + post
+
+    if s in colors:
+        pre, post = colors[s]
+        return pre + s + post
+
+    return s
+
 
 def main(name=None, failfast=False, verbose=1, module=None):
     '''
