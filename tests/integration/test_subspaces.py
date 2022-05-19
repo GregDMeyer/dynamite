@@ -8,7 +8,32 @@ import dynamite_test_runner as dtr
 
 from dynamite import config
 from dynamite.states import State
-from dynamite.subspaces import SpinConserve
+from dynamite.subspaces import SpinConserve, Auto, Full
+
+from hamiltonians import localized
+
+
+class AutoBuild(dtr.DynamiteTestCase):
+
+    def test_full_auto(self):
+        for space in [1, 2]:
+            for sort in [True, False]:
+                with self.subTest(space=space):
+                    with self.subTest(sort=sort):
+                        H = localized()
+                        subspace_dict = {
+                            'full': Full(),
+                            'auto': Auto(H, (1 << (H.L//2))-space, sort=sort)
+                        }
+                        for left in ('full', 'auto'):
+                            for right in ('full', 'auto'):
+                                if left == 'full' and right == 'full':
+                                    continue
+                                with self.subTest(left=left, right=right):
+                                    subspaces = tuple([subspace_dict[x]
+                                                       for x in (left, right)])
+                                    H.add_subspace(*subspaces)
+                                    H.build_mat(subspaces=subspaces)
 
 
 class SpinFlipConversion(dtr.DynamiteTestCase):

@@ -319,9 +319,9 @@ static inline PetscInt S2I_Explicit(PetscInt state, const data_Explicit* data) {
   /* do a binary search on rmap_states */
   PetscInt left, right, mid;
   left = 0;
-  right = data->dim;
+  right = data->dim-1;
   while (left <= right) {
-    mid = left + (right-left)/2;
+    mid = (left + right)/2;
     if (data->rmap_states[mid] == state) {
       return data->rmap_indices[mid];
     }
