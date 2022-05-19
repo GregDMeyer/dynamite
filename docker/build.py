@@ -91,6 +91,11 @@ def main():
     # run builds
     first_target = True
     for target in args.targets:
+
+        if not first_target:
+            # it seems the docker cache needs some time to catch up
+            sleep(10)
+
         builds = []
         for platform in args.platform:
             if platform == 'gpu':
