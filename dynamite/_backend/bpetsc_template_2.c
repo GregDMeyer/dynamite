@@ -406,7 +406,7 @@ PetscErrorCode C(MatMult_CPU_General,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, Vec
 	  }
 	}
 	if (cache_idx >= VECSET_CACHE_SIZE) {
-	  SETERRQ1(MPI_COMM_SELF, PETSC_ERR_MEMC, "cache out of bounds, value %d", cache_idx);
+	  SETERRQ(MPI_COMM_SELF, PETSC_ERR_MEMC, "cache out of bounds, value %d", cache_idx);
 	}
 
 #if C(LEFT_SUBSPACE,SP) == SpinConserve_SP
