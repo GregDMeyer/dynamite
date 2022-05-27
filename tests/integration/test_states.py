@@ -7,7 +7,10 @@ import numpy as np
 
 import dynamite_test_runner as dtr
 
+from dynamite import config
 from dynamite.states import State
+from dynamite.subspaces import Parity
+from dynamite.operators import sigmaz
 
 class RandomSeed(dtr.DynamiteTestCase):
 
@@ -148,6 +151,54 @@ class PetscMethods(dtr.DynamiteTestCase):
         state2 = State()
         with self.assertRaises(TypeError):
             state1 *= state2
+
+
+class Projection(dtr.DynamiteTestCase):
+
+    def check_projection(self, state, idx):
+        for val in (0, 1):
+            with self.subTest(value=val):
+                proj_state = state.copy()
+
+                proj_state.project(idx, val)
+
+                sz = sigmaz(idx)
+                sz.add_subspace(state.subspace)
+
+                self.assertAlmostEqual(
+                    proj_state.dot(sz*proj_state),
+                    1 if val == 0 else -1
+                )
+
+    def test_full(self):
+        state = State(state='random')
+
+        for idx in [0, config.L//2, config.L-1]:
+            with self.subTest(idx=idx):
+                self.check_projection(state, idx)
+
+    def test_parity(self):
+        for parity in ['odd', 'even']:
+            with self.subTest(parity=parity):
+
+                state = State(subspace=Parity(parity),
+                              state='random')
+                for idx in [0, config.L//2, config.L-1]:
+                    with self.subTest(idx=idx):
+                        self.check_projection(state, idx)
+
+    def test_index_exceptions(self):
+        state = State(state='random')
+        for idx in [-1, config.L, config.L+1]:
+            with self.subTest(idx=idx):
+                with self.assertRaises(ValueError):
+                    state.project(idx, 0)
+
+    def test_value_exception(self):
+        state = State(state='random')
+        with self.assertRaises(ValueError):
+            state.project(0, -1)
+
 
 # TODO: check state setting. e.g. setting an invalid state should fail (doesn't for Full subspace)
 

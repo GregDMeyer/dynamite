@@ -1,6 +1,7 @@
 
 from . import config, validate, subspaces
 from .tools import complex_enabled
+from .msc_tools import dnm_int_t
 
 import numpy as np
 from os import urandom
@@ -232,6 +233,44 @@ class State:
 
         if normalize:
             self.vec.normalize()
+
+    def project(self, index, value):
+        '''
+        Project the state onto a subspace in which the qubit
+        at the given index has been projected onto the given
+        value (0 or 1). In other words, perform a projective
+        measurement, post-selecting on the outcome.
+
+        Projection done in-place, function returns None.
+
+        Parameters
+        ----------
+        index : int
+            The spin index to project
+
+        value : 0 or 1
+            Which single-spin state to project onto
+        '''
+
+        if index < 0 or index >= self.subspace.L:
+            raise ValueError("spin index out of range")
+
+        if value not in (0, 1):
+            raise ValueError("value must be 0 or 1")
+
+        # deal with MPI vectors (this process might not own all of it)
+        istart, iend = self.vec.getOwnershipRange()
+        idxs = np.arange(istart, iend, dtype=dnm_int_t)
+
+        state_list = self.subspace.idx_to_state(idxs)
+        idxs_to_zero = idxs[((state_list >> index) & 1) != value]
+
+        # this is sad because you are allocating a whole vector of zeros,
+        # but alas, petsc4py requires a vector...
+        self.vec[idxs_to_zero] = np.zeros(len(idxs_to_zero))
+        self.vec.assemble()
+
+        self.vec.normalize()
 
     @classmethod
     def _to_numpy(cls, vec, to_all = False):
