@@ -43,25 +43,23 @@ PetscErrorCode ReducedDensityMatrix(
   PetscInt rtn_dim,
   PetscScalar* rtn
 ){
-  PetscErrorCode ierr;
   switch (sub_type) {
     case FULL:
-      ierr = rdm_Full(vec, sub_data_p, keep_size, keep, triang, rtn_dim, rtn);CHKERRQ(ierr);
+      PetscCall(rdm_Full(vec, sub_data_p, keep_size, keep, triang, rtn_dim, rtn));
       break;
     case PARITY:
-      ierr = rdm_Parity(vec, sub_data_p, keep_size, keep, triang, rtn_dim, rtn);CHKERRQ(ierr);
+      PetscCall(rdm_Parity(vec, sub_data_p, keep_size, keep, triang, rtn_dim, rtn));
       break;
     case SPIN_CONSERVE:
-      ierr = rdm_SpinConserve(vec, sub_data_p, keep_size, keep, triang, rtn_dim, rtn);CHKERRQ(ierr);
+      PetscCall(rdm_SpinConserve(vec, sub_data_p, keep_size, keep, triang, rtn_dim, rtn));
       break;
     case EXPLICIT:
-      ierr = rdm_Explicit(vec, sub_data_p, keep_size, keep, triang, rtn_dim, rtn);CHKERRQ(ierr);
+      PetscCall(rdm_Explicit(vec, sub_data_p, keep_size, keep, triang, rtn_dim, rtn));
       break;
     default: // shouldn't happen, but give ierr some (nonzero) value for consistency
-      ierr = 1;
-      break;
+      return 1;
   }
-  return ierr;
+  return 0;
 }
 
 #define LEFT_SUBSPACE Full
@@ -141,24 +139,23 @@ PetscErrorCode ReducedDensityMatrix(
  */
 PetscErrorCode BuildMat(const msc_t *msc, subspaces_t *subspaces, shell_impl shell, Mat *A)
 {
-  PetscErrorCode ierr = 0;
   switch (subspaces->left_type) {
     case FULL:
       switch (subspaces->right_type) {
         case FULL:
-          ierr = BuildMat_Full_Full(msc, subspaces->left_data, subspaces->right_data, shell, A);
+          PetscCall(BuildMat_Full_Full(msc, subspaces->left_data, subspaces->right_data, shell, A));
           break;
 
         case PARITY:
-          ierr = BuildMat_Full_Parity(msc, subspaces->left_data, subspaces->right_data, shell, A);
+          PetscCall(BuildMat_Full_Parity(msc, subspaces->left_data, subspaces->right_data, shell, A));
           break;
 
         case SPIN_CONSERVE:
-          ierr = BuildMat_Full_SpinConserve(msc, subspaces->left_data, subspaces->right_data, shell, A);
+          PetscCall(BuildMat_Full_SpinConserve(msc, subspaces->left_data, subspaces->right_data, shell, A));
           break;
 
         case EXPLICIT:
-          ierr = BuildMat_Full_Explicit(msc, subspaces->left_data, subspaces->right_data, shell, A);
+          PetscCall(BuildMat_Full_Explicit(msc, subspaces->left_data, subspaces->right_data, shell, A));
           break;
       }
       break;
@@ -166,19 +163,19 @@ PetscErrorCode BuildMat(const msc_t *msc, subspaces_t *subspaces, shell_impl she
     case PARITY:
       switch (subspaces->right_type) {
         case FULL:
-          ierr = BuildMat_Parity_Full(msc, subspaces->left_data, subspaces->right_data, shell, A);
+          PetscCall(BuildMat_Parity_Full(msc, subspaces->left_data, subspaces->right_data, shell, A));
           break;
 
         case PARITY:
-          ierr = BuildMat_Parity_Parity(msc, subspaces->left_data, subspaces->right_data, shell, A);
+          PetscCall(BuildMat_Parity_Parity(msc, subspaces->left_data, subspaces->right_data, shell, A));
           break;
 
         case SPIN_CONSERVE:
-          ierr = BuildMat_Parity_SpinConserve(msc, subspaces->left_data, subspaces->right_data, shell, A);
+          PetscCall(BuildMat_Parity_SpinConserve(msc, subspaces->left_data, subspaces->right_data, shell, A));
           break;
 
         case EXPLICIT:
-          ierr = BuildMat_Parity_Explicit(msc, subspaces->left_data, subspaces->right_data, shell, A);
+          PetscCall(BuildMat_Parity_Explicit(msc, subspaces->left_data, subspaces->right_data, shell, A));
           break;
       }
       break;
@@ -186,19 +183,19 @@ PetscErrorCode BuildMat(const msc_t *msc, subspaces_t *subspaces, shell_impl she
     case SPIN_CONSERVE:
       switch (subspaces->right_type) {
         case FULL:
-          ierr = BuildMat_SpinConserve_Full(msc, subspaces->left_data, subspaces->right_data, shell, A);
+          PetscCall(BuildMat_SpinConserve_Full(msc, subspaces->left_data, subspaces->right_data, shell, A));
           break;
 
         case PARITY:
-          ierr = BuildMat_SpinConserve_Parity(msc, subspaces->left_data, subspaces->right_data, shell, A);
+          PetscCall(BuildMat_SpinConserve_Parity(msc, subspaces->left_data, subspaces->right_data, shell, A));
           break;
 
       case SPIN_CONSERVE:
-          ierr = BuildMat_SpinConserve_SpinConserve(msc, subspaces->left_data, subspaces->right_data, shell, A);
+          PetscCall(BuildMat_SpinConserve_SpinConserve(msc, subspaces->left_data, subspaces->right_data, shell, A));
           break;
 
         case EXPLICIT:
-          ierr = BuildMat_SpinConserve_Explicit(msc, subspaces->left_data, subspaces->right_data, shell, A);
+          PetscCall(BuildMat_SpinConserve_Explicit(msc, subspaces->left_data, subspaces->right_data, shell, A));
           break;
       }
       break;
@@ -206,22 +203,22 @@ PetscErrorCode BuildMat(const msc_t *msc, subspaces_t *subspaces, shell_impl she
     case EXPLICIT:
       switch (subspaces->right_type) {
         case FULL:
-          ierr = BuildMat_Explicit_Full(msc, subspaces->left_data, subspaces->right_data, shell, A);
+          PetscCall(BuildMat_Explicit_Full(msc, subspaces->left_data, subspaces->right_data, shell, A));
           break;
 
         case PARITY:
-          ierr = BuildMat_Explicit_Parity(msc, subspaces->left_data, subspaces->right_data, shell, A);
+          PetscCall(BuildMat_Explicit_Parity(msc, subspaces->left_data, subspaces->right_data, shell, A));
           break;
 
       case SPIN_CONSERVE:
-          ierr = BuildMat_Explicit_SpinConserve(msc, subspaces->left_data, subspaces->right_data, shell, A);
+          PetscCall(BuildMat_Explicit_SpinConserve(msc, subspaces->left_data, subspaces->right_data, shell, A));
           break;
 
         case EXPLICIT:
-          ierr = BuildMat_Explicit_Explicit(msc, subspaces->left_data, subspaces->right_data, shell, A);
+	  PetscCall(BuildMat_Explicit_Explicit(msc, subspaces->left_data, subspaces->right_data, shell, A));
           break;
       }
       break;
   }
-  return ierr;
+  return 0;
 }

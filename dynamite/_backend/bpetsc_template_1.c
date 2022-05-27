@@ -95,7 +95,6 @@ PetscErrorCode C(rdm,SUBSPACE)(
   PetscScalar* rtn
 ){
 
-  PetscErrorCode ierr;
   const PetscScalar *v0_array;
   PetscInt i, j, n_filled, offset;
   PetscInt tr_state, tr_dim;
@@ -113,17 +112,17 @@ PetscErrorCode C(rdm,SUBSPACE)(
     }
   }
 
-  MPI_Comm_size(PETSC_COMM_WORLD, &mpi_size);
-  MPI_Comm_rank(PETSC_COMM_WORLD, &mpi_rank);
+  PetscCallMPI(MPI_Comm_size(PETSC_COMM_WORLD, &mpi_size));
+  PetscCallMPI(MPI_Comm_rank(PETSC_COMM_WORLD, &mpi_rank));
 
   /* scatter to process 0 */
   /* in the future, perhaps will do this in parallel */
   /* could be achieved with a round-robin type deal, like we do with MatMult */
   if (mpi_size > 1) {
-    ierr = VecScatterCreateToZero(vec, &scat, &v0);CHKERRQ(ierr);
-    ierr = VecScatterBegin(scat, vec, v0, INSERT_VALUES, SCATTER_FORWARD);CHKERRQ(ierr);
-    ierr = VecScatterEnd(scat, vec, v0, INSERT_VALUES, SCATTER_FORWARD);CHKERRQ(ierr);
-    ierr = VecScatterDestroy(&scat);CHKERRQ(ierr);
+    PetscCall(VecScatterCreateToZero(vec, &scat, &v0));
+    PetscCall(VecScatterBegin(scat, vec, v0, INSERT_VALUES, SCATTER_FORWARD));
+    PetscCall(VecScatterEnd(scat, vec, v0, INSERT_VALUES, SCATTER_FORWARD));
+    PetscCall(VecScatterDestroy(&scat));
   }
   else {
     v0 = vec;
@@ -132,13 +131,13 @@ PetscErrorCode C(rdm,SUBSPACE)(
   /* we're done if we're rank > 0 */
   if (mpi_rank > 0) {
     VecDestroy(&v0);
-    return ierr;
+    return 0;
   }
 
-  ierr = VecGetArrayRead(v0, &v0_array);CHKERRQ(ierr);
+  PetscCall(VecGetArrayRead(v0, &v0_array));
 
-  ierr = PetscMalloc1(1<<keep_size, &state_array);CHKERRQ(ierr);
-  ierr = PetscMalloc1(1<<keep_size, &combine_array);CHKERRQ(ierr);
+  PetscCall(PetscMalloc1(1<<keep_size, &state_array));
+  PetscCall(PetscMalloc1(1<<keep_size, &combine_array));
 
   PetscMemzero(rtn, sizeof(PetscScalar)*rtn_dim*rtn_dim);
 
@@ -155,13 +154,13 @@ PetscErrorCode C(rdm,SUBSPACE)(
     }
   }
 
-  ierr = PetscFree(state_array);CHKERRQ(ierr);
-  ierr = PetscFree(combine_array);CHKERRQ(ierr);
+  PetscCall(PetscFree(state_array));
+  PetscCall(PetscFree(combine_array));
 
-  ierr = VecRestoreArrayRead(v0, &v0_array);CHKERRQ(ierr);
+  PetscCall(VecRestoreArrayRead(v0, &v0_array));
   if (mpi_size > 1) {
     VecDestroy(&v0);
   }
 
-  return ierr;
+  return 0;
 }

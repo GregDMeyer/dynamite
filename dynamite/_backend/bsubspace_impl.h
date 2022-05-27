@@ -40,16 +40,14 @@ typedef struct _data_Full
 } data_Full;
 
 static inline PetscErrorCode CopySubspaceData_Full(data_Full** out_p, const data_Full* in) {
-  PetscErrorCode ierr;
-  ierr = PetscMalloc1(1, out_p);CHKERRQ(ierr);
-  ierr = PetscMemcpy(*out_p, in, sizeof(data_Full));CHKERRQ(ierr);
-  return ierr;
+  PetscCall(PetscMalloc1(1, out_p));
+  PetscCall(PetscMemcpy(*out_p, in, sizeof(data_Full)));
+  return 0;
 }
 
 static inline PetscErrorCode DestroySubspaceData_Full(data_Full* data) {
-  PetscErrorCode ierr;
-  ierr = PetscFree(data);CHKERRQ(ierr);
-  return ierr;
+  PetscCall(PetscFree(data));
+  return 0;
 }
 
 static inline PetscInt Dim_Full(const data_Full* data) {
@@ -94,16 +92,14 @@ typedef struct _data_Parity
 } data_Parity;
 
 static inline PetscErrorCode CopySubspaceData_Parity(data_Parity** out_p, const data_Parity* in) {
-  PetscErrorCode ierr;
-  ierr = PetscMalloc1(1, out_p);CHKERRQ(ierr);
-  ierr = PetscMemcpy(*out_p, in, sizeof(data_Parity));CHKERRQ(ierr);
-  return ierr;
+  PetscCall(PetscMalloc1(1, out_p));
+  PetscCall(PetscMemcpy(*out_p, in, sizeof(data_Parity)));
+  return 0;
 }
 
 static inline PetscErrorCode DestroySubspaceData_Parity(data_Parity* data) {
-  PetscErrorCode ierr;
-  ierr = PetscFree(data);CHKERRQ(ierr);
-  return ierr;
+  PetscCall(PetscFree(data));
+  return 0;
 }
 
 static inline PetscInt Dim_Parity(const data_Parity* data) {
@@ -162,23 +158,21 @@ typedef struct _data_SpinConserve
 } data_SpinConserve;
 
 static inline PetscErrorCode CopySubspaceData_SpinConserve(data_SpinConserve** out_p, const data_SpinConserve* in) {
-  PetscErrorCode ierr;
   PetscInt len_nchoosek = (in->k+1)*in->ld_nchoosek;
 
-  ierr = PetscMalloc1(1, out_p);CHKERRQ(ierr);
-  ierr = PetscMemcpy(*out_p, in, sizeof(data_SpinConserve));CHKERRQ(ierr);
+  PetscCall(PetscMalloc1(1, out_p));
+  PetscCall(PetscMemcpy(*out_p, in, sizeof(data_SpinConserve)));
 
-  ierr = PetscMalloc1(len_nchoosek, &((*out_p)->nchoosek));CHKERRQ(ierr);
-  ierr = PetscMemcpy((*out_p)->nchoosek, in->nchoosek, len_nchoosek*sizeof(PetscInt));CHKERRQ(ierr);
+  PetscCall(PetscMalloc1(len_nchoosek, &((*out_p)->nchoosek)));
+  PetscCall(PetscMemcpy((*out_p)->nchoosek, in->nchoosek, len_nchoosek*sizeof(PetscInt)));
 
-  return ierr;
+  return 0;
 }
 
 static inline PetscErrorCode DestroySubspaceData_SpinConserve(data_SpinConserve* data) {
-  PetscErrorCode ierr;
-  ierr = PetscFree(data->nchoosek);CHKERRQ(ierr);
-  ierr = PetscFree(data);CHKERRQ(ierr);
-  return ierr;
+  PetscCall(PetscFree(data->nchoosek));
+  PetscCall(PetscFree(data));
+  return 0;
 }
 
 static inline PetscInt Dim_SpinConserve(const data_SpinConserve* data) {
@@ -286,29 +280,27 @@ typedef struct _data_Explicit
 } data_Explicit;
 
 static inline PetscErrorCode CopySubspaceData_Explicit(data_Explicit** out_p, const data_Explicit* in) {
-  PetscErrorCode ierr;
-  ierr = PetscMalloc1(1, out_p);CHKERRQ(ierr);
-  ierr = PetscMemcpy(*out_p, in, sizeof(data_Explicit));CHKERRQ(ierr);
+  PetscCall(PetscMalloc1(1, out_p));
+  PetscCall(PetscMemcpy(*out_p, in, sizeof(data_Explicit)));
 
-  ierr = PetscMalloc1(in->dim, &((*out_p)->state_map));CHKERRQ(ierr);
-  ierr = PetscMemcpy((*out_p)->state_map, in->state_map, in->dim*sizeof(PetscInt));CHKERRQ(ierr);
+  PetscCall(PetscMalloc1(in->dim, &((*out_p)->state_map)));
+  PetscCall(PetscMemcpy((*out_p)->state_map, in->state_map, in->dim*sizeof(PetscInt)));
 
-  ierr = PetscMalloc1(in->dim, &((*out_p)->rmap_indices));CHKERRQ(ierr);
-  ierr = PetscMemcpy((*out_p)->rmap_indices, in->rmap_indices, in->dim*sizeof(PetscInt));CHKERRQ(ierr);
+  PetscCall(PetscMalloc1(in->dim, &((*out_p)->rmap_indices)));
+  PetscCall(PetscMemcpy((*out_p)->rmap_indices, in->rmap_indices, in->dim*sizeof(PetscInt)));
 
-  ierr = PetscMalloc1(in->dim, &((*out_p)->rmap_states));CHKERRQ(ierr);
-  ierr = PetscMemcpy((*out_p)->rmap_states, in->rmap_states, in->dim*sizeof(PetscInt));CHKERRQ(ierr);
+  PetscCall(PetscMalloc1(in->dim, &((*out_p)->rmap_states)));
+  PetscCall(PetscMemcpy((*out_p)->rmap_states, in->rmap_states, in->dim*sizeof(PetscInt)));
 
-  return ierr;
+  return 0;
 }
 
 static inline PetscErrorCode DestroySubspaceData_Explicit(data_Explicit* data) {
-  PetscErrorCode ierr;
-  ierr = PetscFree(data->state_map);CHKERRQ(ierr);
-  ierr = PetscFree(data->rmap_indices);CHKERRQ(ierr);
-  ierr = PetscFree(data->rmap_states);CHKERRQ(ierr);
-  ierr = PetscFree(data);CHKERRQ(ierr);
-  return ierr;
+  PetscCall(PetscFree(data->state_map));
+  PetscCall(PetscFree(data->rmap_indices));
+  PetscCall(PetscFree(data->rmap_states));
+  PetscCall(PetscFree(data));
+  return 0;
 }
 
 static inline PetscInt Dim_Explicit(const data_Explicit* data) {

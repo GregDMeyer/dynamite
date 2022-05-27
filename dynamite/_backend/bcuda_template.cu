@@ -7,11 +7,10 @@ PetscErrorCode C(BuildGPUShell,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
   const C(data,RIGHT_SUBSPACE)* right_subspace_data,
   Mat *A)
 {
-  PetscErrorCode ierr;
   PetscInt M, N, mpi_size;
   shell_context *ctx;
 
-  MPI_Comm_size(PETSC_COMM_WORLD, &mpi_size);
+  PetscCallMPI(MPI_Comm_size(PETSC_COMM_WORLD, &mpi_size));
   if (mpi_size > 1) {
     SETERRQ(PETSC_COMM_WORLD, PETSC_ERR_SUP,
       "Shell GPU matrices currently only implemented for 1 MPI process.");
@@ -21,21 +20,21 @@ PetscErrorCode C(BuildGPUShell,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
   M = C(Dim,LEFT_SUBSPACE)(left_subspace_data);
   N = C(Dim,RIGHT_SUBSPACE)(right_subspace_data);
 
-  ierr = C(BuildContext_CUDA,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
-    msc, left_subspace_data, right_subspace_data, &ctx);CHKERRQ(ierr);
+  PetscCall(C(BuildContext_CUDA,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
+    msc, left_subspace_data, right_subspace_data, &ctx));
 
-  ierr = MatCreateShell(PETSC_COMM_WORLD, M, N, M, N, ctx, A);CHKERRQ(ierr);
+  PetscCall(MatCreateShell(PETSC_COMM_WORLD, M, N, M, N, ctx, A));
 
-  ierr = MatShellSetOperation(*A, MATOP_MULT,
-    (void(*)(void))C(MatMult_GPU,C(LEFT_SUBSPACE,RIGHT_SUBSPACE)));
-  ierr = MatShellSetOperation(*A, MATOP_NORM,
-    (void(*)(void))C(MatNorm_GPU,C(LEFT_SUBSPACE,RIGHT_SUBSPACE)));
-  ierr = MatShellSetOperation(*A, MATOP_CREATE_VECS,
-    (void(*)(void))MatCreateVecs_GPU);
-  ierr = MatShellSetOperation(*A, MATOP_DESTROY,
-    (void(*)(void))C(MatDestroyCtx_GPU,C(LEFT_SUBSPACE,RIGHT_SUBSPACE)));
+  PetscCall(MatShellSetOperation(*A, MATOP_MULT,
+    (void(*)(void))C(MatMult_GPU,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))));
+  PetscCall(MatShellSetOperation(*A, MATOP_NORM,
+    (void(*)(void))C(MatNorm_GPU,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))));
+  PetscCall(MatShellSetOperation(*A, MATOP_CREATE_VECS,
+    (void(*)(void))MatCreateVecs_GPU));
+  PetscCall(MatShellSetOperation(*A, MATOP_DESTROY,
+    (void(*)(void))C(MatDestroyCtx_GPU,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))));
 
-  return ierr;
+  return 0;
 }
 
 PetscErrorCode C(BuildContext_CUDA,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
@@ -44,13 +43,12 @@ PetscErrorCode C(BuildContext_CUDA,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
   const C(data,RIGHT_SUBSPACE)* right_subspace_data,
   shell_context **ctx_p)
 {
-  PetscErrorCode ierr;
   PetscReal *cpu_real_coeffs, real_part;
   PetscInt nterms, i;
   cudaError_t err;
   shell_context *ctx;
 
-  ierr = PetscMalloc(sizeof(shell_context), ctx_p);CHKERRQ(ierr);
+  PetscCall(PetscMalloc(sizeof(shell_context), ctx_p));
   ctx = (*ctx_p);
 
   ctx->nmasks = msc->nmasks;
@@ -76,51 +74,47 @@ PetscErrorCode C(BuildContext_CUDA,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
    * we need a CPU vector in which we will store the real coefficients, then we'll copy
    * from that over to the CPU.
    */
-  ierr = PetscMalloc1(nterms, &cpu_real_coeffs);CHKERRQ(ierr);
+  PetscCall(PetscMalloc1(nterms, &cpu_real_coeffs));
   for (i=0; i < nterms; ++i) {
     real_part = PetscRealPart(msc->coeffs[i]);
     cpu_real_coeffs[i] = (real_part != 0) ? real_part : PetscImaginaryPart(msc->coeffs[i]);
   }
   err = cudaMemcpy(ctx->real_coeffs, cpu_real_coeffs, sizeof(PetscReal)*nterms,
     cudaMemcpyHostToDevice);CHKERRCUDA(err);
-  ierr = PetscFree(cpu_real_coeffs);CHKERRQ(ierr);
+  PetscCall(PetscFree(cpu_real_coeffs));
 
-  ierr = C(CopySubspaceData_CUDA,LEFT_SUBSPACE)(
+  PetscCall(C(CopySubspaceData_CUDA,LEFT_SUBSPACE)(
     (C(data,LEFT_SUBSPACE)**)&(ctx->left_subspace_data),
-    (C(data,LEFT_SUBSPACE)*)left_subspace_data);CHKERRQ(ierr);
-  ierr = C(CopySubspaceData_CUDA,RIGHT_SUBSPACE)(
+    (C(data,LEFT_SUBSPACE)*)left_subspace_data));
+  PetscCall(C(CopySubspaceData_CUDA,RIGHT_SUBSPACE)(
     (C(data,RIGHT_SUBSPACE)**)&(ctx->right_subspace_data),
-    (C(data,RIGHT_SUBSPACE)*)right_subspace_data);CHKERRQ(ierr);
-
-  return ierr;
+    (C(data,RIGHT_SUBSPACE)*)right_subspace_data));
 }
 
 PetscErrorCode C(MatDestroyCtx_GPU,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A)
 {
-  PetscErrorCode ierr;
   cudaError_t err;
   shell_context *ctx;
 
-  ierr = MatShellGetContext(A, &ctx);CHKERRQ(ierr);
+  PetscCall(MatShellGetContext(A, &ctx));
 
   err = cudaFree(ctx->masks);CHKERRCUDA(err);
   err = cudaFree(ctx->mask_offsets);CHKERRCUDA(err);
   err = cudaFree(ctx->signs);CHKERRCUDA(err);
   err = cudaFree(ctx->real_coeffs);CHKERRCUDA(err);
 
-  ierr = C(DestroySubspaceData_CUDA,LEFT_SUBSPACE)(
-    (C(data,LEFT_SUBSPACE)*) ctx->left_subspace_data);CHKERRQ(ierr);
-  ierr = C(DestroySubspaceData_CUDA,RIGHT_SUBSPACE)(
-    (C(data,RIGHT_SUBSPACE)*) ctx->right_subspace_data);CHKERRQ(ierr);
+  PetscCall(C(DestroySubspaceData_CUDA,LEFT_SUBSPACE)(
+    (C(data,LEFT_SUBSPACE)*) ctx->left_subspace_data));
+  PetscCall(C(DestroySubspaceData_CUDA,RIGHT_SUBSPACE)(
+    (C(data,RIGHT_SUBSPACE)*) ctx->right_subspace_data));
 
-  ierr = PetscFree(ctx);CHKERRQ(ierr);
+  PetscCall(PetscFree(ctx));
 
-  return ierr;
+  return 0;
 }
 
 PetscErrorCode C(MatMult_GPU,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, Vec x, Vec b)
 {
-  PetscErrorCode ierr;
   cudaError_t err;
   shell_context *ctx;
 
@@ -128,14 +122,14 @@ PetscErrorCode C(MatMult_GPU,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, Vec x, Vec 
   PetscScalar* barray;
   PetscInt size;
 
-  ierr = VecSet(b, 0);CHKERRQ(ierr);
+  PetscCall(VecSet(b, 0));
 
-  ierr = MatShellGetContext(A, &ctx);CHKERRQ(ierr);
+  PetscCall(MatShellGetContext(A, &ctx));
 
-  ierr = VecCUDAGetArrayRead(x, &xarray);CHKERRQ(ierr);
-  ierr = VecCUDAGetArray(b, &barray);CHKERRQ(ierr);
+  PetscCall(VecCUDAGetArrayRead(x, &xarray));
+  PetscCall(VecCUDAGetArray(b, &barray));
 
-  ierr = VecGetSize(b, &size);CHKERRQ(ierr);
+  PetscCall(VecGetSize(b, &size));
 
   err = cudaThreadSynchronize();CHKERRCUDA(err);
 
@@ -153,10 +147,10 @@ PetscErrorCode C(MatMult_GPU,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, Vec x, Vec 
 
   err = cudaThreadSynchronize();CHKERRCUDA(err);
 
-  ierr = VecCUDARestoreArrayRead(x, &xarray);CHKERRQ(ierr);
-  ierr = VecCUDARestoreArray(b, &barray);CHKERRQ(ierr);
+  PetscCall(VecCUDARestoreArrayRead(x, &xarray));
+  PetscCall(VecCUDARestoreArray(b, &barray));
 
-  return ierr;
+  return 0;
 }
 
 __global__ void C(device_MatMult,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
@@ -241,7 +235,6 @@ __global__ void C(device_MatMult,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
 
 PetscErrorCode C(MatNorm_GPU,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, NormType type, PetscReal *nrm)
 {
-  PetscErrorCode ierr;
   cudaError_t err;
   shell_context *ctx;
 
@@ -252,7 +245,7 @@ PetscErrorCode C(MatNorm_GPU,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, NormType ty
     SETERRQ(PETSC_COMM_WORLD,PETSC_ERR_ARG_OUTOFRANGE,"Only NORM_INFINITY is implemented for shell matrices.");
   }
 
-  ierr = MatShellGetContext(A, &ctx);CHKERRQ(ierr);
+  PetscCall(MatShellGetContext(A, &ctx));
 
   /*
     keep the norm cached so we don't have to compute it all the time.
@@ -260,13 +253,13 @@ PetscErrorCode C(MatNorm_GPU,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, NormType ty
   */
   if (ctx->nrm != -1) {
     (*nrm) = ctx->nrm;
-    return ierr;
+    return 0;
   }
 
   err = cudaMalloc((void **) &d_maxs, sizeof(PetscReal)*GPU_BLOCK_NUM);CHKERRCUDA(err);
-  ierr = PetscMalloc1(GPU_BLOCK_NUM, &h_maxs);CHKERRQ(ierr);
+  PetscCall(PetscMalloc1(GPU_BLOCK_NUM, &h_maxs));
 
-  ierr = MatGetSize(A, &M, NULL);CHKERRQ(ierr);
+  PetscCall(MatGetSize(A, &M, NULL));
 
   C(device_MatNorm,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))<<<GPU_BLOCK_NUM, GPU_BLOCK_SIZE, sizeof(PetscReal)*GPU_BLOCK_SIZE>>>(
     M,
@@ -292,9 +285,9 @@ PetscErrorCode C(MatNorm_GPU,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, NormType ty
   ctx->nrm = (*nrm);
 
   err = cudaFree(d_maxs);CHKERRCUDA(err);
-  ierr = PetscFree(h_maxs);CHKERRQ(ierr);
+  PetscCall(PetscFree(h_maxs));
 
-  return ierr;
+  return 0;
 }
 
 __global__ void C(device_MatNorm,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(

@@ -61,13 +61,12 @@ __device__ PetscInt I2S_CUDA_Parity(PetscInt idx, const data_Parity* data) {
 }
 
 PetscErrorCode CopySubspaceData_CUDA_SpinConserve(data_SpinConserve** out_p, const data_SpinConserve* in) {
-  PetscErrorCode ierr;
   cudaError_t err;
   PetscInt len_nchoosek = (in->k+1)*in->ld_nchoosek;
 
   data_SpinConserve cpu_data;
 
-  ierr = PetscMemcpy(&cpu_data, in, sizeof(data_SpinConserve));CHKERRQ(ierr);
+  PetscCall(PetscMemcpy(&cpu_data, in, sizeof(data_SpinConserve)));
 
   err = cudaMalloc(&(cpu_data.nchoosek), sizeof(PetscInt)*len_nchoosek);CHKERRCUDA(err);
   err = cudaMemcpy(cpu_data.nchoosek, in->nchoosek,
@@ -76,7 +75,7 @@ PetscErrorCode CopySubspaceData_CUDA_SpinConserve(data_SpinConserve** out_p, con
   err = cudaMalloc((void **) out_p, sizeof(data_SpinConserve));CHKERRCUDA(err);
   err = cudaMemcpy(*out_p, &cpu_data, sizeof(data_SpinConserve), cudaMemcpyHostToDevice);CHKERRCUDA(err);
 
-  return ierr;
+  return 0;
 }
 
 PetscErrorCode DestroySubspaceData_CUDA_SpinConserve(data_SpinConserve* data) {
@@ -134,12 +133,11 @@ __device__ PetscInt I2S_CUDA_SpinConserve(PetscInt idx, const data_SpinConserve*
 }
 
 PetscErrorCode CopySubspaceData_CUDA_Explicit(data_Explicit** out_p, const data_Explicit* in) {
-  PetscErrorCode ierr;
   cudaError_t err;
 
   data_Explicit cpu_data;
 
-  ierr = PetscMemcpy(&cpu_data, in, sizeof(data_Explicit));CHKERRQ(ierr);
+  PetscCall(PetscMemcpy(&cpu_data, in, sizeof(data_Explicit)));
 
   err = cudaMalloc(&(cpu_data.state_map), sizeof(PetscInt)*in->dim);CHKERRCUDA(err);
   err = cudaMemcpy(cpu_data.state_map, in->state_map,
@@ -156,7 +154,7 @@ PetscErrorCode CopySubspaceData_CUDA_Explicit(data_Explicit** out_p, const data_
   err = cudaMalloc((void **) out_p, sizeof(data_Explicit));CHKERRCUDA(err);
   err = cudaMemcpy(*out_p, &cpu_data, sizeof(data_Explicit), cudaMemcpyHostToDevice);CHKERRCUDA(err);
 
-  return ierr;
+  return 0;
 }
 
 PetscErrorCode DestroySubspaceData_CUDA_Explicit(data_Explicit* data) {
@@ -202,20 +200,19 @@ __device__ PetscInt I2S_CUDA_Explicit(PetscInt idx, const data_Explicit* data) {
 
 PetscErrorCode MatCreateVecs_GPU(Mat mat, Vec *right, Vec *left)
 {
-  PetscErrorCode ierr;
   PetscInt M, N;
 
-  ierr = MatGetSize(mat, &M, &N);CHKERRQ(ierr);
+  PetscCall(MatGetSize(mat, &M, &N));
 
   if (right) {
-    ierr = VecCreate(PetscObjectComm((PetscObject)mat),right);CHKERRQ(ierr);
-    ierr = VecSetSizes(*right, PETSC_DECIDE, N);CHKERRQ(ierr);
-    ierr = VecSetFromOptions(*right);
+    PetscCall(VecCreate(PetscObjectComm((PetscObject)mat),right));
+    PetscCall(VecSetSizes(*right, PETSC_DECIDE, N));
+    PetscCall(VecSetFromOptions(*right));
   }
   if (left) {
-    ierr = VecCreate(PetscObjectComm((PetscObject)mat),left);CHKERRQ(ierr);
-    ierr = VecSetSizes(*left, PETSC_DECIDE, M);CHKERRQ(ierr);
-    ierr = VecSetFromOptions(*left);
+    PetscCall(VecCreate(PetscObjectComm((PetscObject)mat),left));
+    PetscCall(VecSetSizes(*left, PETSC_DECIDE, M));
+    PetscCall(VecSetFromOptions(*left));
   }
 
   return 0;

@@ -47,7 +47,6 @@ PetscErrorCode C(BuildPetsc,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
   const void* right_subspace_data,
   Mat *A)
 {
-  PetscErrorCode ierr;
   PetscInt M, N, row_start, row_end, col_start;
   PetscInt mask_idx, term_idx, row_count;
   int mpi_size;
@@ -60,39 +59,39 @@ PetscErrorCode C(BuildPetsc,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
   PetscInt s2i_sign;
 #endif
 
-  ierr = MPI_Comm_size(PETSC_COMM_WORLD, &mpi_size);CHKERRMPI(ierr);
+  PetscCallMPI(MPI_Comm_size(PETSC_COMM_WORLD, &mpi_size));
 
   /* N is dimension of right subspace, M of left */
   M = C(Dim,LEFT_SUBSPACE)(left_subspace_data);
   N = C(Dim,RIGHT_SUBSPACE)(right_subspace_data);
 
   /* create matrix */
-  ierr = MatCreate(PETSC_COMM_WORLD, A);CHKERRQ(ierr);
-  ierr = MatSetSizes(*A, PETSC_DECIDE, PETSC_DECIDE, M, N);CHKERRQ(ierr);
-  ierr = MatSetFromOptions(*A);CHKERRQ(ierr);
+  PetscCall(MatCreate(PETSC_COMM_WORLD, A));
+  PetscCall(MatSetSizes(*A, PETSC_DECIDE, PETSC_DECIDE, M, N));
+  PetscCall(MatSetFromOptions(*A));
 
   /* TODO: we only should call these preallocation routines if matrix type is aij */
   /* preallocate memory */
-  ierr = C(ComputeNonzeros,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))
-          (M, N, msc, &diag_nonzeros, &offdiag_nonzeros,
-           left_subspace_data, right_subspace_data);CHKERRQ(ierr);
+  PetscCall(C(ComputeNonzeros,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))
+	    (M, N, msc, &diag_nonzeros, &offdiag_nonzeros,
+	     left_subspace_data, right_subspace_data));
 
   if (mpi_size == 1) {
-    ierr = MatSeqAIJSetPreallocation(*A, 0, diag_nonzeros);CHKERRQ(ierr);
+    PetscCall(MatSeqAIJSetPreallocation(*A, 0, diag_nonzeros));
   }
   else {
-    ierr = MatMPIAIJSetPreallocation(*A, 0, diag_nonzeros,
-                                     0, offdiag_nonzeros);CHKERRQ(ierr);
+    PetscCall(MatMPIAIJSetPreallocation(*A, 0, diag_nonzeros,
+                                     0, offdiag_nonzeros));
   }
 
   /* this memory is allocated in ComputeNonzeros */
-  ierr = PetscFree(diag_nonzeros);
-  ierr = PetscFree(offdiag_nonzeros);
+  PetscCall(PetscFree(diag_nonzeros));
+  PetscCall(PetscFree(offdiag_nonzeros));
 
   /* compute matrix elements */
-  ierr = MatSetOption(*A, MAT_NO_OFF_PROC_ENTRIES, PETSC_TRUE);CHKERRQ(ierr);
-  ierr = MatGetOwnershipRange(*A, &row_start, &row_end);CHKERRQ(ierr);
-  ierr = MatGetOwnershipRangeColumn(*A, &col_start, NULL);CHKERRQ(ierr);
+  PetscCall(MatSetOption(*A, MAT_NO_OFF_PROC_ENTRIES, PETSC_TRUE));
+  PetscCall(MatGetOwnershipRange(*A, &row_start, &row_end));
+  PetscCall(MatGetOwnershipRangeColumn(*A, &col_start, NULL));
 
   for (row_idx = row_start; row_idx < row_end; ++row_idx) {
 
@@ -124,19 +123,19 @@ PetscErrorCode C(BuildPetsc,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
 #endif
 
       row_count++;
-      ierr = MatSetValue(*A, row_idx, col_idx, value, ADD_VALUES);CHKERRQ(ierr);
+      PetscCall(MatSetValue(*A, row_idx, col_idx, value, ADD_VALUES));
     }
 
     /* workaround for a bug in PETSc that triggers if there are empty rows */
     if (row_count == 0) {
-      ierr = MatSetValue(*A, row_idx, col_start, 0, ADD_VALUES);CHKERRQ(ierr);
+      PetscCall(MatSetValue(*A, row_idx, col_start, 0, ADD_VALUES));
     }
   }
 
-  ierr = MatAssemblyBegin(*A,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
-  ierr = MatAssemblyEnd(*A,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
+  PetscCall(MatAssemblyBegin(*A,MAT_FINAL_ASSEMBLY));
+  PetscCall(MatAssemblyEnd(*A,MAT_FINAL_ASSEMBLY));
 
-  return ierr;
+  return 0;
 
 }
 
@@ -151,24 +150,23 @@ PetscErrorCode C(ComputeNonzeros,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))
    PetscInt** diag_nonzeros, PetscInt** offdiag_nonzeros,
    const void *left_subspace_data, const void *right_subspace_data)
 {
-  PetscErrorCode ierr;
   PetscInt mask_idx, row_idx, row_start, col_idx, col_start, state;
   PetscInt local_rows = PETSC_DECIDE;
   PetscInt local_cols = PETSC_DECIDE;
-  ierr = PetscSplitOwnership(PETSC_COMM_WORLD, &local_rows, &M);CHKERRQ(ierr);
-  ierr = PetscSplitOwnership(PETSC_COMM_WORLD, &local_cols, &N);CHKERRQ(ierr);
+  PetscCall(PetscSplitOwnership(PETSC_COMM_WORLD, &local_rows, &M));
+  PetscCall(PetscSplitOwnership(PETSC_COMM_WORLD, &local_cols, &N));
 
   /* prefix sum to get the start indices on each process */
-  ierr = MPI_Scan(&local_rows, &row_start, 1, MPIU_INT, MPI_SUM, PETSC_COMM_WORLD);CHKERRMPI(ierr);
-  ierr = MPI_Scan(&local_cols, &col_start, 1, MPIU_INT, MPI_SUM, PETSC_COMM_WORLD);CHKERRMPI(ierr);
+  PetscCallMPI(MPI_Scan(&local_rows, &row_start, 1, MPIU_INT, MPI_SUM, PETSC_COMM_WORLD));
+  PetscCallMPI(MPI_Scan(&local_cols, &col_start, 1, MPIU_INT, MPI_SUM, PETSC_COMM_WORLD));
 
   /* MPI_Scan includes current value in the sum */
   row_start -= local_rows;
   col_start -= local_cols;
 
   /* allocate storage for our diagonal and offdiagonal arrays */
-  ierr = PetscCalloc1(local_rows, diag_nonzeros);CHKERRQ(ierr);
-  ierr = PetscCalloc1(local_rows, offdiag_nonzeros);CHKERRQ(ierr);
+  PetscCall(PetscCalloc1(local_rows, diag_nonzeros));
+  PetscCall(PetscCalloc1(local_rows, offdiag_nonzeros));
 
   for (row_idx = 0; row_idx < local_rows; row_idx++) {
     state = C(I2S,LEFT_SUBSPACE)(row_idx+row_start, left_subspace_data);
@@ -196,7 +194,7 @@ PetscErrorCode C(ComputeNonzeros,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))
       (*diag_nonzeros)[row_idx] = 1;
     }
   }
-  return ierr;
+  return 0;
 }
 
 #undef  __FUNCT__
@@ -207,7 +205,6 @@ PetscErrorCode C(BuildCPUShell,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
   const C(data,RIGHT_SUBSPACE)* right_subspace_data,
   Mat *A)
 {
-  PetscErrorCode ierr;
   PetscInt M, N, m, n;
   shell_context *ctx;
 
@@ -220,18 +217,18 @@ PetscErrorCode C(BuildCPUShell,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
   PetscSplitOwnership(PETSC_COMM_WORLD,&m,&M);
   PetscSplitOwnership(PETSC_COMM_WORLD,&n,&N);
 
-  ierr = C(BuildContext_CPU,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
-    msc, left_subspace_data, right_subspace_data, &ctx);CHKERRQ(ierr);
+  PetscCall(C(BuildContext_CPU,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
+    msc, left_subspace_data, right_subspace_data, &ctx));
 
-  ierr = MatCreateShell(PETSC_COMM_WORLD, m, n, M, N, ctx, A);CHKERRQ(ierr);
-  ierr = MatShellSetOperation(*A, MATOP_MULT,
-           (void(*)(void))C(MatMult_CPU,C(LEFT_SUBSPACE,RIGHT_SUBSPACE)));
-  ierr = MatShellSetOperation(*A, MATOP_NORM,
-           (void(*)(void))C(MatNorm_CPU,C(LEFT_SUBSPACE,RIGHT_SUBSPACE)));
-  ierr = MatShellSetOperation(*A, MATOP_DESTROY,
-           (void(*)(void))C(MatDestroyCtx_CPU,C(LEFT_SUBSPACE,RIGHT_SUBSPACE)));
+  PetscCall(MatCreateShell(PETSC_COMM_WORLD, m, n, M, N, ctx, A));
+  PetscCall(MatShellSetOperation(*A, MATOP_MULT,
+				 (void(*)(void))C(MatMult_CPU,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))));
+  PetscCall(MatShellSetOperation(*A, MATOP_NORM,
+				 (void(*)(void))C(MatNorm_CPU,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))));
+  PetscCall(MatShellSetOperation(*A, MATOP_DESTROY,
+				 (void(*)(void))C(MatDestroyCtx_CPU,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))));
 
-  return ierr;
+  return 0;
 }
 
 #undef  __FUNCT__
@@ -245,12 +242,11 @@ PetscErrorCode C(BuildContext_CPU,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
   const C(data,RIGHT_SUBSPACE)* right_subspace_data,
   shell_context **ctx_p)
 {
-  PetscErrorCode ierr;
   shell_context *ctx;
   PetscInt nterms, i;
   PetscReal real_part;
 
-  ierr = PetscMalloc1(1, ctx_p);CHKERRQ(ierr);
+  PetscCall(PetscMalloc1(1, ctx_p));
   ctx = (*ctx_p);
 
   ctx->nmasks = msc->nmasks;
@@ -258,52 +254,51 @@ PetscErrorCode C(BuildContext_CPU,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
   nterms = msc->mask_offsets[msc->nmasks];
 
   /* we need to keep track of this stuff on our own. the numpy array might get garbage collected */
-  ierr = PetscMalloc1(msc->nmasks, &(ctx->masks));CHKERRQ(ierr);
-  ierr = PetscMemcpy(ctx->masks, msc->masks, msc->nmasks*sizeof(PetscInt));CHKERRQ(ierr);
+  PetscCall(PetscMalloc1(msc->nmasks, &(ctx->masks)));
+  PetscCall(PetscMemcpy(ctx->masks, msc->masks, msc->nmasks*sizeof(PetscInt)));
 
-  ierr = PetscMalloc1(msc->nmasks+1, &(ctx->mask_offsets));CHKERRQ(ierr);
-  ierr = PetscMemcpy(ctx->mask_offsets, msc->mask_offsets,
-                     (msc->nmasks+1)*sizeof(PetscInt));CHKERRQ(ierr);
+  PetscCall(PetscMalloc1(msc->nmasks+1, &(ctx->mask_offsets)));
+  PetscCall(PetscMemcpy(ctx->mask_offsets, msc->mask_offsets,
+                     (msc->nmasks+1)*sizeof(PetscInt)));
 
-  ierr = PetscMalloc1(nterms, &(ctx->signs));CHKERRQ(ierr);
-  ierr = PetscMemcpy(ctx->signs, msc->signs, nterms*sizeof(PetscInt));CHKERRQ(ierr);
+  PetscCall(PetscMalloc1(nterms, &(ctx->signs)));
+  PetscCall(PetscMemcpy(ctx->signs, msc->signs, nterms*sizeof(PetscInt)));
 
-  ierr = PetscMalloc1(nterms, &(ctx->real_coeffs));CHKERRQ(ierr);
+  PetscCall(PetscMalloc1(nterms, &(ctx->real_coeffs)));
   for (i=0; i < nterms; ++i) {
     real_part = PetscRealPart(msc->coeffs[i]);
     ctx->real_coeffs[i] = (real_part != 0) ? real_part : PetscImaginaryPart(msc->coeffs[i]);
   }
 
-  ierr = C(CopySubspaceData,LEFT_SUBSPACE)(
+  PetscCall(C(CopySubspaceData,LEFT_SUBSPACE)(
     (C(data,LEFT_SUBSPACE)**)&(ctx->left_subspace_data),
-    (C(data,LEFT_SUBSPACE)*)left_subspace_data);CHKERRQ(ierr);
-  ierr = C(CopySubspaceData,RIGHT_SUBSPACE)(
+    (C(data,LEFT_SUBSPACE)*)left_subspace_data));
+  PetscCall(C(CopySubspaceData,RIGHT_SUBSPACE)(
     (C(data,RIGHT_SUBSPACE)**)&(ctx->right_subspace_data),
-    (C(data,RIGHT_SUBSPACE)*)right_subspace_data);CHKERRQ(ierr);
+    (C(data,RIGHT_SUBSPACE)*)right_subspace_data));
 
-  return ierr;
+  return 0;
 }
 
 #undef  __FUNCT__
 #define __FUNCT__ "MatDestroyCtx_CPU"
 PetscErrorCode C(MatDestroyCtx_CPU,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A)
 {
-  PetscErrorCode ierr;
   shell_context *ctx;
 
-  ierr = MatShellGetContext(A,&ctx);CHKERRQ(ierr);
+  PetscCall(MatShellGetContext(A,&ctx));
 
-  ierr = PetscFree(ctx->masks);CHKERRQ(ierr);
-  ierr = PetscFree(ctx->mask_offsets);CHKERRQ(ierr);
-  ierr = PetscFree(ctx->signs);CHKERRQ(ierr);
-  ierr = PetscFree(ctx->real_coeffs);CHKERRQ(ierr);
+  PetscCall(PetscFree(ctx->masks));
+  PetscCall(PetscFree(ctx->mask_offsets));
+  PetscCall(PetscFree(ctx->signs));
+  PetscCall(PetscFree(ctx->real_coeffs));
 
-  ierr = C(DestroySubspaceData,LEFT_SUBSPACE)(ctx->left_subspace_data);CHKERRQ(ierr);
-  ierr = C(DestroySubspaceData,RIGHT_SUBSPACE)(ctx->right_subspace_data);CHKERRQ(ierr);
+  PetscCall(C(DestroySubspaceData,LEFT_SUBSPACE)(ctx->left_subspace_data));
+  PetscCall(C(DestroySubspaceData,RIGHT_SUBSPACE)(ctx->right_subspace_data));
 
-  ierr = PetscFree(ctx);CHKERRQ(ierr);
+  PetscCall(PetscFree(ctx));
 
-  return ierr;
+  return 0;
 }
 
 #undef  __FUNCT__
@@ -321,7 +316,6 @@ PetscErrorCode C(MatDestroyCtx_CPU,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A)
  */
 PetscErrorCode C(MatMult_CPU_General,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, Vec x, Vec b)
 {
-  PetscErrorCode ierr;
   int mpi_size, mpi_rank;
   PetscBool assembling;
 
@@ -341,34 +335,34 @@ PetscErrorCode C(MatMult_CPU_General,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, Vec
 
   shell_context *ctx;
 
-  ierr = MPI_Comm_size(PETSC_COMM_WORLD, &mpi_size);CHKERRMPI(ierr);
-  ierr = MPI_Comm_rank(PETSC_COMM_WORLD, &mpi_rank);CHKERRMPI(ierr);
+  PetscCallMPI(MPI_Comm_size(PETSC_COMM_WORLD, &mpi_size));
+  PetscCallMPI(MPI_Comm_rank(PETSC_COMM_WORLD, &mpi_rank));
 
   /* TODO: check that vectors are of correct type */
 
-  ierr = MatShellGetContext(A, &ctx);CHKERRQ(ierr);
+  PetscCall(MatShellGetContext(A, &ctx));
 
-  ierr = VecSet(b, 0);CHKERRQ(ierr);
+  PetscCall(VecSet(b, 0));
 
-  ierr = VecGetArrayRead(x, &(local_x_array));CHKERRQ(ierr);
+  PetscCall(VecGetArrayRead(x, &(local_x_array)));
 
-  ierr = VecGetOwnershipRange(x, &col_start, &col_end);CHKERRQ(ierr);
-  ierr = VecGetOwnershipRange(b, &row_start, &row_end);CHKERRQ(ierr);
+  PetscCall(VecGetOwnershipRange(x, &col_start, &col_end));
+  PetscCall(VecGetOwnershipRange(b, &row_start, &row_end));
 
   /* if there is only one process, just do one call to the kernel */
   if (mpi_size == 1) {
-    ierr = VecGetArray(b, &(b_array));CHKERRQ(ierr);
+    PetscCall(VecGetArray(b, &(b_array)));
 
     C(MatMult_CPU_kernel,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
-      local_x_array, b_array, ctx, row_start, row_end, col_start, col_end);CHKERRQ(ierr);
+      local_x_array, b_array, ctx, row_start, row_end, col_start, col_end);
 
-    ierr = VecRestoreArray(b, &b_array);CHKERRQ(ierr);
+    PetscCall(VecRestoreArray(b, &b_array));
   }
   else {
 
     /* allocate for cache */
-    ierr = PetscMalloc1(VECSET_CACHE_SIZE, &row_idxs);CHKERRQ(ierr);
-    ierr = PetscMalloc1(VECSET_CACHE_SIZE, &to_send);CHKERRQ(ierr);
+    PetscCall(PetscMalloc1(VECSET_CACHE_SIZE, &row_idxs));
+    PetscCall(PetscMalloc1(VECSET_CACHE_SIZE, &to_send));
 
     /* we are not already sending values to another processor */
     assembling = PETSC_FALSE;
@@ -419,15 +413,15 @@ PetscErrorCode C(MatMult_CPU_General,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, Vec
 
 	if (cache_idx == VECSET_CACHE_SIZE) {
 	  if (assembling) {
-	    ierr = VecAssemblyEnd(b);CHKERRQ(ierr);
+	    PetscCall(VecAssemblyEnd(b));
 	    im_done = 0;
-	    ierr = MPI_Allreduce(&im_done, &done_communicating, 1, MPI_INT, MPI_BAND, MPI_COMM_WORLD);CHKERRMPI(ierr);
+	    PetscCallMPI(MPI_Allreduce(&im_done, &done_communicating, 1, MPI_INT, MPI_BAND, MPI_COMM_WORLD));
 	    assembling = PETSC_FALSE;
 	  }
 
-	  ierr = VecSetValues(b, VECSET_CACHE_SIZE, row_idxs, to_send, ADD_VALUES);CHKERRQ(ierr);
+	  PetscCall(VecSetValues(b, VECSET_CACHE_SIZE, row_idxs, to_send, ADD_VALUES));
 
-	  ierr = VecAssemblyBegin(b);CHKERRQ(ierr);
+	  PetscCall(VecAssemblyBegin(b));
 	  assembling = PETSC_TRUE;
 
 	  cache_idx = 0;
@@ -438,28 +432,28 @@ PetscErrorCode C(MatMult_CPU_General,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, Vec
     im_done = cache_idx==0;
     done_communicating = PETSC_FALSE;
     if (assembling) {
-      ierr = VecAssemblyEnd(b);CHKERRQ(ierr);
-      ierr = MPI_Allreduce(&im_done, &done_communicating, 1, MPI_INT, MPI_BAND, MPI_COMM_WORLD);CHKERRMPI(ierr);
+      PetscCall(VecAssemblyEnd(b));
+      PetscCallMPI(MPI_Allreduce(&im_done, &done_communicating, 1, MPI_INT, MPI_BAND, MPI_COMM_WORLD));
     }
 
     if (!im_done) {
-      ierr = VecSetValues(b, cache_idx, row_idxs, to_send, ADD_VALUES);CHKERRQ(ierr);
+      PetscCall(VecSetValues(b, cache_idx, row_idxs, to_send, ADD_VALUES));
     }
 
     while (!done_communicating) {
-      ierr = VecAssemblyBegin(b);CHKERRQ(ierr);
-      ierr = VecAssemblyEnd(b);CHKERRQ(ierr);
+      PetscCall(VecAssemblyBegin(b));
+      PetscCall(VecAssemblyEnd(b));
       im_done = 1;
-      ierr = MPI_Allreduce(&im_done, &done_communicating, 1, MPI_INT, MPI_BAND, MPI_COMM_WORLD);CHKERRMPI(ierr);
+      PetscCallMPI(MPI_Allreduce(&im_done, &done_communicating, 1, MPI_INT, MPI_BAND, MPI_COMM_WORLD));
     }
 
-    ierr = PetscFree(row_idxs);CHKERRQ(ierr);
-    ierr = PetscFree(to_send);CHKERRQ(ierr);
+    PetscCall(PetscFree(row_idxs));
+    PetscCall(PetscFree(to_send));
   }
 
-  ierr = VecRestoreArrayRead(x, &local_x_array);CHKERRQ(ierr);
+  PetscCall(VecRestoreArrayRead(x, &local_x_array));
 
-  return ierr;
+  return 0;
 }
 
 #undef  __FUNCT__
@@ -533,16 +527,15 @@ PetscErrorCode C(MatMult_CPU_Fast,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, Vec x,
 
 PetscErrorCode C(MatMult_CPU,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, Vec x, Vec b)
 {
-  PetscErrorCode ierr;
   PetscBool use_fast_matmult;
   PetscInt local_size;
   shell_context *ctx;
   int mpi_size;
-  ierr = MPI_Comm_size(PETSC_COMM_WORLD,&mpi_size);CHKERRMPI(ierr);
+  PetscCallMPI(MPI_Comm_size(PETSC_COMM_WORLD,&mpi_size));
 
-  ierr = VecGetLocalSize(b, &local_size);CHKERRQ(ierr);
+  PetscCall(VecGetLocalSize(b, &local_size));
 
-  ierr = MatShellGetContext(A,&ctx);CHKERRQ(ierr);
+  PetscCall(MatShellGetContext(A,&ctx));
 
   /* mpi size is a power of 2 */
   use_fast_matmult = __builtin_popcount(mpi_size) == 1;
@@ -557,12 +550,12 @@ PetscErrorCode C(MatMult_CPU,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, Vec x, Vec 
   #endif
 
   if (use_fast_matmult) {
-    ierr = C(MatMult_CPU_Fast,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(A, x, b);CHKERRQ(ierr);
+    PetscCall(C(MatMult_CPU_Fast,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(A, x, b));
   }
   else {
-    ierr = C(MatMult_CPU_General,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(A, x, b);CHKERRQ(ierr);
+    PetscCall(C(MatMult_CPU_General,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(A, x, b));
   }
-  return ierr;
+  return 0;
 }
 
 #ifndef HELPER_FNS
@@ -611,7 +604,6 @@ PetscErrorCode do_cache_product(
 )
 {
   PetscInt iterate_max, cache_idx, inner_idx, row_idx, stop;
-  PetscErrorCode ierr = 0;
 
   /* TODO: this is not compatible with 64 bit ints */
   iterate_max = 1 << __builtin_ctz(mask);
@@ -638,7 +630,7 @@ PetscErrorCode do_cache_product(
     }
   }
 
-  return ierr;
+  return 0;
 
 }
 
@@ -721,7 +713,6 @@ void C(compute_mask_starts,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
 #define __FUNCT__ "MatMult_CPU_Fast"
 PetscErrorCode C(MatMult_CPU_Fast,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, Vec x, Vec b)
 {
-  PetscErrorCode ierr;
   PetscInt proc_idx, proc_me, proc_mask, n_local_spins;
   PetscInt proc_start_idx, block_start_idx;
   PetscInt mask_idx, term_idx;
@@ -745,33 +736,33 @@ PetscErrorCode C(MatMult_CPU_Fast,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, Vec x,
   PetscInt cache_idx;
 
   int mpi_rank,mpi_size;
-  ierr = MPI_Comm_rank(PETSC_COMM_WORLD,&mpi_rank);CHKERRMPI(ierr);
-  ierr = MPI_Comm_size(PETSC_COMM_WORLD,&mpi_size);CHKERRMPI(ierr);
+  PetscCallMPI(MPI_Comm_rank(PETSC_COMM_WORLD,&mpi_rank));
+  PetscCallMPI(MPI_Comm_size(PETSC_COMM_WORLD,&mpi_size));
 
   /* check if number of processors is a multiple of 2 */
   if ((mpi_size & (mpi_size-1)) != 0) {
     SETERRQ(PETSC_COMM_WORLD, PETSC_ERR_SUP, "number of MPI procs must be a power of 2");
   }
 
-  ierr = MatShellGetContext(A,&ctx);CHKERRQ(ierr);
+  PetscCall(MatShellGetContext(A,&ctx));
 
   /* clear out the b vector */
-  ierr = VecSet(b,0);CHKERRQ(ierr);
+  PetscCall(VecSet(b,0));
 
   /* prepare x array */
-  ierr = VecGetOwnershipRange(x, &x_start, &x_end);CHKERRQ(ierr);
-  ierr = VecGetArrayRead(x, &x_array);CHKERRQ(ierr);
+  PetscCall(VecGetOwnershipRange(x, &x_start, &x_end));
+  PetscCall(VecGetArrayRead(x, &x_array));
 
   /* allocate for cache */
-  ierr = PetscMalloc1(VECSET_CACHE_SIZE, &row_idx);CHKERRQ(ierr);
-  ierr = PetscMalloc1(VECSET_CACHE_SIZE, &summed_coeffs);CHKERRQ(ierr);
-  ierr = PetscMalloc1(VECSET_CACHE_SIZE, &values);CHKERRQ(ierr);
+  PetscCall(PetscMalloc1(VECSET_CACHE_SIZE, &row_idx));
+  PetscCall(PetscMalloc1(VECSET_CACHE_SIZE, &summed_coeffs));
+  PetscCall(PetscMalloc1(VECSET_CACHE_SIZE, &values));
 
-  ierr = PetscMalloc1(LKP_SIZE*LKP_SIZE, &lookup);CHKERRQ(ierr);
+  PetscCall(PetscMalloc1(LKP_SIZE*LKP_SIZE, &lookup));
   compute_sign_lookup(lookup);
 
   #if (C(LEFT_SUBSPACE,SP) == Parity_SP)
-    ierr = PetscMalloc1(LKP_SIZE*LKP_SIZE, &parity_lookup);CHKERRQ(ierr);
+    PetscCall(PetscMalloc1(LKP_SIZE*LKP_SIZE, &parity_lookup));
     compute_parity_sign_lookup(((data_Parity*)(ctx->left_subspace_data))->space, parity_lookup);
   #endif
 
@@ -779,7 +770,7 @@ PetscErrorCode C(MatMult_CPU_Fast,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, Vec x,
   /* this is log base 2 of the local vector size */
   n_local_spins = __builtin_ctz(x_end - x_start);
 
-  ierr = PetscMalloc1(mpi_size+1,&(mask_starts));CHKERRQ(ierr);
+  PetscCall(PetscMalloc1(mpi_size+1,&(mask_starts)));
   C(compute_mask_starts,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
     ctx->nmasks,
     n_local_spins,
@@ -810,8 +801,8 @@ PetscErrorCode C(MatMult_CPU_Fast,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, Vec x,
          block_start_idx < proc_start_idx + (x_end - x_start);
          block_start_idx += VECSET_CACHE_SIZE) {
 
-      ierr = PetscMemzero(values,   sizeof(PetscScalar)*VECSET_CACHE_SIZE);CHKERRQ(ierr);
-      ierr = PetscMemzero(summed_coeffs, sizeof(PetscScalar)*VECSET_CACHE_SIZE);CHKERRQ(ierr);
+      PetscCall(PetscMemzero(values,   sizeof(PetscScalar)*VECSET_CACHE_SIZE));
+      PetscCall(PetscMemzero(summed_coeffs, sizeof(PetscScalar)*VECSET_CACHE_SIZE));
 
       for (cache_idx=0; cache_idx < VECSET_CACHE_SIZE; ++cache_idx) {
         row_idx[cache_idx] = block_start_idx+cache_idx;
@@ -851,43 +842,42 @@ PetscErrorCode C(MatMult_CPU_Fast,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, Vec x,
 
         }
 
-        ierr = do_cache_product(m, block_start_idx, x_start, x_end, summed_coeffs, x_array, values);CHKERRQ(ierr);
-        ierr = PetscMemzero(summed_coeffs, sizeof(PetscScalar)*VECSET_CACHE_SIZE);CHKERRQ(ierr);
+        PetscCall(do_cache_product(m, block_start_idx, x_start, x_end, summed_coeffs, x_array, values));
+        PetscCall(PetscMemzero(summed_coeffs, sizeof(PetscScalar)*VECSET_CACHE_SIZE));
 
       }
 
       if (assembling) {
-        ierr = VecAssemblyEnd(b);CHKERRQ(ierr);
+        PetscCall(VecAssemblyEnd(b));
         assembling = PETSC_FALSE;
       }
-      ierr = VecSetValues(b, VECSET_CACHE_SIZE, row_idx, values, ADD_VALUES);CHKERRQ(ierr);
+      PetscCall(VecSetValues(b, VECSET_CACHE_SIZE, row_idx, values, ADD_VALUES));
 
-      ierr = VecAssemblyBegin(b);CHKERRQ(ierr);
+      PetscCall(VecAssemblyBegin(b));
       assembling = PETSC_TRUE;
     }
   }
 
   if (assembling) {
-    ierr = VecAssemblyEnd(b);CHKERRQ(ierr);
+    PetscCall(VecAssemblyEnd(b));
   }
 
-  ierr = VecRestoreArrayRead(x,&x_array);CHKERRQ(ierr);
+  PetscCall(VecRestoreArrayRead(x,&x_array));
 
-  ierr = PetscFree(lookup);CHKERRQ(ierr);
-  ierr = PetscFree(row_idx);CHKERRQ(ierr);
-  ierr = PetscFree(values);CHKERRQ(ierr);
-  ierr = PetscFree(summed_coeffs);CHKERRQ(ierr);
+  PetscCall(PetscFree(lookup));
+  PetscCall(PetscFree(row_idx));
+  PetscCall(PetscFree(values));
+  PetscCall(PetscFree(summed_coeffs));
 
-  return ierr;
+  return 0;
 }
 
 #else
 
 PetscErrorCode C(MatMult_CPU,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, Vec x, Vec b)
 {
-  PetscErrorCode ierr;
-  ierr = C(MatMult_CPU_General,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(A,x,b);CHKERRQ(ierr);
-  return ierr;
+  PetscCall(C(MatMult_CPU_General,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(A,x,b));
+  return 0;
 }
 
 #endif
@@ -900,7 +890,6 @@ PetscErrorCode C(MatMult_CPU,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, Vec x, Vec 
 PetscErrorCode C(MatNorm_CPU,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
   Mat A, NormType type, PetscReal *nrm)
 {
-  PetscErrorCode ierr;
   PetscInt row_idx, row_start, row_end;
   PetscInt mask_idx, term_idx, ket, bra;
   PetscInt sign;
@@ -912,7 +901,7 @@ PetscErrorCode C(MatNorm_CPU,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
     SETERRQ(PETSC_COMM_WORLD, PETSC_ERR_ARG_OUTOFRANGE, "Only NORM_INFINITY is implemented for shell matrices.");
   }
 
-  ierr = MatShellGetContext(A, &ctx);CHKERRQ(ierr);
+  PetscCall(MatShellGetContext(A, &ctx));
 
   /*
    * keep the norm cached so we don't have to compute it all the time.
@@ -920,10 +909,10 @@ PetscErrorCode C(MatNorm_CPU,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
    */
   if (ctx->nrm != -1) {
     (*nrm) = ctx->nrm;
-    return ierr;
+    return 0;
   }
 
-  ierr = MatGetOwnershipRange(A, &row_start, &row_end);CHKERRQ(ierr);
+  PetscCall(MatGetOwnershipRange(A, &row_start, &row_end));
 
   local_max = 0;
   for (row_idx = row_start; row_idx < row_end; ++row_idx) {
@@ -967,10 +956,10 @@ PetscErrorCode C(MatNorm_CPU,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
     }
   }
 
-  ierr = MPIU_Allreduce(&local_max, &global_max, 1, MPIU_REAL, MPIU_MAX, PETSC_COMM_WORLD);CHKERRQ(ierr);
+  PetscCallMPI(MPIU_Allreduce(&local_max, &global_max, 1, MPIU_REAL, MPIU_MAX, PETSC_COMM_WORLD));
 
   ctx->nrm = global_max;
   (*nrm) = global_max;
 
-  return ierr;
+  return 0;
 }
