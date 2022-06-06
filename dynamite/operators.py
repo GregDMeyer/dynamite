@@ -637,6 +637,17 @@ class Operator:
         '''
         return msc_tools.shift(self.msc, shift, wrap_idx)
 
+    def truncate(self, tol=1e-12):
+        '''
+        Remove terms whose magnitude (absolute value) is less than `tol`.
+
+        Parameters
+        ----------
+        tol : float
+            The cutoff for truncation
+        '''
+        self.msc = msc_tools.truncate(self.msc, tol=tol)
+
     ### interface to numpy
 
     def to_numpy(self, subspaces=None, sparse=True):

@@ -521,6 +521,68 @@ class ReduceMSC(ut.TestCase):
 
         self.check_same(check, target)
 
+class Truncate(ut.TestCase):
+    '''
+    Test truncation method
+    '''
+    dtype = msc_tools.msc_dtype
+
+    def test_single(self):
+        check =  np.array([(5, 2, -0.5j)], dtype=self.dtype)
+        target = np.array([(5, 2, -0.5j)], dtype=self.dtype)
+        self.assertTrue(np.array_equal(msc_tools.truncate(check, tol=1e-12), target),
+                        msg='\ncheck:\n'+str(check) + '\ntarget:\n'+str(target))
+
+    def test_zero_tol(self):
+        check =  np.array([(1, 2, 0),
+                           (2, 3, -1e-13),
+                           (5, 2, -0.5j)], dtype=self.dtype)
+        target = np.array([(2, 3, -1e-13), (5, 2, -0.5j)], dtype=self.dtype)
+        self.assertTrue(np.array_equal(msc_tools.truncate(check, tol=0), target),
+                        msg='\ncheck:\n'+str(check) + '\ntarget:\n'+str(target))
+
+    def test_neg_tol(self):
+        check = np.array([(5, 2, -0.5j)], dtype=self.dtype)
+        with self.assertRaises(ValueError):
+            msc_tools.truncate(check, tol=-1e-12)
+
+    def test_empty(self):
+        check = np.array([(5, 2, 0)], dtype=self.dtype)
+        target = np.array([], dtype=self.dtype)
+        self.assertTrue(np.array_equal(msc_tools.truncate(check, tol=1e-12), target),
+                        msg='\ncheck:\n'+str(check) + '\ntarget:\n'+str(target))
+
+    def test_few_empty(self):
+        check = np.array([(5, 2, 0), (4, 1, 0)], dtype=self.dtype)
+        target = np.array([], dtype=self.dtype)
+        self.assertTrue(np.array_equal(msc_tools.truncate(check, tol=1e-12), target),
+                        msg='\ncheck:\n'+str(check) + '\ntarget:\n'+str(target))
+
+    def test_many(self):
+        check = np.array([(0, 0, 1.2),
+                          (1, 0, 1.2e-13),
+                          (1, 3, 8e-15),
+                          (2, 3, 4),
+                          (5, 2, -0.5),
+                          (5, 3, 2),
+                          (6, 2, -1e-14),
+                          (6, 4, 1j*1e-15),
+                          (14, 3, 2j),
+                          (15, 3, 1.5j)],
+                         dtype=self.dtype)
+
+        target = np.array([(0, 0, 1.2),
+                           (2, 3, 4),
+                           (5, 2, -0.5),
+                           (5, 3, 2),
+                           (14, 3, 2j),
+                           (15, 3, 1.5j)],
+                          dtype=self.dtype)
+
+        self.assertTrue(np.array_equal(msc_tools.truncate(check, tol=1e-12), target),
+                        msg='\ncheck:\n'+str(check) + '\ntarget:\n'+str(target))
+
+
 class Serialization(ut.TestCase):
     '''
     Test the msc.serialize and msc.deserialize methods.

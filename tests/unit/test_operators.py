@@ -654,6 +654,26 @@ class MSC(ut.TestCase):
         o.is_reduced = True
         self.assertTrue(o.is_reduced)
 
+    def test_truncate(self):
+        for tol in (None, 1e-10):
+            with self.subTest(tol=tol):
+                o = Operator()
+                o.msc = np.array([(1, 2, 3), (4, 5, 1e-13)], dtype=self.dtype)
+                if tol is None:
+                    o.truncate()
+                else:
+                    o.truncate(tol=tol)
+                self.assertTrue(np.array_equal(o.msc,
+                                               np.array([(1,2,3)], dtype=self.dtype)))
+
+    def test_truncate_adjust_tol(self):
+        o = Operator()
+        o.msc = np.array([(1, 2, 3), (4, 5, 1e-8)], dtype=self.dtype)
+        o.truncate(tol=1e-5)
+        self.assertTrue(np.array_equal(o.msc,
+                                       np.array([(1,2,3)], dtype=self.dtype)))
+
+
 from dynamite.operators import from_bytes
 class FromBytes(ut.TestCase):
 

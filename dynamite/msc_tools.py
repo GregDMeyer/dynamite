@@ -265,6 +265,28 @@ def combine_and_sort(msc):
 
     return rtn
 
+def truncate(msc, tol):
+    '''
+    Remove terms whose magnitude is less than `tol`.
+
+    Parameters
+    ----------
+    MSC : np.ndarray
+        The input MSC representation.
+
+    tol : float
+        The cutoff for truncation.
+
+    Returns
+    -------
+    np.ndarray
+        The truncated MSC representation.
+    '''
+    if tol < 0:
+        raise ValueError('tol cannot be less than zero')
+
+    return msc[np.abs(msc['coeffs'])>tol]
+
 def serialize(msc):
     '''
     Take an MSC representation and spin chain length and serialize it into a
