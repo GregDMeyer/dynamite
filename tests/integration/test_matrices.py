@@ -2,6 +2,7 @@
 Integration tests ensuring that matrices are built correctly.
 '''
 
+from math import isclose
 import numpy as np
 
 import unittest as ut
@@ -9,9 +10,9 @@ import dynamite_test_runner as dtr
 
 from dynamite import config
 from dynamite.states import State
-from dynamite.tools import complex_enabled
+from dynamite.tools import complex_enabled, get_cur_memory_usage
 from dynamite.operators import identity, sigmax, sigmay, index_sum
-from dynamite.msc_tools import msc_dtype
+from dynamite.msc_tools import msc_dtype, dnm_int_t
 from dynamite.subspaces import Auto, SpinConserve
 import hamiltonians
 
@@ -202,6 +203,49 @@ class LargeInt64(dtr.DynamiteTestCase):
         if H_np is not None:
             self.assertTrue(result,
                             msg=msg)
+
+
+class MemoryUsage(dtr.DynamiteTestCase):
+
+    def setUp(self):
+        config._initialize()
+        from petsc4py import PETSc
+        self.mpi_size = PETSc.COMM_WORLD.size
+
+    def test_diagonal(self):
+        H = index_sum(sigmaz())
+        mem_pre = get_cur_memory_usage(which='petsc')
+        H.build_mat()
+        mem_post = get_cur_memory_usage(which='petsc')
+        self.assertGreater(
+                1E-5 + 1.3*H.estimate_memory()/self.mpi_size,
+                mem_post-mem_pre
+        )
+
+    def test_XX(self):
+        H = index_sum(sigmax(0)+sigmax(1))
+        mem_pre = get_cur_memory_usage(which='petsc')
+        H.build_mat()
+        mem_post = get_cur_memory_usage(which='petsc')
+        self.assertGreater(
+                1E-5 + 1.3*H.estimate_memory()/self.mpi_size,
+                mem_post-mem_pre
+        )
+
+    def test_XXYY_auto(self):
+        for sort in (False, True):
+            with self.subTest(sort=sort):
+                H = index_sum(sigmax(0)*sigmax(1) + sigmay(0)*sigmay(1))
+                half = config.L//2
+                H.subspace = Auto(H, 'U'*half + 'D'*(config.L-half), sort=sort)
+                mem_pre = get_cur_memory_usage(which='petsc')
+                H.build_mat()
+                mem_post = get_cur_memory_usage(which='petsc')
+                self.assertGreater(
+                    1E-5 + 1.3*H.estimate_memory()/self.mpi_size,
+                    mem_post-mem_pre
+                )
+
 
 if __name__ == '__main__':
     dtr.main()

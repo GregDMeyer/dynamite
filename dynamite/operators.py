@@ -7,8 +7,9 @@ import numpy as np
 
 from . import config, validate, msc_tools
 from .computations import evolve, eigsolve
-from .subspaces import Full
+from .subspaces import Full, Explicit
 from .states import State
+from .tools import complex_enabled
 
 class Operator:
     """
@@ -565,6 +566,76 @@ class Operator:
             mat = self._mats.pop(k, None)
             if mat is not None:
                 mat.destroy()
+
+    def estimate_memory(self, mpi_size=None):
+        '''
+        Estimate the total amount of memory that will be used by this
+        operator once the matrix is constructed (for example, after
+        calling ``.evolve()``), summed across all MPI ranks.
+
+        Note that the memory allocated for communication etc. depends on
+        a number of different parameters, so actual memory usage may vary.
+
+        For operators containing terms that cancel to zero in some cases
+        (such as XX+YY), this function will overestimate the required
+        memory for non-shell matrices.
+
+        Parameters
+        ----------
+
+        mpi_size : int, optional
+            The number of ranks to estimate memory usage for. If not
+            provided, the mpi size of the running program is used.
+
+        Returns
+        -------
+        float
+            The expected memory usage, in gigabytes
+        '''
+        if mpi_size is None:
+            config._initialize()
+            from petsc4py import PETSc
+            mpi_size = PETSc.COMM_WORLD.size
+
+        if self.shell:
+            usage_bytes = self.msc.nbytes
+
+            # Explicit is the only subspace that uses an appreciable
+            # amount of memory
+            for sp in (self.left_subspace, self.right_subspace):
+                if isinstance(sp, Explicit):
+                    usage_bytes += sp.state_map.nbytes
+                    usage_bytes += sp.rmap_indices.nbytes
+                    usage_bytes += sp.rmap_states.nbytes
+
+            # these values are stored redundantly on every rank
+            usage_bytes *= mpi_size
+
+        else:
+            int_size = msc_tools.dnm_int_t().itemsize
+            scalar_size = 16 if complex_enabled() else 8
+            elem_size = int_size + scalar_size
+
+            # because we have to add a zero diagonal if it doesn't exist
+            # to keep PETSc happy
+            nnz = self.nnz
+            if np.all(self.msc['masks']):
+                nnz += 1
+
+            usage_bytes = nnz*self.dim[0]*elem_size
+
+            # the pointers to the array for each row and
+            # other bookkeeping arrays petsc allocates
+            usage_bytes += 5*int_size*self.dim[0]
+
+            if mpi_size > 1:
+                usage_bytes += 3*int_size*self.dim[0]  # indices for sparse mat
+                usage_bytes += scalar_size*self.dim[1] # VecCreate_Seq
+                usage_bytes += int_size*self.dim[0]    # MatSetUpMultiply
+                usage_bytes += 2*int_size*self.dim[1]  # VecScatterCreate
+                usage_bytes += 2*int_size*self.dim[0]  # MatMarkDiagonal
+
+        return usage_bytes/1E9
 
     def create_states(self):
         '''

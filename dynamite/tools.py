@@ -78,8 +78,9 @@ def track_memory():
 
 def get_max_memory_usage(which='all'):
     '''
-    Get the maximum memory usage up to this point. Only updated whenever
-    objects are destroyed (e.g. with :meth:`dynamite.operators.Operator.destroy_mat`)
+    Get the maximum memory usage up to this point, in gigabytes.
+    Only updated whenever objects are destroyed (e.g. with
+    :meth:`dynamite.operators.Operator.destroy_mat`)
 
     .. note::
         :meth:`track_memory` must be called before this function is called,
@@ -95,16 +96,16 @@ def get_max_memory_usage(which='all'):
     Returns
     -------
     float
-        The max memory usage in bytes
+        The max memory usage in gigabytes
     '''
     from . import config
     config._initialize()
     from ._backend import bpetsc
-    return bpetsc.get_max_memory_usage(which=which)
+    return bpetsc.get_max_memory_usage(which=which)/1E9
 
 def get_cur_memory_usage(which='all'):
     '''
-    Get the current memory usage (resident set size) in bytes.
+    Get the current memory usage (resident set size) in gigabytes.
 
     Parameters
     ----------
@@ -115,12 +116,12 @@ def get_cur_memory_usage(which='all'):
     Returns
     -------
     float
-        The max memory usage in bytes
+        The max memory usage in gigabytes
     '''
     from . import config
     config._initialize()
     from ._backend import bpetsc
-    return bpetsc.get_cur_memory_usage(which=which)
+    return bpetsc.get_cur_memory_usage(which=which)/1E9
 
 def complex_enabled():
     from ._backend import bbuild
