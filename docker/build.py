@@ -110,6 +110,11 @@ def main():
             for cuda_arch in cuda_archs:
                 for int_size in args.int_sizes:
 
+                    # this configuration is currently not supported
+                    if platform == 'gpu' and int_size == 64:
+                        print('Skipping unsupported 64-bit GPU build')
+                        continue
+
                     tags = ["latest", version]
 
                     if platform == 'gpu':
