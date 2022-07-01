@@ -11,6 +11,7 @@
 
 ### Changed
  - default JupyterLab port is now 8887 to avoid conflict with any other running instances of JupyterLab
+ - memory usage tracking functions now report results in gigabytes instead of bytes
 
 ### Fixed
  - Improvements to docker build process
