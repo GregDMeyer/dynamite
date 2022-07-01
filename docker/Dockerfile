@@ -24,7 +24,9 @@ ONBUILD RUN apt-get update && \
 
 ARG PETSC_ARCH=complex-opt
 ENV PETSC_ARCH=$PETSC_ARCH
-ENV PETSC_CONFIG_FLAGS=--download-scalapack=1 --with-mumps=1
+
+ARG PETSC_CONFIG_FLAGS
+ENV PETSC_CONFIG_FLAGS="$PETSC_CONFIG_FLAGS --download-scalapack=1 --with-mumps=1"
 
 
 FROM nvidia/cuda:11.6.0-devel-ubuntu20.04 AS base-gpu
@@ -48,7 +50,9 @@ ONBUILD RUN apt-get update && \
 
 ARG PETSC_ARCH=cuda-opt
 ENV PETSC_ARCH=$PETSC_ARCH
-ENV PETSC_CONFIG_FLAGS=--with-mpi=0
+
+ARG PETSC_CONFIG_FLAGS
+ENV PETSC_CONFIG_FLAGS="$PETSC_CONFIG_FLAGS --with-mpi=0"
 
 
 FROM base-${PLATFORM} as build
