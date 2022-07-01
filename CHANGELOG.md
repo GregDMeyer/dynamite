@@ -15,6 +15,7 @@
 ### Fixed
  - Improvements to docker build process
  - Update deprecated petsc macros in backend
+ - broken int64 test
 
 ## 0.2.1 - 2022-05-19
 

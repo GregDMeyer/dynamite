@@ -200,7 +200,7 @@ class LargeInt64(dtr.DynamiteTestCase):
             else:
                 msg = ''
 
-        if H_np is not None:
+        if H_dnm is not None:
             self.assertTrue(result,
                             msg=msg)
 
