@@ -17,6 +17,11 @@ from dynamite.tools import complex_enabled
 class Explicit(dtr.DynamiteTestCase):
     def setUp(self):
         self.state = State()
+        self.old_L = config.L
+        config._L = None
+
+    def tearDown(self):
+        config.L = self.old_L
 
     def compare(self, check, correct):
         eps = 1E-10  # TODO: should compute this from machine epsilon

@@ -60,7 +60,9 @@ def evolve(H, state, t, result=None, **kwargs):
     config._initialize()
     from slepc4py import SLEPc
 
-    if (state.subspace, state.subspace) not in H.get_subspace_list():
+    H.establish_L()
+
+    if not H.has_subspace(state.subspace, state.subspace):
         raise ValueError('Hamiltonian and state are defined on different '
                          'subspaces.')
 
@@ -180,9 +182,11 @@ def eigsolve(H, getvecs=False, nev=1, which='smallest', target=None, tol=None, s
         and a list of the corresponding eigenvectors.
     """
 
+    H.establish_L()
+
     if subspace is None:
         subspace = H.subspace
-    elif (subspace, subspace) not in H.get_subspace_list():
+    elif not H.has_subspace(subspace):
         raise ValueError('Requested subspace has not been added to operator.')
 
     config._initialize()

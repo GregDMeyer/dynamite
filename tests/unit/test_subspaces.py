@@ -40,6 +40,23 @@ class TestFull(ut.TestCase):
     def test_product_state_basis(self):
         self.assertTrue(Full._product_state_basis)
 
+    def test_no_L(self):
+        s = Full()
+        with self.assertRaises(ValueError):
+            s.get_dimension()
+
+        with self.assertRaises(ValueError):
+            s.idx_to_state(0)
+
+        with self.assertRaises(ValueError):
+            s.state_to_idx(0)
+
+    def test_change_L(self):
+        s = Full()
+        s.L = 5
+        with self.assertRaises(AttributeError):
+            s.L = 6
+
 
 class TestParity(ut.TestCase):
 
@@ -124,6 +141,27 @@ class TestParity(ut.TestCase):
                 correct[2] = int(bad_states[p], 2)
                 idxs = Parity._state_to_idx(correct, L, p)
                 self.assertEqual(idxs[2], -1)
+
+    def test_no_L(self):
+        for p in ('even', 'odd'):
+            with self.subTest(parity=p):
+                s = Parity(p)
+                with self.assertRaises(ValueError):
+                    s.get_dimension()
+
+                with self.assertRaises(ValueError):
+                    s.idx_to_state(0)
+
+                with self.assertRaises(ValueError):
+                    s.state_to_idx(0)
+
+    def test_change_L(self):
+        for p in ('even', 'odd'):
+            with self.subTest(parity=p):
+                s = Parity(p)
+                s.L = 5
+                with self.assertRaises(AttributeError):
+                    s.L = 6
 
 
 class TestSpinConserve(ut.TestCase):
@@ -545,14 +583,16 @@ class Checksum(ut.TestCase):
         self.assertEqual(chksum1, chksum2)
 
     def test_diff_full(self):
-        space = Full()
-        space.L = 10
-        chksum1 = space.get_checksum()
+        space1 = Full()
+        space1.L = 10
 
-        space.L = 11
-        chksum2 = space.get_checksum()
+        space2 = Full()
+        space2.L = 11
 
-        self.assertNotEqual(chksum1, chksum2)
+        self.assertNotEqual(
+            space1.get_checksum(),
+            space2.get_checksum()
+        )
 
     def test_same_full_large(self):
         space = Full()
@@ -562,14 +602,16 @@ class Checksum(ut.TestCase):
         self.assertEqual(chksum1, chksum2)
 
     def test_diff_full_large(self):
-        space = Full()
-        space.L = 20
-        chksum1 = space.get_checksum()
+        space1 = Full()
+        space1.L = 20
 
-        space.L = 21
-        chksum2 = space.get_checksum()
+        space2 = Full()
+        space2.L = 21
 
-        self.assertNotEqual(chksum1, chksum2)
+        self.assertNotEqual(
+            space1.get_checksum(),
+            space2.get_checksum()
+        )
 
     def test_same_parity(self):
         space = Parity('even')

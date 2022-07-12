@@ -95,8 +95,8 @@ class PetscMethods(dtr.DynamiteTestCase):
         self.assertTrue(np.array_equal(result, np.arange(start, end)))
 
     def test_copy_exception_L(self):
-        state1 = State()
-        state2 = State(L=state1.subspace.L+1)
+        state1 = State(subspace=Parity('even'))
+        state2 = State(subspace=Parity('odd'))
 
         with self.assertRaises(ValueError):
             state1.copy(state2)

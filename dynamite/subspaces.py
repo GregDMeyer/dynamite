@@ -24,7 +24,7 @@ class Subspace:
     _checksum_start = 0
 
     def __init__(self):
-        self._L = None
+        self._L = config.L
         self._chksum = None
 
     def __eq__(self, s):
@@ -39,12 +39,19 @@ class Subspace:
             raise ValueError('Cannot compare Subspace to non-Subspace type')
 
         if self._L is None:
-            raise ValueError('Cannot compare subspaces before setting L')
+            raise ValueError('Cannot evaluate equality of subspaces before setting L')
 
         if self.get_dimension() != s.get_dimension():
             return False
 
         return self.get_checksum() == s.get_checksum()
+
+    def identical(self, s):
+        '''
+        Returns whether two subspaces are exactly the same---both the same
+        type and with the same values.
+        '''
+        raise NotImplementedError()
 
     @property
     def L(self):
@@ -59,13 +66,12 @@ class Subspace:
 
     @L.setter
     def L(self, value):
+        if self.L is not None and value != self.L:
+            raise AttributeError('Cannot change L for a subspace after it is set')
+
         # check that this value of L is compatible with the subspace
         value = validate.L(value)
         value = self.check_L(value)
-
-        if value != self._L:
-            self._chksum = None
-
         self._L = value
 
     def get_dimension(self):
@@ -154,10 +160,15 @@ class Full(Subspace):
     # overriding __eq__ causes this to get unset. :(
     __hash__ = Subspace.__hash__
 
+    def identical(self, s):
+        return type(self) == type(s) and self.L == s.L
+
     def get_dimension(self):
         """
         Get the dimension of the subspace.
         """
+        if self.L is None:
+            raise ValueError('L has not been set for this subspace')
         return self._get_dimension(self.L)
 
     @classmethod
@@ -169,12 +180,16 @@ class Full(Subspace):
         Maps an index to an integer that in binary corresponds to the spin configuration.
         Vectorized implementation allows passing a numpy array of indices as idx.
         """
+        if self.L is None:
+            raise ValueError('L has not been set for this subspace')
         return self._idx_to_state(idx, self.L)
 
     def state_to_idx(self, state):
         """
         The inverse mapping of :meth:`idx_to_state`.
         """
+        if self.L is None:
+            raise ValueError('L has not been set for this subspace')
         return self._state_to_idx(state, self.L)
 
     @classmethod
@@ -191,6 +206,8 @@ class Full(Subspace):
         '''
         Returns an object containing the subspace data accessible by the C backend.
         '''
+        if self.L is None:
+            raise ValueError('L has not been set for this subspace')
         return self._get_cdata(self.L)
 
     @classmethod
@@ -233,10 +250,24 @@ class Parity(Subspace):
             raise ValueError('Invalid parity space "'+str(value)+'" '
                              '(valid choices are 0, 1, "even", or "odd")')
 
+    def identical(self, s):
+        if type(self) != type(s):
+            return False
+
+        if self.L != s.L:
+            return False
+
+        if self.space != s.space:
+            return False
+
+        return True
+
     def get_dimension(self):
         """
         Get the dimension of the subspace.
         """
+        if self.L is None:
+            raise ValueError('L has not been set for this subspace')
         return self._get_dimension(self.L, self.space)
 
     @classmethod
@@ -248,6 +279,8 @@ class Parity(Subspace):
         Maps an index to an integer that in binary corresponds to the spin configuration.
         Vectorized implementation allows passing a numpy array of indices as idx.
         """
+        if self.L is None:
+            raise ValueError('L has not been set for this subspace')
         idx = self._numeric_to_array(idx)
         return self._idx_to_state(idx, self.L, self.space)
 
@@ -255,6 +288,8 @@ class Parity(Subspace):
         """
         The inverse mapping of :meth:`idx_to_state`.
         """
+        if self.L is None:
+            raise ValueError('L has not been set for this subspace')
         state = self._numeric_to_array(state)
         return self._state_to_idx(state, self.L, self.space)
 
@@ -270,6 +305,8 @@ class Parity(Subspace):
         '''
         Returns an object containing the subspace data accessible by the C backend.
         '''
+        if self.L is None:
+            raise ValueError('L has not been set for this subspace')
         return self._get_cdata(self.L, self.space)
 
     @classmethod
@@ -305,7 +342,7 @@ class SpinConserve(Subspace):
 
     def __init__(self, L, k, spinflip=None):
         Subspace.__init__(self)
-        self._L = self._check_L(L)
+        self._L = validate.L(L)
 
         if spinflip is None or spinflip == 0:
             self._spinflip = 0
@@ -324,6 +361,18 @@ class SpinConserve(Subspace):
         self._k = self._check_k(k)
 
         self._nchoosek = self._compute_nchoosek(L, k)
+
+    def identical(self, s):
+        if type(self) != type(s):
+            return False
+
+        if self.L != s.L or self.k != s.k:
+            return False
+
+        if self.spinflip != s.spinflip:
+            return False
+
+        return True
 
     @property
     def spinflip(self):
@@ -425,12 +474,6 @@ class SpinConserve(Subspace):
             rtn[kk, LL] = math.comb(LL, kk)
 
         return rtn
-
-    def _check_L(self, L):
-        if config.L is not None and L != config.L:
-            raise ValueError('attempted to set L to value different from config.L')
-
-        return validate.L(L)
 
     def _check_k(self, k):
         if not (0 <= k <= self.L):
@@ -537,6 +580,12 @@ class Explicit(Subspace):
             raise ValueError('State in subspace has more spins than provided')
         return value
 
+    def identical(self, s):
+        if type(self) != type(s):
+            return False
+
+        return self == s
+
     def get_dimension(self):
         """
         Get the dimension of the subspace.
@@ -608,17 +657,19 @@ class Auto(Explicit):
 
     def __init__(self, H, state, size_guess=None, sort=True):
 
-        self.state = states.State.str_to_state(state, H.get_length())
+        H.establish_L()
+
+        self.state = states.State.str_to_state(state, H.L)
 
         if size_guess is None:
-            size_guess = 2**H.get_length()
+            size_guess = 2**H.L
 
         state_map = np.ndarray((size_guess,), dtype=bsubspace.dnm_int_t)
 
         H.reduce_msc()
 
         dim = bsubspace.compute_rcm(H.msc['masks'], H.msc['signs'], H.msc['coeffs'],
-                                    state_map, self.state, H.get_length())
+                                    state_map, self.state, H.L)
 
         state_map = state_map[:dim]
 
@@ -627,9 +678,4 @@ class Auto(Explicit):
 
         Explicit.__init__(self, state_map)
 
-        self._L = H.get_length()
-
-    def check_L(self, value):
-        if value != self.L:
-            raise TypeError('Cannot change L for Auto subspace type.')
-        return value
+        self._L = H.L

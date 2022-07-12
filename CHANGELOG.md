@@ -1,6 +1,19 @@
 
 # Changelog
 
+## 0.2.3 - IN PROGRESS
+
+### Added
+ - `Subspace.identical` method determines whether two subspaces are exactly the same (both equal and of the same type)
+ - `Operator.has_subspace` method returns whether a given subspace has been registered with the operator
+
+### Changed
+ - `L` of operators and states is now stored in their subspaces
+ - The value of `L` in a Subspace object now cannot be modified after it is set
+
+### Fixed
+ - Ensure that the `L` of all of an operator's subspaces remains consistent
+
 ## 0.2.2 - 2022-07-01
 
 ### Added

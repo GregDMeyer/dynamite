@@ -38,6 +38,22 @@ class StrToIdx(ut.TestCase):
             with self.assertRaises(ValueError):
                 State.str_to_state(s, L)
 
+
+class SetL(ut.TestCase):
+
+    def test_L_direct(self):
+        s = State(L=5)
+        self.assertEqual(s.L, 5)
+
+    def test_L_subspace(self):
+        from dynamite.subspaces import Subspace
+        subspace = Mock(spec=Subspace)
+        subspace.L = 5
+
+        s = State(subspace=subspace)
+        self.assertEqual(s.L, 5)
+
+
 class SetValues(ut.TestCase):
 
     def setUp(self):
@@ -45,6 +61,7 @@ class SetValues(ut.TestCase):
 
         self.s._subspace = Mock()
         self.s._subspace.state_to_idx = lambda x: x+1
+        self.s._subspace.L = 5
 
         self.s.vec.getOwnershipRange = Mock(return_value=(10,20))
 

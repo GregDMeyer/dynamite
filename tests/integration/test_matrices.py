@@ -71,6 +71,13 @@ from dynamite.operators import sigmax, sigmay, sigmaz, sigma_plus, sigma_minus
 
 class Fundamental(dtr.DynamiteTestCase):
 
+    def setUp(self):
+        self.old_L = config.L
+        config._L = None
+
+    def tearDown(self):
+        config.L = self.old_L
+
     def test_sigmax(self):
         o = sigmax()
         o.L = 1

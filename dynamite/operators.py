@@ -20,15 +20,19 @@ class Operator:
     """
 
     def __init__(self):
-
-        self._L = config.L
         self._max_spin_idx = None
         self._mats = {}
         self._msc = None
         self._is_reduced = False
         self._shell = config.shell
 
-        self._subspaces = []
+        if config.subspace is not None:
+            self._subspaces = [(config.subspace, config.subspace)]
+        else:
+            self._subspaces = [(Full(), Full())]
+
+        if config.L is not None:
+            self.L = config.L
 
         self._tex = r'\[\text{operator}\]'
         self._string = '[operator]'
@@ -64,8 +68,7 @@ class Operator:
 
     def evolve(self, state, t, **kwargs):
         r"""
-        Evolve a state under the Hamiltonian. If the Hamiltonian's chain length has not
-        been set, attempts to set it based on the state's length.
+        Time-evolve a state, using the operator as the Hamiltonian.
 
         This method wraps :meth:`dynamite.computations.evolve` (see that documentation
         for a full description of the method's functionality).
@@ -88,10 +91,6 @@ class Operator:
         dynamite.states.State
             The result vector :math:`\Psi_f`.
         """
-
-        if self.L is None:
-            self.L = state.L
-
         return evolve(self, state, t, **kwargs)
 
     def eigsolve(self, **kwargs):
@@ -123,9 +122,11 @@ class Operator:
         '''
         # save this so we don't recompute it every time.
         # cleared when MSC changes
-
         if self._max_spin_idx is None:
-            self._max_spin_idx = msc_tools.max_spin_idx(self.msc)
+            if self.msc is None:
+                self._max_spin_idx = 0
+            else:
+                self._max_spin_idx = msc_tools.max_spin_idx(self.msc)
 
         return self._max_spin_idx
 
@@ -133,9 +134,28 @@ class Operator:
     def L(self):
         """
         Property representing the length of the spin chain.
-        If L hasn't been set, defaults to the size of support of the operator (from site 0).
         """
-        return self._L
+        self._update_L_from_subspaces()
+        return self.left_subspace.L
+
+    def _update_L_from_subspaces(self):
+        '''
+        Propagate L to all subspaces if it has been set in any
+        one of them.
+        '''
+        L = None
+        for subspaces in self._subspaces:
+            for subspace in subspaces:
+                if subspace.L is not None:
+                    if L is None:
+                        L = subspace.L
+                    elif L != subspace.L:
+                        raise ValueError('All subspaces of an operator must '
+                                         'have the same spin chain length L.')
+
+        # propagate the value to all subspaces
+        if L is not None:
+            self.L = L
 
     @L.setter
     def L(self, value):
@@ -144,16 +164,24 @@ class Operator:
             raise ValueError('Cannot set L smaller than one plus the largest spin index'
                              'on which the operator has support (max_spin_idx = %d)' %
                              (self.max_spin_idx))
-        for left, right in self.get_subspace_list():
+        for left, right in self._subspaces:
             left.L = L
             right.L = L
-        self._L = L
+
+    def establish_L(self):
+        '''
+        If L has not been set, set it to the minimum value possible based on the
+        support of the operator (and propagate that value to all registered
+        subspaces). Does nothing if the operator already has a value for L
+        other than `None`.
+        '''
+        self.L = self.get_length()
 
     def get_length(self):
         '''
         Returns the length of the spin chain for this operator. It is defined by the
-        property :meth:`Operator.L` if it has been set by the user. Otherwise, the
-        number of sites on which the operator has support is returned by default.
+        property :meth:`Operator.L` if it has been set by the user. Otherwise, one
+        plus the largest spin index on which the operator has support is returned.
         '''
         if self.L is None:
             return self.max_spin_idx + 1
@@ -165,6 +193,7 @@ class Operator:
         """
         Read-only attribute returning the dimensions of the matrix.
         """
+        self.establish_L()
         return self.left_subspace.get_dimension(), self.right_subspace.get_dimension()
 
     @property
@@ -219,9 +248,7 @@ class Operator:
         added with :meth:`Operator.add_subspace`, or config.subspace if
         :meth:`Operator.add_subspace` has not been called.
         """
-        space = self.get_subspace_list()[-1][0]
-        space.L = self.get_length()
-        return space
+        return self.get_subspace_list()[-1][0]
 
     @property
     def right_subspace(self):
@@ -230,9 +257,7 @@ class Operator:
         added with :meth:`Operator.add_subspace`, or config.subspace if
         :meth:`Operator.add_subspace` has not been called.
         """
-        space = self.get_subspace_list()[-1][1]
-        space.L = self.get_length()
-        return space
+        return self.get_subspace_list()[-1][1]
 
     @property
     def subspace(self):
@@ -276,26 +301,55 @@ class Operator:
         left = validate.subspace(left)
         right = validate.subspace(right)
 
-        left.L = self.get_length()
-        right.L = self.get_length()
+        # L should become the subspace spin chain length if it's not set
+        if self.L is None:
+            if left.L is not None:
+                self.L = left.L
+            elif right.L is not None:
+                self.L = right.L
 
-        if (left, right) not in self.get_subspace_list():
+        # now if the operator's L is set, both subspaces' L should equal it
+        if self.L is not None:
+            for subspace in (left, right):
+                if subspace.L is None:
+                    subspace.L = self.L
+                elif subspace.L != self.L:
+                    raise ValueError('operator and subspaces must all have '
+                                     'same spin chain length')
+
+        if not self.has_subspace(left, right):
             self.get_subspace_list().append((left, right))
 
     def get_subspace_list(self):
         '''
         Return a list of the subspaces that have been registered for this operator.
         '''
-        if not self._subspaces:
-            if config.subspace is not None:
-                self._subspaces = [(config.subspace, config.subspace)]
-            else:
-                self._subspaces = [(Full(), Full())]
-
-        for left, right in self._subspaces:
-            left.L = self.get_length()
-            right.L = self.get_length()
+        self._update_L_from_subspaces()
         return self._subspaces
+
+    def has_subspace(self, left, right=None):
+        '''
+        Check if a subspace or pair of subspaces has been added to the
+        operator.
+
+        Parameters
+        ----------
+
+        left : dynamite.subspaces.Subspace
+            The left subspace
+
+        right : dynamite.subspaces.Subspace, optional
+            The right subspace. If omitted,
+            the left subspace is reused for the right.
+        '''
+        if right is None:
+            right = left
+
+        for (left_s, right_s) in self.get_subspace_list():
+            if left.identical(left_s) and right.identical(right_s):
+                return True
+
+        return False
 
     ### text representations
 
@@ -501,11 +555,10 @@ class Operator:
         by the end user, since it is called automatically whenever the underlying matrix
         needs to be built or rebuilt.
         """
-
         if subspaces is None:
             subspaces = (self.left_subspace, self.right_subspace)
 
-        if subspaces not in self.get_subspace_list():
+        if not self.has_subspace(*subspaces):
             raise ValueError('Attempted to build matrix for a subspace that has not '
                              'been added to the operator.')
 
@@ -531,7 +584,6 @@ class Operator:
             raise ValueError('Building non-Hermitian matrices currently not supported.')
 
         mat = bpetsc.build_mat(
-            L = self.get_length(),
             masks = np.ascontiguousarray(masks),
             mask_offsets = np.ascontiguousarray(mask_offsets),
             signs = np.ascontiguousarray(term_array['signs']),
@@ -646,8 +698,10 @@ class Operator:
         tuple
             The two states
         '''
-        bra = State(self.get_length(), self.left_subspace)
-        ket = State(self.get_length(), self.right_subspace)
+        self.establish_L()
+
+        bra = State(subspace=self.left_subspace)
+        ket = State(subspace=self.right_subspace)
         return (bra, ket)
 
     ### mask, sign, coefficient representation of operators
@@ -874,9 +928,11 @@ class Operator:
         dynamite.states.State
             The result
         '''
+        self.establish_L()
+
         right_subspace = x.subspace
         right_match = [(left, right) for left, right in self.get_subspace_list()
-                       if right == right_subspace]
+                       if right.identical(right_subspace)]
         if not right_match:
             raise ValueError('No operator subspace found that matches input vector subspace. '
                              'Try adding the subspace with the Operator.add_subspace method.')

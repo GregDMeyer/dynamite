@@ -8,7 +8,7 @@ import dynamite_test_runner as dtr
 
 from dynamite import config
 from dynamite.states import State
-from dynamite.subspaces import SpinConserve, Auto, Full
+from dynamite.subspaces import SpinConserve, Auto, Full, Parity
 
 from hamiltonians import localized
 
@@ -34,6 +34,19 @@ class AutoBuild(dtr.DynamiteTestCase):
                                                        for x in (left, right)])
                                     H.add_subspace(*subspaces)
                                     H.build_mat(subspaces=subspaces)
+
+
+class ConfigLSetting(dtr.DynamiteTestCase):
+
+    def test_full(self):
+        s = Full()
+        self.assertEqual(s.L, config.L)
+
+    def test_parity(self):
+        for p in ('even', 'odd'):
+            with self.subTest(parity=p):
+                s = Parity(p)
+                self.assertEqual(s.L, config.L)
 
 
 class SpinFlipConversion(dtr.DynamiteTestCase):

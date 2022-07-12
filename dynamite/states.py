@@ -14,8 +14,9 @@ class State:
     Parameters
     ----------
 
-    L : int
-        Spin chain length. Can be ommitted if config.L is set.
+    L : int, optional
+        Spin chain length. Can be ommitted if config.L is set or a subspace
+        is provided.
 
     subspace : dynamite.subspace.Subspace, optional
         The subspace on which the state should be defined.
@@ -36,19 +37,26 @@ class State:
         config._initialize()
         from petsc4py import PETSc
 
-        if L is None:
-            L = config.L
-
-        self.L = validate.L(L)
-
         if subspace is None:
             if config.subspace is not None:
                 subspace = config.subspace
             else:
                 subspace = subspaces.Full()
 
+        if L is None and subspace.L is None:
+            L = config.L
+
+        if subspace.L is None:
+            if L is None:
+                raise ValueError('Must specify L either as a parameter, '
+                                 'by providing a subspace, or via config.L')
+            else:
+                subspace.L = validate.L(L)
+        elif L is not None and L != subspace.L:
+            raise ValueError('The value of L provided as a parameter '
+                             'does not match that of the subspace')
+
         self._subspace = validate.subspace(subspace)
-        self._subspace.L = self.L
 
         self._vec = PETSc.Vec().create()
         self.vec.setSizes(subspace.get_dimension())
@@ -59,6 +67,10 @@ class State:
                 self.set_random(seed=seed)
             else:
                 self.set_product(state)
+
+    @property
+    def L(self):
+        return self.subspace.L
 
     def copy(self, result=None):
         if result is None:

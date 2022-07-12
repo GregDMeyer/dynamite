@@ -67,8 +67,7 @@ cdef extern from "bpetsc_impl.h":
 
 include "config.pxi"
 
-def build_mat(int L,
-              PetscInt [:] masks,
+def build_mat(PetscInt [:] masks,
               PetscInt [:] mask_offsets,
               PetscInt [:] signs,
               np.complex128_t [:] coeffs,

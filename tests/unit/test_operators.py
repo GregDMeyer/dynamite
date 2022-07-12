@@ -485,20 +485,24 @@ class Properties(ut.TestCase):
         o = sigmaz(4)
         self.assertEqual(o.dim, (32, 32))
 
+    def test_dim_explicit_L(self):
+        o = sigmaz(4)
         o.L = 6
         self.assertEqual(o.dim, (64, 64))
 
+    def test_dim_subspace(self):
         from dynamite.subspaces import Full
 
         subspace = Mock()
-        subspace.get_dimension = MagicMock(return_value = 7)
+        subspace.get_dimension = MagicMock(return_value=7)
+        subspace.L = None
+
+        o = sigmaz(4)
+        o.L = 6
         o._subspaces.append((subspace, Full()))
         self.assertEqual(o.dim, (7, 64))
-
-        o.L = 5
-        self.assertEqual(o.dim, (7, 32))
         # this should have set the subspace dimension too
-        self.assertEqual(o.left_subspace.L, 5)
+        self.assertEqual(subspace.L, 6)
 
         o._subspaces[1] = (subspace, subspace)
         self.assertEqual(o.dim, (7, 7))
@@ -533,13 +537,14 @@ class Properties(ut.TestCase):
 
         from dynamite.subspaces import Subspace, Full
         subspace = Mock(spec=Subspace)
+        subspace.L = None
+        subspace.identical = MagicMock(return_value=False)
 
         o = sigmaz()
         o.L = 5
         o.add_subspace(Full(), subspace)
+        self.assertEqual(o.left_subspace.L, 5)
         self.assertEqual(o.right_subspace.L, 5)
-        o.L = 6
-        self.assertEqual(o.right_subspace.L, 6)
 
         with self.assertRaises(ValueError):
             o.subspace
@@ -548,13 +553,15 @@ class Properties(ut.TestCase):
 
         from dynamite.subspaces import Subspace, Full
         subspace = Mock(spec=Subspace)
+        subspace.L = None
+        subspace.identical = MagicMock(return_value=False)
 
         o = sigmaz()
         o.L = 5
+
         o.add_subspace(subspace, Full())
         self.assertEqual(o.left_subspace.L, 5)
-        o.L = 6
-        self.assertEqual(o.left_subspace.L, 6)
+        self.assertEqual(o.right_subspace.L, 5)
 
         with self.assertRaises(ValueError):
             o.subspace
@@ -563,6 +570,8 @@ class Properties(ut.TestCase):
 
         from dynamite.subspaces import Subspace
         subspace = Mock(spec=Subspace)
+        subspace.L = None
+        subspace.identical = MagicMock(return_value=False)
 
         o = sigmaz()
         o.L = 5
@@ -573,13 +582,119 @@ class Properties(ut.TestCase):
         self.assertIs(o.subspace, subspace)
 
         self.assertEqual(o.subspace.L, 5)
-        o.L = 6
-        self.assertEqual(o.subspace.L, 6)
 
-    def test_subspace_fail(self):
+    def test_subspace_L_later(self):
+
+        from dynamite.subspaces import Subspace
+        subspace = Mock(spec=Subspace)
+        subspace.L = None
+        subspace.identical = MagicMock(return_value=False)
+
+        o = sigmaz()
+        o.add_subspace(subspace)
+        o.L = 5
+
+        self.assertEqual(o.subspace.L, 5)
+
+    def test_subspace_L_later_both(self):
+
+        from dynamite.subspaces import Subspace
+        left = Mock(spec=Subspace)
+        right = Mock(spec=Subspace)
+        left.identical = MagicMock(return_value=False)
+
+        left.L = None
+        right.L = None
+
+        o = sigmaz()
+        o.add_subspace(left, right)
+        o.L = 5
+
+        self.assertEqual(o.left_subspace.L, 5)
+        self.assertEqual(o.right_subspace.L, 5)
+
+    def test_subspace_set_L(self):
+
+        from dynamite.subspaces import Subspace
+        subspace = Mock(spec=Subspace)
+        subspace.identical = MagicMock(return_value=False)
+
+        o = sigmaz()
+        subspace.L = 5
+        o.add_subspace(subspace)
+
+        self.assertEqual(o.L, 5)
+        self.assertEqual(o.subspace.L, 5)
+
+    def test_subspace_set_L_left(self):
+
+        from dynamite.subspaces import Subspace
+        left = Mock(spec=Subspace)
+        right = Mock(spec=Subspace)
+        left.identical = MagicMock(return_value=False)
+
+        o = sigmaz()
+        left.L = 5
+        right.L = None
+        o.add_subspace(left, right)
+
+        self.assertEqual(o.L, 5)
+        self.assertEqual(left.L, 5)
+        self.assertEqual(right.L, 5)
+
+    def test_subspace_set_L_right(self):
+
+        from dynamite.subspaces import Subspace
+        left = Mock(spec=Subspace)
+        right = Mock(spec=Subspace)
+        left.identical = MagicMock(return_value=False)
+
+        o = sigmaz()
+        left.L = None
+        right.L = 5
+        o.add_subspace(left, right)
+
+        self.assertEqual(o.L, 5)
+        self.assertEqual(left.L, 5)
+        self.assertEqual(right.L, 5)
+
+    def test_subspace_set_L_fail(self):
+
+        from dynamite.subspaces import Subspace
+        left = Mock(spec=Subspace)
+        right = Mock(spec=Subspace)
+        left.identical = MagicMock(return_value=False)
+
+        o = sigmaz()
+        left.L = 5
+        right.L = 6
+        with self.assertRaises(ValueError):
+            o.add_subspace(left, right)
+
+    def test_subspace_L_later_fail(self):
+        from dynamite.subspaces import Subspace
+        left = Mock(spec=Subspace)
+        right = Mock(spec=Subspace)
+        left.identical = MagicMock(return_value=False)
+
+        left.L = None
+        right.L = None
+
+        o = sigmaz()
+        o.add_subspace(left, right)
+
+        left.L = 5
+        right.L = 6
+
+        with self.assertRaises(ValueError):
+            o.L
+
+    def test_subspace_product_state_fail(self):
 
         from dynamite.subspaces import Subspace, Full
         subspace = Mock(spec=Subspace)
+        subspace.L = None
+        subspace.identical = MagicMock(return_value=False)
         subspace.product_state_basis = False
 
         o = sigmaz()
