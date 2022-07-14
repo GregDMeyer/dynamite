@@ -37,23 +37,23 @@ def extensions():
         extra_args = paths
 
         if name not in cython_only:
-            depends += ['dynamite/_backend/{name}_impl.h'.format(name=name)]
+            depends += ['src/dynamite/_backend/{name}_impl.h'.format(name=name)]
             if name not in header_only:
-                depends += ['dynamite/_backend/{name}_impl.c'.format(name=name)]
-                object_files = ['dynamite/_backend/{name}_impl.o'.format(name=name)]
+                depends += ['src/dynamite/_backend/{name}_impl.c'.format(name=name)]
+                object_files = ['src/dynamite/_backend/{name}_impl.o'.format(name=name)]
 
         if name == 'bpetsc':
-            depends += ['dynamite/_backend/bsubspace.pxd'
-                        'dynamite/_backend/bcuda_impl.h',
-                        'dynamite/_backend/bcuda_impl.cu',
-                        'dynamite/_backend/shellcontext.h',
-                        'dynamite/_backend/bsubspace_impl.h']
+            depends += ['src/dynamite/_backend/bsubspace.pxd'
+                        'src/dynamite/_backend/bcuda_impl.h',
+                        'src/dynamite/_backend/bcuda_impl.cu',
+                        'src/dynamite/_backend/shellcontext.h',
+                        'src/dynamite/_backend/bsubspace_impl.h']
             if check_cuda():
-                object_files += ['dynamite/_backend/bcuda_impl.o'.format(name=name)]
+                object_files += ['src/dynamite/_backend/bcuda_impl.o'.format(name=name)]
 
         exts += [
             Extension('dynamite._backend.{name}'.format(name=name),
-                      sources = ['dynamite/_backend/{name}.pyx'.format(name=name)],
+                      sources = ['src/dynamite/_backend/{name}.pyx'.format(name=name)],
                       depends = depends,
                       extra_objects = object_files,
                       **extra_args)
@@ -88,7 +88,7 @@ def write_build_headers():
     hardcoded into the backend build.
     '''
     print('Writing header files...')
-    with open(join(dirname(__file__), 'dynamite', '_backend', 'config.pxi'), 'w') as f:
+    with open(join(dirname(__file__), 'src/dynamite/_backend/config.pxi'), 'w') as f:
 
         f.write('DEF USE_CUDA = %d\n' % int(check_cuda()))
 
@@ -148,11 +148,11 @@ class MakeBuildExt(build_ext):
                 continue
 
             make = check_output(['make', '{name}_impl.o'.format(name=name)],
-                                cwd='dynamite/_backend')
+                                cwd='src/dynamite/_backend')
             print(make.decode())
 
         if check_cuda():
-            make = check_output(['make', 'bcuda_impl.o'], cwd='dynamite/_backend')
+            make = check_output(['make', 'bcuda_impl.o'], cwd='src/dynamite/_backend')
             print(make.decode())
 
         # get the correct compiler from SLEPc

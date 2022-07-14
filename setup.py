@@ -21,6 +21,7 @@ setup(
     author          = "Greg Kahanamoku-Meyer",
     author_email    = "gkm@berkeley.edu",
     description     = "Fast numerics for large quantum spin chains.",
+    package_dir     = {"": "src"},
     packages        = ['dynamite'],
     classifiers = [
         "Development Status :: 4 - Beta",

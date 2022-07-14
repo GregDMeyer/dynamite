@@ -11,6 +11,7 @@
 ### Changed
  - `L` of operators and states is now stored in their subspaces
  - The value of `L` in a Subspace object now cannot be modified after it is set
+ - Moved package source into `src/` directory
 
 ### Fixed
  - Ensure that the `L` of all of an operator's subspaces remains consistent
