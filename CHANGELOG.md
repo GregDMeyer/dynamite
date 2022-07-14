@@ -6,6 +6,7 @@
 ### Added
  - `Subspace.identical` method determines whether two subspaces are exactly the same (both equal and of the same type)
  - `Operator.has_subspace` method returns whether a given subspace has been registered with the operator
+ - `State.save` and `State.from_file` methods to allow saving states to disk and loading them later
 
 ### Changed
  - `L` of operators and states is now stored in their subspaces

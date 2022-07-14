@@ -6,6 +6,7 @@ from .msc_tools import dnm_int_t
 import numpy as np
 from os import urandom
 from time import time
+import pickle
 
 class State:
     """
@@ -34,9 +35,6 @@ class State:
 
     def __init__(self, L = None, subspace = None, state = None, seed = None):
 
-        config._initialize()
-        from petsc4py import PETSc
-
         if subspace is None:
             if config.subspace is not None:
                 subspace = config.subspace
@@ -57,10 +55,7 @@ class State:
                              'does not match that of the subspace')
 
         self._subspace = validate.subspace(subspace)
-
-        self._vec = PETSc.Vec().create()
-        self.vec.setSizes(subspace.get_dimension())
-        self.vec.setFromOptions()
+        self._vec = None  # create when first used
 
         if state is not None:
             if state == 'random':
@@ -100,6 +95,14 @@ class State:
         State `s`, one can do `state.vec.norm()`. The methods don't seem to be documented anywhere,
         but are fairly transparent from looking at the petsc4py source code.
         """
+        if self._vec is None:
+            config._initialize()
+            from petsc4py import PETSc
+
+            self._vec = PETSc.Vec().create()
+            self._vec.setSizes(self.subspace.get_dimension())
+            self._vec.setFromOptions()
+
         return self._vec
 
     @classmethod
@@ -341,6 +344,72 @@ class State:
             or just rank 0 (False).
         """
         return self._to_numpy(self.vec, to_all)
+
+    def save(self, fname):
+        '''
+        Save the state to disk. Note that this method saves the state
+        as a pair of files, ``<fname>.vec`` and ``<fname>.metadata``.
+
+        Parameters
+        ----------
+
+        fname : str
+            The path to save the state to
+        '''
+        with open(fname+'.metadata', 'wb') as f:
+            pickle.dump(self.subspace, f)
+
+        config._initialize()
+        from petsc4py import PETSc
+
+        viewer = PETSc.Viewer().createBinary(
+            fname+'.vec',
+            mode=PETSc.Viewer.Mode.WRITE
+        )
+        self.vec.view(viewer)
+
+    @classmethod
+    def from_file(cls, fname):
+        '''
+        Load a state from a file. You do not need to create a state to call
+        this method---just directly call ``State.from_file(fname)`` and the
+        return value will be your new state object.
+
+        .. note::
+
+            This method uses the Python
+            ``pickle`` module which is not secure against maliciously constructed
+            data; thus this method should not be used on data from untrusted
+            sources.
+
+        Parameters
+        ----------
+
+        fname : str
+            The path from which to load the state
+
+        Returns
+        -------
+
+        State
+            The state from the file
+        '''
+        with open(fname+'.metadata', 'rb') as f:
+            subspace = pickle.load(f)
+
+        config._initialize()
+        from petsc4py import PETSc
+
+        viewer = PETSc.Viewer().createBinary(
+            fname+'.vec',
+            mode=PETSc.Viewer.Mode.READ
+        )
+        vec = PETSc.Vec().create()
+        vec.load(viewer)
+
+        rtn = cls(subspace=subspace)
+        rtn._vec = vec
+        return rtn
 
     def dot(self, x):
         return self.vec.dot(x.vec)

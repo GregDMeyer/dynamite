@@ -9,8 +9,8 @@ import dynamite_test_runner as dtr
 
 from dynamite import config
 from dynamite.states import State
-from dynamite.subspaces import Parity
-from dynamite.operators import sigmaz
+from dynamite.subspaces import Parity, SpinConserve, Auto
+from dynamite.operators import sigmaz, sigmax, sigmay, index_sum
 
 class RandomSeed(dtr.DynamiteTestCase):
 
@@ -199,6 +199,51 @@ class Projection(dtr.DynamiteTestCase):
         with self.assertRaises(ValueError):
             state.project(0, -1)
 
+
+class Saving(dtr.DynamiteTestCase):
+
+    fname = '/tmp/dnm_test_save'
+
+    def check_states_equal(self, a, b):
+        self.assertTrue(a.subspace.identical(b.subspace))
+        self.assertTrue(a.vec.equal(b.vec))
+
+    def test_save_simple(self):
+        state = State(state='random')
+        state.save(self.fname)
+        loaded = State.from_file(self.fname)
+        self.check_states_equal(state, loaded)
+
+    def test_save_parity(self):
+        subspace = Parity('even')
+        state = State(state='random', subspace=subspace)
+        state.save(self.fname)
+        loaded = State.from_file(self.fname)
+        self.check_states_equal(state, loaded)
+
+    def test_save_spinconserve(self):
+        subspace = SpinConserve(config.L, config.L//2)
+        state = State(state='random', subspace=subspace)
+        state.save(self.fname)
+        loaded = State.from_file(self.fname)
+        self.check_states_equal(state, loaded)
+
+    def test_save_spinconserve_spinflip(self):
+        subspace = SpinConserve(config.L, config.L//2, spinflip=True)
+        state = State(state='random', subspace=subspace)
+        state.save(self.fname)
+        loaded = State.from_file(self.fname)
+        self.check_states_equal(state, loaded)
+
+    def test_save_auto(self):
+        H = index_sum(sigmax(0)*sigmax(1) + sigmay(0)*sigmay(1))
+
+        half_L = config.L//2
+        subspace = Auto(H, 'U'*half_L + 'D'*(config.L - half_L))
+        state = State(state='random', subspace=subspace)
+        state.save(self.fname)
+        loaded = State.from_file(self.fname)
+        self.check_states_equal(state, loaded)
 
 # TODO: check state setting. e.g. setting an invalid state should fail (doesn't for Full subspace)
 

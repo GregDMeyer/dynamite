@@ -72,6 +72,9 @@ class _Config:
                 '-mat_type', 'aijcusparse',
             ]
 
+        # to avoid an extra useless file being created when we save State objects
+        slepc_args += ['-viewer_binary_skip_info']
+
         # prevent PETSc from being sad if we don't use gpu aware mpi
         if not self.initialized and bbuild.have_gpu_shell():
             slepc_args += ['-use_gpu_aware_mpi', '0'] # we only use one process anyway
