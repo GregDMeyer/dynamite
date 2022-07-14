@@ -356,11 +356,12 @@ class State:
         fname : str
             The path to save the state to
         '''
-        with open(fname+'.metadata', 'wb') as f:
-            pickle.dump(self.subspace, f)
-
         config._initialize()
         from petsc4py import PETSc
+
+        if PETSc.COMM_WORLD.rank == 0:
+            with open(fname+'.metadata', 'wb') as f:
+                pickle.dump(self.subspace, f)
 
         viewer = PETSc.Viewer().createBinary(
             fname+'.vec',
