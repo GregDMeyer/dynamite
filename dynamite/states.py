@@ -408,6 +408,10 @@ class State:
         vec = PETSc.Vec().create()
         vec.load(viewer)
 
+        if subspace.get_dimension() != vec.getSize():
+            raise RuntimeError("corrupt data encountered when loading state"
+                               "from file")
+
         rtn = cls(subspace=subspace)
         rtn._vec = vec
         return rtn
