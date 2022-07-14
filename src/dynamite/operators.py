@@ -517,7 +517,7 @@ class Operator:
 
     ### interface with PETSc
 
-    def get_mat(self, subspaces=None, diag_entries=False):
+    def get_mat(self, subspaces=None):
         """
         Get the PETSc matrix corresponding to this operator, building it if necessary.
 
@@ -528,12 +528,6 @@ class Operator:
             pair, it will be reused. If this option is omitted, the last subspace added with
             :meth:`Operator.add_subspace` will be used, or the Full space by default.
 
-        diag_entries : bool, optional
-            Ensure that the sparse matrix has all diagonal elements filled,
-            even if they are zero. Some PETSc functions fail if the
-            diagonal elements do not exist. Currently a dummy argument; diagonal
-            entries are always included.
-
         Returns
         -------
         petsc4py.PETSc.Mat
@@ -543,11 +537,11 @@ class Operator:
             subspaces = (self.left_subspace, self.right_subspace)
 
         if subspaces not in self._mats:
-            self.build_mat(subspaces, diag_entries=diag_entries)
+            self.build_mat(subspaces)
 
         return self._mats[subspaces]
 
-    def build_mat(self, subspaces=None, diag_entries=False):
+    def build_mat(self, subspaces=None):
         """
         Build the PETSc matrix, destroying any matrix that has already been built, and
         store it internally. This function does not return the matrix--see
@@ -567,11 +561,6 @@ class Operator:
 
         self.reduce_msc()
         term_array = self.msc
-
-        # TODO: keep track of diag_entries
-        diag_entries = True
-        if term_array[0]['masks'] != 0:
-            term_array = np.hstack([np.array([(0,0,0)], dtype=term_array.dtype), term_array])
 
         masks, indices = np.unique(term_array['masks'], return_index=True)
 

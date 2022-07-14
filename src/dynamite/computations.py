@@ -207,13 +207,11 @@ def eigsolve(H, getvecs=False, nev=1, which='smallest', target=None, tol=None, s
         st.setType(SLEPc.ST.Type.SINVERT)
         eps.setTarget(target)
 
-        # fix for "bug" discussed here:
-        # https://www.mail-archive.com/petsc-users@mcs.anl.gov/msg22867.html
-        eps.setOperators(H.get_mat(subspaces=(subspace, subspace), diag_entries=True))
     else:
         if which=='target':
             raise ValueError("Must specify target when setting which='target'")
-        eps.setOperators(H.get_mat(subspaces=(subspace, subspace)))
+
+    eps.setOperators(H.get_mat(subspaces=(subspace, subspace)))
 
     eps.setDimensions(nev)
 

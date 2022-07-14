@@ -6,7 +6,8 @@ import hamiltonians
 
 import dynamite_test_runner as dtr
 
-from dynamite.operators import index_sum, sigmax, identity
+from dynamite import config
+from dynamite.operators import index_sum, sigmax, identity, op_sum
 from dynamite.states import State
 from dynamite.subspaces import Parity
 from dynamite.tools import complex_enabled
@@ -89,7 +90,7 @@ class Analytic(Checker):
 
 class Hamiltonians(Checker):
 
-    def test_all(self):
+    def test_all_smallest(self):
         for H_name, real in hamiltonians.names:
             if not complex_enabled() and not real:
                 continue
@@ -99,6 +100,38 @@ class Hamiltonians(Checker):
                 with self.subTest(which = 'smallest'):
                     evals, evecs = H.eigsolve(nev = 5, getvecs = True, tol = 1E-12)
                     self.check_all(H, evals, evecs, tol = 1E-10)
+
+    def test_all_target(self):
+        if config.shell:
+            self.skipTest("solving for target not supported with shell matrices")
+
+        for H_name, real in hamiltonians.names:
+            if not complex_enabled() and not real:
+                continue
+            with self.subTest(H=H_name):
+                H = getattr(hamiltonians, H_name)()
+
+                for target in [0.01, 0.9]:
+                    with self.subTest(target=target):
+                        evals, evecs = H.eigsolve(nev=5, getvecs=True, tol=1E-12, target=target)
+                        self.check_all(H, evals, evecs, tol=1E-9)
+
+class ZeroDiagonal(Checker):
+
+    def test_smallest(self):
+        H = op_sum(0.1*i*sigmax(i) for i in range(config.L))
+        evals, evecs = H.eigsolve(nev=5, getvecs=True, tol=1E-12)
+        self.check_all(H, evals, evecs, tol=1E-10)
+
+    def test_target(self):
+        if config.shell:
+            self.skipTest("solving for target not supported with shell matrices")
+
+        H = op_sum(0.1*i*sigmax(i) for i in range(config.L))
+        for target in [0.011, 0.999]:
+            with self.subTest(target=target):
+                evals, evecs = H.eigsolve(nev=5, getvecs=True, tol=1E-12, target=target)
+                self.check_all(H, evals, evecs, tol=1E-9)
 
 class ParityTests(Checker):
 
