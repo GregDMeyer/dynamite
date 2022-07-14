@@ -14,6 +14,7 @@
 
 ### Fixed
  - Ensure that the `L` of all of an operator's subspaces remains consistent
+ - Small errors in `SpinConserve` subspace documentation
 
 ## 0.2.2 - 2022-07-01
 

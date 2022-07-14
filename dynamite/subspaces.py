@@ -323,8 +323,8 @@ class Parity(Subspace):
 
 class SpinConserve(Subspace):
     '''
-    The subspaces of states in which conserve total magnetization (total
-    number of up spins).
+    The subspaces of states which conserve total magnetization (total
+    number of up/down spins).
 
     Parameters
     ----------
@@ -332,7 +332,7 @@ class SpinConserve(Subspace):
         Length of spin chain (constant for this class)
 
     k : int
-        Number of up spins (0's in integer representation of state)
+        Number of down spins (1's in integer representation of state)
 
     spinflip : str, optional
         Sign of spinflip basis ('+' or '-'). Omit to not use Z2 symmetry.
