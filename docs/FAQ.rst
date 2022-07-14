@@ -2,20 +2,13 @@
 FAQ
 ===
 
-**Why is dynamite crashing with some message about MPI INIT?**
+**I got an error message about an integer overflow even though I'm running with fewer than 32 spins.**
 
-Are you running with ``mpirun``? PETSc and SLEPc are sometimes unhappy if they
-are run outside of MPI (see :ref:`parallelism`).
-
-**I tried to run dynamite in a Jupyter Notebook and my kernel died on import. Why?**
-
-This seems to be a result of the same situation as above. Running MPI in a
-notebook to keep the libraries happy (and allow use of more than one process) is
-possible and pretty cool---just takes a bit of work to set up.
+Even if the state vector length is shorter than :math:`2^{32}`, sometimes PETSc allocates a block of many vectors at once, and the total length of this allocated block is greater than the maximum 32-bit integer. Before switching to 64-bit integers, try passing the ``-bv_type vecs`` flag to SLEPc (call ``dynamite.config.initialize(slepc_args=['-bv_type', 'vecs'])`` at the beginning of your script). That way each vector will be allocated individually.
 
 **I am so tired of setting the size of all my matrices to the same value!**
 
-That wasn't a question. But anyway, there is an easy way to globally set a
+There is an easy way to globally set a
 default value for ``L``. Before you start building any operators:
 
 .. code:: python
@@ -23,5 +16,5 @@ default value for ``L``. Before you start building any operators:
     from dynamite import config
     config.L = 24  # or whatever you want
 
-There are other global configuration options, too. See the full documentation
+There are other global configuration options, too. See the documentation
 for details.
