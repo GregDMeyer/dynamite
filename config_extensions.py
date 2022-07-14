@@ -10,6 +10,10 @@ import numpy
 import petsc4py
 import slepc4py
 
+if any(e not in environ for e in ['PETSC_DIR', 'PETSC_ARCH', 'SLEPC_DIR']):
+    raise ValueError('Must set environment variables PETSC_DIR, '
+                     'PETSC_ARCH and SLEPC_DIR before installing!')
+
 extension_names = [
     'bsubspace',
     'bbuild',
@@ -103,13 +107,6 @@ def write_build_headers():
         f.write('DEF DNM_BRANCH = "%s"\n' % branch)
 
 def configure_paths():
-
-    if any(e not in environ for e in ['PETSC_DIR', 'PETSC_ARCH', 'SLEPC_DIR']):
-        raise ValueError('Must set environment variables PETSC_DIR, '
-                         'PETSC_ARCH and SLEPC_DIR before installing! '
-                         'If executing with sudo, you may want the -E '
-                         'flag to pass environment variables through '
-                         'sudo.')
 
     PETSC_DIR  = environ['PETSC_DIR']
     PETSC_ARCH = environ['PETSC_ARCH']
