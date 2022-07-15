@@ -29,6 +29,10 @@ def parse_command_line(cmd_argv=None):
     parser.add_argument('-v', type=int, default=0,
                         help='Verbosity of output from each test run')
 
+    parser.add_argument('--shell', action=argparse.BooleanOptionalAction,
+                        help='Whether to run the tests using shell matrices. '
+                        'If omitted, tests are repeated with shell on and off')
+
     args = parser.parse_args(cmd_argv)
 
     return args
@@ -59,10 +63,16 @@ def main():
             params.nprocs = [1,3,4]
 
     const_options = ['-v', str(params.v), '-L', str(params.L)]
-    run_options = [[], ['--shell']]
+
+    if params.shell is None:
+        run_options = [[], ['--shell']]
+    elif params.shell:
+        run_options = [['--shell']]
+    else:
+        run_options = [[]]
 
     if params.gpu:
-        run_options += [['--gpu'], ['--shell', '--gpu']]
+        run_options += [v+['--gpu'] for v in run_options]
 
     for fname in fnames:
         for options in run_options:
