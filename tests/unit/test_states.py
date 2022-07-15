@@ -16,22 +16,22 @@ from dynamite.states import State
 class StrToIdx(ut.TestCase):
 
     test_cases = [
-        ('DDDUU', 5, 107),
-        ('UUDUU', 5, 104),
-        ('DUUUDUDU', 8, 181),
-        (49, 6, 149),
+        ('DDDUU', 5, 7),
+        ('UUDUU', 5, 4),
+        ('DUUUDUDU', 8, 81),
+        (49, 6, 49),
     ]
 
     fail_cases = [
         ('DDFUUU', 6),     # bad character
         ('DUUDU',  6),     # wrong size
+        (85,       6),     # wrong size
     ]
 
     def test_good(self):
-        state_to_idx = lambda x: x+100
         for s, L, c in self.test_cases:
             with self.subTest(s = s):
-                self.assertEqual(state_to_idx(State.str_to_state(s, L)), c)
+                self.assertEqual(State.str_to_state(s, L), c)
 
     def test_fail(self):
         for s, L in self.fail_cases:

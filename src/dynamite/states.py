@@ -145,6 +145,13 @@ class State:
         else:
             state = int(s)
 
+            # ensure that it is valid, to the extent possible
+            # essentially, it just should not have a bit set at a
+            # position above L
+            if state >> L != 0:
+                raise ValueError(f"value (binary: {bin(s)[2:]}) does not "
+                                 "correspond to a valid state of length L")
+
         return state
 
     def set_product(self, s):

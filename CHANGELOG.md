@@ -16,6 +16,7 @@
 ### Fixed
  - Ensure that the `L` of all of an operator's subspaces remains consistent
  - Small errors in `SpinConserve` subspace documentation
+ - Ensure that product states passed as an integer to `State.str_to_state` correspond to valid states of the given length L
 
 ## 0.2.2 - 2022-07-01
 
