@@ -385,8 +385,9 @@ class SpinConserve(Subspace):
     @classmethod
     def convert_spinflip(cls, state, sign=None):
         """
-        Convert a state on a subspace with one spinflip value
-        to a state with opposite spinflip value
+        Convert a state on a subspace where spinflip is set
+        to a state on a product state SpinConserve subspace,
+        and vice versa
 
         Parameters
         ----------
@@ -397,6 +398,12 @@ class SpinConserve(Subspace):
         sign : str, optional
             The sign of the spinflip subspace. Required when converting from
             non-spinflip subspace.
+
+        Returns
+        -------
+
+        State
+            The converted state
         """
         if not state.initialized:
             # this import has to be done here to avoid circular import
