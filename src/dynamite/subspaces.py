@@ -398,6 +398,11 @@ class SpinConserve(Subspace):
             The sign of the spinflip subspace. Required when converting from
             non-spinflip subspace.
         """
+        if not state.initialized:
+            # this import has to be done here to avoid circular import
+            from .states import UninitializedError
+            raise UninitializedError("State vector data has not been set yet")
+
         if state.subspace.spinflip == 0 and sign is None:
             raise ValueError('must provide sign when converting to spinflip')
 
@@ -458,6 +463,8 @@ class SpinConserve(Subspace):
 
         rtn_state.vec.assemble()
         rtn_state.vec.scale(1/np.sqrt(2))
+
+        rtn_state.set_initialized()
 
         return rtn_state
 

@@ -7,6 +7,21 @@ import numpy as np
 from os import urandom
 from time import time
 import pickle
+import functools
+
+
+def _require_initialized(func):
+    '''
+    Decorator to make sure state has data before running the given function
+    '''
+    @functools.wraps(func)
+    def wrapper(self, *args, **kwargs):
+        if not self.initialized:
+            raise UninitializedError("State vector data has not been set yet")
+        return func(self, *args, **kwargs)
+
+    return wrapper
+
 
 class State:
     """
@@ -56,6 +71,7 @@ class State:
 
         self._subspace = validate.subspace(subspace)
         self._vec = None  # create when first used
+        self._initialized = False
 
         if state is not None:
             if state == 'random':
@@ -74,7 +90,13 @@ class State:
         if self.subspace != result.subspace:
             raise ValueError('subspace of state and result must match')
 
-        self.vec.copy(result.vec)
+        if self.initialized:
+            self.vec.copy(result.vec)
+            result.set_initialized()
+        elif result.initialized:
+            raise UninitializedError('Cannot copy from uninitialized state to '
+                                     'one that has been initialized')
+
         return result
 
     @property
@@ -104,6 +126,19 @@ class State:
             self._vec.setFromOptions()
 
         return self._vec
+
+    @property
+    def initialized(self):
+        '''
+        Whether the state vector data has been set yet.
+        '''
+        return self._initialized
+
+    def set_initialized(self):
+        '''
+        Mark that the state vector data has been set.
+        '''
+        self._initialized = True
 
     @classmethod
     def str_to_state(cls, s, L):
@@ -191,6 +226,8 @@ class State:
         self.vec.assemblyBegin()
         self.vec.assemblyEnd()
 
+        self.set_initialized()
+
     @classmethod
     def generate_time_seed(cls):
 
@@ -256,6 +293,9 @@ class State:
         if normalize:
             self.vec.normalize()
 
+        self.set_initialized()
+
+    @_require_initialized
     def project(self, index, value):
         '''
         Project the state onto a subspace in which the qubit
@@ -273,7 +313,6 @@ class State:
         value : 0 or 1
             Which single-spin state to project onto
         '''
-
         if index < 0 or index >= self.subspace.L:
             raise ValueError("spin index out of range")
 
@@ -340,6 +379,7 @@ class State:
 
         return ret
 
+    @_require_initialized
     def to_numpy(self, to_all = False):
         """
         Return a numpy representation of the state.
@@ -352,6 +392,7 @@ class State:
         """
         return self._to_numpy(self.vec, to_all)
 
+    @_require_initialized
     def save(self, fname):
         '''
         Save the state to disk. Note that this method saves the state
@@ -421,23 +462,65 @@ class State:
 
         rtn = cls(subspace=subspace)
         rtn._vec = vec
+
+        rtn.set_initialized()
+
         return rtn
 
+    @_require_initialized
     def dot(self, x):
+        '''
+        Compute the inner product of two states.
+
+        Parameters
+        ----------
+
+        x : State
+            The state to take the inner product against
+
+        Returns
+        -------
+
+        complex
+            The value of the inner product
+        '''
+        if not x.initialized:
+            raise UninitializedError("Argument's vector data has not been set yet")
         return self.vec.dot(x.vec)
 
+    @_require_initialized
+    def norm(self):
+        '''
+        Compute the Euclidean norm of the state vector.
+
+        Returns
+        -------
+
+        float
+            The vector norm
+        '''
+        return self.vec.norm()
+
+    @_require_initialized
+    def normalize(self):
+        '''
+        Scale the vector such that the norm is 1.
+        '''
+        return self.vec.normalize()
+
+    @_require_initialized
     def __imul__(self, x):
         self.vec.scale(x)
         return self
 
+    @_require_initialized
     def __itruediv__(self, x):
         self.vec.scale(1/x)
         return self
 
     def __len__(self):
-        return self.vec.getSize()
+        return self.subspace.get_dimension()
 
 
-auto_wrap = ['norm', 'normalize']
-for petsc_func in auto_wrap:
-    setattr(State, petsc_func, lambda self, f=petsc_func: getattr(self.vec, f)())
+class UninitializedError(RuntimeError):
+    pass

@@ -8,7 +8,7 @@ import numpy as np
 from . import config, validate, msc_tools
 from .computations import evolve, eigsolve
 from .subspaces import Full, Explicit
-from .states import State
+from .states import State, UninitializedError
 from .tools import complex_enabled
 
 class Operator:
@@ -917,6 +917,9 @@ class Operator:
         dynamite.states.State
             The result
         '''
+        if not x.initialized:
+            raise UninitializedError("State vector data has not been set yet")
+
         self.establish_L()
 
         right_subspace = x.subspace
@@ -941,6 +944,7 @@ class Operator:
             raise ValueError('Subspaces of matrix and result vector do not match.')
 
         self.get_mat(subspaces=(left_subspace, right_subspace)).mult(x.vec, result.vec)
+        result.set_initialized()
         return result
 
     def _vec_mul(self, x):

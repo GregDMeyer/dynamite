@@ -7,7 +7,7 @@ import numpy as np
 import dynamite_test_runner as dtr
 
 from dynamite import config
-from dynamite.states import State
+from dynamite.states import State, UninitializedError
 from dynamite.subspaces import SpinConserve, Auto, Full, Parity
 
 from hamiltonians import localized
@@ -66,6 +66,12 @@ class SpinFlipConversion(dtr.DynamiteTestCase):
         subspace = SpinConserve(L=4, k=2)
         spinflip_state = State(state='UUDD', subspace=subspace)
         with self.assertRaises(ValueError):
+            SpinConserve.convert_spinflip(spinflip_state)
+
+    def test_uninitialized_error(self):
+        subspace = SpinConserve(L=4, k=2, spinflip='+')
+        spinflip_state = State(subspace=subspace)
+        with self.assertRaises(UninitializedError):
             SpinConserve.convert_spinflip(spinflip_state)
 
     def test_explicit_plus_basis(self):

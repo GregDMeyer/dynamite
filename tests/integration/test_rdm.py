@@ -16,7 +16,6 @@ from dynamite.tools import complex_enabled
 
 class Explicit(dtr.DynamiteTestCase):
     def setUp(self):
-        self.state = State()
         self.old_L = config.L
         config._L = None
 
@@ -67,18 +66,21 @@ class Explicit(dtr.DynamiteTestCase):
 
     def test_exception_badidx_low(self):
         keep = [-1, 0]
+        state = State(L=4, state='U'*4)
         with self.assertRaises(ValueError):
-            reduced_density_matrix(self.state, keep)
+            reduced_density_matrix(state, keep)
 
     def test_exception_badidx_high(self):
         keep = [0, 1, 50]
+        state = State(L=4, state='U'*4)
         with self.assertRaises(ValueError):
-            reduced_density_matrix(self.state, keep)
+            reduced_density_matrix(state, keep)
 
     def test_exception_wrong_order(self):
         keep = [1, 0]
+        state = State(L=4, state='U'*4)
         with self.assertRaises(ValueError):
-            reduced_density_matrix(self.state, keep)
+            reduced_density_matrix(state, keep)
 
     def test_empty_keep(self):
         state = State(L=2)
@@ -89,6 +91,7 @@ class Explicit(dtr.DynamiteTestCase):
             state.vec[i] = vals[i]
         state.vec.assemblyBegin()
         state.vec.assemblyEnd()
+        state.set_initialized()
 
         dm = reduced_density_matrix(state, keep)
 
@@ -107,6 +110,7 @@ class Explicit(dtr.DynamiteTestCase):
             state.vec[i] = vals[i]
         state.vec.assemblyBegin()
         state.vec.assemblyEnd()
+        state.set_initialized()
 
         dm = reduced_density_matrix(state, keep)
 
@@ -127,6 +131,9 @@ class Explicit(dtr.DynamiteTestCase):
         start, end = state.vec.getOwnershipRange()
         for i in range(start, end):
             state.vec[i] = state_vals[i]
+        state.vec.assemblyBegin()
+        state.vec.assemblyEnd()
+        state.set_initialized()
 
         correct_dms = [
             (
@@ -270,7 +277,12 @@ class SpinConserveSpinFlipSpace(FullSpace):
 
         for sign in '+-':
             with self.subTest(sign=sign):
-                state = State(subspace=SpinConserve(config.L, config.L//2, spinflip=sign))
+                state = State(
+                    state='random',
+                    subspace=SpinConserve(
+                        config.L, config.L//2, spinflip=sign
+                    )
+                )
                 with self.assertRaises(ValueError):
                     reduced_density_matrix(state, [0])
 

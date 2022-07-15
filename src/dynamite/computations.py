@@ -1,6 +1,6 @@
 
 from . import config
-from .states import State
+from .states import State, UninitializedError
 from .tools import complex_enabled
 from .msc_tools import dnm_int_t
 
@@ -56,6 +56,8 @@ def evolve(H, state, t, result=None, **kwargs):
     dynamite.states.State
         The result state
     """
+    if not state.initialized:
+        raise UninitializedError("State vector data has not been set yet")
 
     config._initialize()
     from slepc4py import SLEPc
@@ -72,7 +74,7 @@ def evolve(H, state, t, result=None, **kwargs):
         raise ValueError('input and result states are on different subspaces.')
 
     if t == 0.0:
-        state.vec.copy(result.vec)
+        state.copy(result)
         return result
 
     if not complex_enabled() and t.real != 0:
@@ -110,6 +112,8 @@ def evolve(H, state, t, result=None, **kwargs):
 
         else:
             raise RuntimeError('solver failed to converge.')
+
+    result.set_initialized()
 
     return result
 
@@ -236,6 +240,7 @@ def eigsolve(H, getvecs=False, nev=1, which='smallest', target=None, tol=None, s
         if getvecs:
             v = State(H.L, H.subspace)
             eps.getEigenpair(i, v.vec)
+            v.set_initialized()
             evecs.append(v)
 
     if getvecs:
@@ -268,6 +273,8 @@ def reduced_density_matrix(state, keep):
     numpy.ndarray[np.complex128]
         The density matrix
     """
+    if not state.initialized:
+        raise UninitializedError("State vector data has not been set yet")
 
     config._initialize()
     from ._backend import bpetsc
