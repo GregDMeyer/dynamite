@@ -215,4 +215,4 @@ RUN pip3 install --no-cache-dir jupyterlab matplotlib
 # run it!
 WORKDIR /home/dnm
 EXPOSE 8887
-CMD ["jupyter", "lab", "--no-browser", "--ip=0.0.0.0", "--port=8887"]
+ENTRYPOINT ["jupyter", "lab", "--no-browser", "--ip=0.0.0.0", "--port=8887"]
