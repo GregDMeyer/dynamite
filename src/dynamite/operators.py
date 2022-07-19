@@ -783,6 +783,7 @@ class Operator:
         np.ndarray(dtype = np.complex128)
             The array
         '''
+        self.establish_L()
 
         if subspaces is None:
             subspaces = (self.left_subspace, self.right_subspace)
