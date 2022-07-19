@@ -53,7 +53,7 @@ class Hamiltonians(EvolveChecker):
         if skip is None:
             skip = set()
 
-        for H_name, _ in hamiltonians.names:
+        for H_name in hamiltonians.get_names():
             if H_name in skip:
                 continue
 

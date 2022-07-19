@@ -91,9 +91,7 @@ class Analytic(Checker):
 class Hamiltonians(Checker):
 
     def test_all_smallest(self):
-        for H_name, real in hamiltonians.names:
-            if not complex_enabled() and not real:
-                continue
+        for H_name in hamiltonians.get_names(complex_enabled()):
             with self.subTest(H=H_name):
                 H = getattr(hamiltonians, H_name)()
 
@@ -105,9 +103,7 @@ class Hamiltonians(Checker):
         if config.shell:
             self.skipTest("solving for target not supported with shell matrices")
 
-        for H_name, real in hamiltonians.names:
-            if not complex_enabled() and not real:
-                continue
+        for H_name in hamiltonians.get_names(complex_enabled()):
             with self.subTest(H=H_name):
                 H = getattr(hamiltonians, H_name)()
 

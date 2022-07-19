@@ -19,10 +19,7 @@ class Hamiltonians(dtr.DynamiteTestCase):
         config._initialize()
         from petsc4py import PETSc
 
-        for H_name, real in hamiltonians.names:
-            if not real and not complex_enabled():
-                continue
-
+        for H_name in hamiltonians.get_names(complex_enabled()):
             with self.subTest(H = H_name):
                 H = getattr(hamiltonians, H_name)()
                 H.shell = True

@@ -14,6 +14,14 @@ names = [
     ('syk', False),
 ]
 
+
+def get_names(include_complex=True):
+    if include_complex:
+        return [x for x, _ in names]
+    else:
+        return [x for x, real in names if real]
+
+
 def ising(L = None):
     '''
     Classic quantum Ising model with a transverse field.

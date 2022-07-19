@@ -14,9 +14,7 @@ from dynamite.states import State
 from dynamite.tools import complex_enabled
 
 def generate_hamiltonian_tests(cls):
-    for H_name, real in hamiltonians.names:
-        if not complex_enabled() and not real:
-            continue
+    for H_name in hamiltonians.get_names(complex_enabled()):
         setattr(cls, 'test_'+H_name, lambda self, n=H_name: self.check_hamiltonian(n))
     return cls
 
