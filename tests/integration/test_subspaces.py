@@ -1,5 +1,5 @@
 '''
-Integration tests for states.
+Integration tests for subspaces.
 '''
 
 import numpy as np
