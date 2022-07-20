@@ -25,6 +25,7 @@ class Operator:
         self._msc = None
         self._is_reduced = False
         self._shell = config.shell
+        self._allow_projection = False
 
         if config.subspace is not None:
             self._subspaces = [(config.subspace, config.subspace)]
@@ -351,6 +352,56 @@ class Operator:
 
         return False
 
+    def conserves(self, left, right=None):
+        """
+        Return whether the operator conserves the given subspace. If both
+        ``left`` and ``right`` are supplied, return whether the image of the
+        operator when applied to the ``right`` subspace is completely
+        contained in the ``left`` subspace.
+        """
+        self.establish_L()
+
+        if right is None:
+            right = left
+
+        if left.product_state_basis != right.product_state_basis:
+            raise ValueError('left and right subspaces incompatible---either '
+                             'both must be a product state basis or neither')
+
+        left.L = self.L
+        right.L = self.L
+
+        self.reduce_msc()
+
+        masks, mask_offsets = self._get_mask_offsets()
+
+        config._initialize()
+        from ._backend import bpetsc
+
+        return bpetsc.check_conserves(
+            masks=masks,
+            mask_offsets=mask_offsets,
+            signs=np.ascontiguousarray(self.msc['signs']),
+            coeffs=np.ascontiguousarray(self.msc['coeffs']),
+            left_type=left.to_enum(),
+            left_data=left.get_cdata(),
+            right_type=right.to_enum(),
+            right_data=right.get_cdata(),
+        )
+
+    @property
+    def allow_projection(self):
+        """
+        Whether to allow subspaces for which matrix multiplication implements
+        a projection (those for which ``Operator.conserves(subspace)`` or
+        ``Operator.conserves(left_subspace, right_subspace)`` returns False).
+        """
+        return self._allow_projection
+
+    @allow_projection.setter
+    def allow_projection(self, value):
+        self._allow_projection = value
+
     ### text representations
 
     # TODO: perhaps encapsulate the string/tex methods into their own class
@@ -560,23 +611,24 @@ class Operator:
         from ._backend import bpetsc
 
         self.reduce_msc()
-        term_array = self.msc
 
-        masks, indices = np.unique(term_array['masks'], return_index=True)
+        if not self.allow_projection and not self.conserves(*subspaces):
+            raise ValueError("Constructing the operator's matrix on this "
+                             "subspace yields a projection (e.g. subspace is "
+                             "not conserved by the operator). If this "
+                             "behavior is desired, set the "
+                             "Operator.allow_projection parameter to True.")
 
-        # need to add the last index
-        mask_offsets = np.ndarray((indices.size+1,), dtype=term_array.dtype['masks'])
-        mask_offsets[:-1] = indices
-        mask_offsets[-1]  = term_array.shape[0]
-
-        if not msc_tools.is_hermitian(term_array):
+        if not msc_tools.is_hermitian(self.msc):
             raise ValueError('Building non-Hermitian matrices currently not supported.')
+
+        masks, mask_offsets = self._get_mask_offsets()
 
         mat = bpetsc.build_mat(
             masks = np.ascontiguousarray(masks),
             mask_offsets = np.ascontiguousarray(mask_offsets),
-            signs = np.ascontiguousarray(term_array['signs']),
-            coeffs = np.ascontiguousarray(term_array['coeffs']),
+            signs = np.ascontiguousarray(self.msc['signs']),
+            coeffs = np.ascontiguousarray(self.msc['coeffs']),
             left_type = subspaces[0].to_enum(),
             left_data = subspaces[0].get_cdata(),
             right_type = subspaces[1].to_enum(),
@@ -586,6 +638,23 @@ class Operator:
         )
 
         self._mats[subspaces] = mat
+
+    def _get_mask_offsets(self):
+        """
+        Return an array of unique mask values, and the indices where each starts
+        """
+        if not self.is_reduced:
+            raise RuntimeError('must reduce MSC first')
+
+        masks, indices = np.unique(self.msc['masks'], return_index=True)
+
+        # need to add the last index
+        mask_offsets = np.ndarray((indices.size+1,),
+                                  dtype=self.msc.dtype['masks'])
+        mask_offsets[:-1] = indices
+        mask_offsets[-1] = self.msc.shape[0]
+
+        return masks, mask_offsets
 
     def destroy_mat(self, subspaces=None):
         """

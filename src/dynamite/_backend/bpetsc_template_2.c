@@ -963,3 +963,123 @@ PetscErrorCode C(MatNorm_CPU,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
 
   return 0;
 }
+
+#undef  __FUNCT__
+#define __FUNCT__ "CheckConserves"
+PetscErrorCode C(CheckConserves,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
+  const msc_t *msc,
+  const C(data,LEFT_SUBSPACE)* left_subspace_data,
+  const C(data,RIGHT_SUBSPACE)* right_subspace_data,
+  PetscInt* result)
+{
+  PetscLayout layout;
+  PetscInt N, col_start, col_end;
+  PetscInt mask_idx, term_idx;
+  PetscInt row_idx, ket, col_idx, bra, sign;
+  PetscScalar value;
+
+#if C(LEFT_SUBSPACE,SP) == SpinConserve_SP && C(RIGHT_SUBSPACE,SP) == SpinConserve_SP
+  PetscInt bra_complement;
+  PetscScalar value_complement;
+  PetscInt switch_spinflip;
+
+  /* whether left and right have different values */
+  switch_spinflip = left_subspace_data->spinflip*right_subspace_data->spinflip;
+#endif
+
+  PetscInt local_result;
+
+  /* dimension of right subspace */
+  N = C(Dim,RIGHT_SUBSPACE)(right_subspace_data);
+
+  /* split the work across processes */
+  PetscCall(PetscLayoutCreate(PETSC_COMM_WORLD, &layout));
+  PetscCall(PetscLayoutSetSize(layout, N));
+  PetscCall(PetscLayoutSetUp(layout));
+  PetscCall(PetscLayoutGetRange(layout, &col_start, &col_end));
+
+  local_result = 1;
+
+  for (col_idx=col_start; col_idx<col_end; ++col_idx) {
+
+    /* each term looks like value*|ket><bra| */
+    bra = C(I2S,RIGHT_SUBSPACE)(col_idx, right_subspace_data);
+#if C(LEFT_SUBSPACE,SP) == SpinConserve_SP && C(RIGHT_SUBSPACE,SP) == SpinConserve_SP
+    bra_complement = bra ^ ((1<<left_subspace_data->L)-1);
+#endif
+
+    for (mask_idx=0; mask_idx<msc->nmasks; mask_idx++) {
+      ket = bra ^ msc->masks[mask_idx];
+
+#if C(LEFT_SUBSPACE,SP) == SpinConserve_SP
+      row_idx = C(S2I,LEFT_SUBSPACE)(ket, NULL, left_subspace_data);
+#else
+      row_idx = C(S2I,LEFT_SUBSPACE)(ket, left_subspace_data);
+#endif
+
+      /* in this case, it mapped onto a row that was in the subspace, so we're good */
+      /* (except spinflip, which needs extra sign checks) */
+#if C(LEFT_SUBSPACE,SP) == SpinConserve_SP && C(RIGHT_SUBSPACE,SP) == SpinConserve_SP
+      if (row_idx != -1 && !left_subspace_data->spinflip) {
+        continue;
+      }
+#else
+      if (row_idx != -1) {
+        continue;
+      }
+#endif
+
+      /* otherwise, if the sum of all terms for this matrix element is 0, we're OK */
+      value = 0;
+      for (term_idx=msc->mask_offsets[mask_idx]; term_idx<msc->mask_offsets[mask_idx+1]; ++term_idx) {
+        sign = 1 - 2*(builtin_parity(bra & msc->signs[term_idx]));
+        value += sign * msc->coeffs[term_idx];
+      }
+
+      /* for spinflip, we need to make sure that the value and its complement have the correct sign change */
+#if C(LEFT_SUBSPACE,SP) == SpinConserve_SP && C(RIGHT_SUBSPACE,SP) == SpinConserve_SP
+      value_complement = 0;
+      if (left_subspace_data->spinflip) {
+	for (term_idx=msc->mask_offsets[mask_idx]; term_idx<msc->mask_offsets[mask_idx+1]; ++term_idx) {
+	  sign = 1 - 2*(builtin_parity(bra_complement & msc->signs[term_idx]));
+	  value_complement += sign * msc->coeffs[term_idx];
+	}
+      }
+#endif
+
+      /* if value == 0, we can just forget about it and continue */
+#if C(LEFT_SUBSPACE,SP) == SpinConserve_SP && C(RIGHT_SUBSPACE,SP) == SpinConserve_SP
+      if (value != 0 || value_complement != 0) {
+	if (!left_subspace_data->spinflip) {
+	  /* no spinflip, we're just like all the other subspaces */
+	  local_result = 0;
+	  break;
+	}
+	/* this row isn't included but the values were nonzero */
+	else if (row_idx == -1) {
+	  local_result = 0;
+	  break;
+	}
+	/* in this case we have to make sure the signs are right */
+	else if (value*switch_spinflip != value_complement) {
+	  local_result = 0;
+	  break;
+	}
+      }
+#else
+      if (value != 0) {
+	local_result = 0;
+	break;
+      }
+#endif
+    }
+    if (!local_result) break;
+  }
+
+  /* communicate the result among everybody */
+  PetscCallMPI(MPI_Allreduce(&local_result, result, 1, MPIU_INT, MPI_LAND, PETSC_COMM_WORLD));
+
+  /* global result is now stored in result, we're done */
+
+  return 0;
+}

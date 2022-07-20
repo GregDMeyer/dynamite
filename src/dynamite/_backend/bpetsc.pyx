@@ -49,6 +49,10 @@ cdef extern from "bpetsc_impl.h":
                  shell_impl shell,
                  PetscMat *A)
 
+    int CheckConserves(msc_t *msc,
+                       subspaces_t *subspaces,
+                       bint *result)
+
     int ReducedDensityMatrix(
         PetscVec vec,
         int sub_type,
@@ -129,6 +133,54 @@ def build_mat(PetscInt [:] masks,
         raise Error(ierr)
 
     return M
+
+
+def check_conserves(PetscInt [:] masks,
+                    PetscInt [:] mask_offsets,
+                    PetscInt [:] signs,
+                    np.complex128_t [:] coeffs,
+                    subspace_type left_type,
+                    left_data,
+                    subspace_type right_type,
+                    right_data):
+
+    cdef int ierr, nterms, nmasks
+    cdef subspaces_t subspaces
+    cdef msc_t msc
+    cdef bint result
+
+    cdef np.float64_t [:] real_coeffs
+
+    msc.nmasks      = masks.size
+    msc.masks       = &masks[0]
+    msc.mask_offsets = &mask_offsets[0]
+    msc.signs       = &signs[0]
+
+    if DNM_PETSC_COMPLEX:
+        msc.coeffs = <void*>&coeffs[0]
+    else:
+        # check that all the coefficients were actually real
+        if not np.all(np.isreal(coeffs)):
+            raise ValueError('matrix has complex entries but PETSc was '
+                             'configured for real numbers')
+
+        real_coeffs_np = np.ascontiguousarray(np.real(coeffs), dtype=np.float64)
+        real_coeffs = real_coeffs_np
+
+        msc.coeffs = <void*>&real_coeffs[0]
+
+    subspaces.left_type = left_type
+    bsubspace.set_data_pointer(left_type, left_data, &(subspaces.left_data))
+    subspaces.right_type = right_type
+    bsubspace.set_data_pointer(right_type, right_data, &(subspaces.right_data))
+
+    ierr = CheckConserves(&msc, &subspaces, &result)
+
+    if ierr != 0:
+        raise Error(ierr)
+
+    return result
+
 
 def track_memory():
     '''

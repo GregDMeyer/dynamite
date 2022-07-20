@@ -72,6 +72,9 @@ def parse_args(argv=None):
                         help='A list of spins, separated by commas, to keep during the '
                         'RDM computation. By default, the first half are kept.')
 
+    parser.add_argument('--check-conserves', action='store_true',
+                        help='Check whether the given subspace is conserved by the matrix.')
+
     return parser.parse_args(argv)
 
 def build_subspace(params, hamiltonian=None):
@@ -161,6 +164,9 @@ def do_mult(params, hamiltonian, state, result):
 def do_rdm(state, keep):
     reduced_density_matrix(state, keep)
 
+def do_check_conserves(hamiltonian):
+    hamiltonian.conserves(hamiltonian.subspace)
+
 # this decorator keeps track of and times function calls
 def log_call(function, stat_dict):
     config._initialize()
@@ -246,6 +252,9 @@ def main():
         if keep_idxs is None:
             keep_idxs = range(0, arg_params.L//2)
         log_call(do_rdm, stats)(in_state, keep_idxs)
+
+    if arg_params.check_conserves:
+        log_call(do_check_conserves, stats)(H)
 
     # trigger memory measurement
     out_state.vec.destroy()

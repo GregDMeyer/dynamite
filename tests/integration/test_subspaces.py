@@ -33,6 +33,7 @@ class AutoBuild(dtr.DynamiteTestCase):
                                     subspaces = tuple([subspace_dict[x]
                                                        for x in (left, right)])
                                     H.add_subspace(*subspaces)
+                                    H.allow_projection = True
                                     H.build_mat(subspaces=subspaces)
 
 

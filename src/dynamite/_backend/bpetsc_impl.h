@@ -39,6 +39,8 @@ typedef enum _shell_impl {
 
 PetscErrorCode BuildMat(const msc_t *msc, subspaces_t *subspaces, shell_impl shell, Mat *A);
 
+PetscErrorCode CheckConserves(const msc_t *msc, subspaces_t *subspaces, PetscInt *result);
+
 /* define a type for context destroying functions, and we keep that in the context */
 // TODO
 

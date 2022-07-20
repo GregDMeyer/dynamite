@@ -9,6 +9,9 @@
  - `State.save` and `State.from_file` methods to allow saving states to disk and loading them later
  - `State.initialized` flag to track whether the state's vector has been filled with data
  - Expanded Jupyter notebook tutorial
+ - `Operator.conserves` method returns whether the given subspace is conserved by the operator
+ - When the matrix for an operator is built, subspaces are automatically checked for conservation/compatibility
+ - `Operator.allow_projection` property allows the automatic subspace check to be turned off
 
 ### Changed
  - `L` of operators and states is now stored in their subspaces

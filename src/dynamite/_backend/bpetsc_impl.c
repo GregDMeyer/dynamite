@@ -222,3 +222,95 @@ PetscErrorCode BuildMat(const msc_t *msc, subspaces_t *subspaces, shell_impl she
   }
   return 0;
 }
+
+/*
+ * we short-circuit some of these because they always return a particular value
+ */
+PetscErrorCode CheckConserves(const msc_t *msc, subspaces_t *subspaces, PetscInt *result)
+{
+  switch (subspaces->left_type) {
+
+    /* when the outgoing subspace is FULL, it is always conserved */
+    case FULL:
+      switch (subspaces->right_type) {
+        case FULL:
+          *result = 1;
+          break;
+
+        case PARITY:
+          *result = 1;
+          break;
+
+        case SPIN_CONSERVE:
+          *result = 1;
+          break;
+
+        case EXPLICIT:
+          *result = 1;
+          break;
+      }
+      break;
+
+    case PARITY:
+      switch (subspaces->right_type) {
+        case FULL:
+	  *result = 0; /* always fails to go from full to anything else */
+          break;
+
+        case PARITY:
+          PetscCall(CheckConserves_Parity_Parity(msc, subspaces->left_data, subspaces->right_data, result));
+          break;
+
+        case SPIN_CONSERVE:
+          PetscCall(CheckConserves_Parity_SpinConserve(msc, subspaces->left_data, subspaces->right_data, result));
+          break;
+
+        case EXPLICIT:
+          PetscCall(CheckConserves_Parity_Explicit(msc, subspaces->left_data, subspaces->right_data, result));
+          break;
+      }
+      break;
+
+    case SPIN_CONSERVE:
+      switch (subspaces->right_type) {
+        case FULL:
+	  *result = 0; /* always fails to go from full to anything else */
+          break;
+
+        case PARITY:
+          PetscCall(CheckConserves_SpinConserve_Parity(msc, subspaces->left_data, subspaces->right_data, result));
+          break;
+
+        case SPIN_CONSERVE:
+          PetscCall(CheckConserves_SpinConserve_SpinConserve(msc, subspaces->left_data, subspaces->right_data, result));
+          break;
+
+        case EXPLICIT:
+          PetscCall(CheckConserves_SpinConserve_Explicit(msc, subspaces->left_data, subspaces->right_data, result));
+          break;
+      }
+      break;
+
+    case EXPLICIT:
+      switch (subspaces->right_type) {
+        case FULL:
+          PetscCall(CheckConserves_Explicit_Full(msc, subspaces->left_data, subspaces->right_data, result));
+          break;
+
+        case PARITY:
+          PetscCall(CheckConserves_Explicit_Parity(msc, subspaces->left_data, subspaces->right_data, result));
+          break;
+
+        case SPIN_CONSERVE:
+          PetscCall(CheckConserves_Explicit_SpinConserve(msc, subspaces->left_data, subspaces->right_data, result));
+          break;
+
+        case EXPLICIT:
+	  PetscCall(CheckConserves_Explicit_Explicit(msc, subspaces->left_data, subspaces->right_data, result));
+          break;
+      }
+      break;
+  }
+
+  return 0;
+}

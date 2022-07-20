@@ -121,6 +121,7 @@ class Subspaces(dtr.DynamiteTestCase):
         self.assertIs(x_sub.subspace, check_subspace)
 
         to_space = identity()
+        to_space.allow_projection = True
         if extra_conversion:
             to_space.add_subspace(SpinConserve(check_subspace.L, check_subspace.k), Full())
         else:
@@ -141,6 +142,7 @@ class Subspaces(dtr.DynamiteTestCase):
             self.check_s2s(H, x_sub, check_subspace, correct_sub)
 
         if not extra_conversion:
+            H.allow_projection = True
             with self.subTest(which='f2s'):
                 self.check_f2s(H, x_full, check_subspace, correct_sub)
 
@@ -180,6 +182,7 @@ class Subspaces(dtr.DynamiteTestCase):
         H.add_subspace(Full(), check_subspace)
         to_space = identity()
         to_space.add_subspace(check_subspace, Full())
+        to_space.allow_projection = True
 
         sub_state = State(subspace=check_subspace)
         full_state = State(subspace=Full())
@@ -266,6 +269,7 @@ class Projection(dtr.DynamiteTestCase):
 
         project = identity()
         project.add_subspace(to_subspace, from_subspace)
+        project.allow_projection = True
 
         project.dot(s, result=r)
 
