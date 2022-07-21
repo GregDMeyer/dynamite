@@ -24,8 +24,7 @@ def get_version():
     -------
 
     dict
-        A dictionary with the keys 'PETSc', 'SLEPc', and 'dynamite', each of which contains version
-        information for the respective library.
+        A dictionary with the keys 'PETSc', 'SLEPc', and 'dynamite'
     '''
 
     from ._backend import bbuild
@@ -39,8 +38,9 @@ def get_version():
     rtn['PETSc'] = PETSc.Sys.getVersionInfo()
     rtn['SLEPc'] = SLEPc.Sys.getVersionInfo()
     rtn['dynamite'] = {}
-    rtn['dynamite']['commit'] = bbuild.get_build_version()
+    rtn['dynamite']['commit'] = bbuild.get_build_commit()
     rtn['dynamite']['branch'] = bbuild.get_build_branch()
+    rtn['dynamite']['version'] = bbuild.get_build_version()
     return rtn
 
 def get_version_str():
@@ -56,15 +56,18 @@ def get_version_str():
 
     info = get_version()
 
-    rtn = 'dynamite commit {dnm_v} on branch "{dnm_branch}" ' +\
-          'built with PETSc {PETSc_v} and SLEPc {SLEPc_v}'
-    rtn = rtn.format(
-        dnm_v = info['dynamite']['commit'],
-        dnm_branch = info['dynamite']['branch'],
-        PETSc_v = '.'.join([str(info['PETSc'][k]) for k in ['major', 'minor', 'subminor']]),
-        SLEPc_v = '.'.join([str(info['SLEPc'][k]) for k in ['major', 'minor', 'subminor']]),
+    dnm_version = info['dynamite']['version']
+    dnm_commit = info['dynamite']['commit']
+    dnm_branch = info['dynamite']['branch']
+    PETSc_v = '.'.join(
+        [str(info['PETSc'][k]) for k in ['major', 'minor', 'subminor']]
+    )
+    SLEPc_v = '.'.join(
+        [str(info['SLEPc'][k]) for k in ['major', 'minor', 'subminor']]
     )
 
+    rtn = f'dynamite version {dnm_version} (commit {dnm_commit} on branch ' +\
+        f'"{dnm_branch}") built with PETSc {PETSc_v} and SLEPc {SLEPc_v}'
     return rtn
 
 def track_memory():

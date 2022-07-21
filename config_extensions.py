@@ -92,19 +92,20 @@ def write_build_headers():
     hardcoded into the backend build.
     '''
     print('Writing header files...')
+
+    commit = check_output(['git', 'describe', '--always'],
+                          cwd=dirname(realpath(__file__)),
+                          universal_newlines=True).strip()
+    branch = check_output(['git', 'rev-parse', '--abbrev-ref', 'HEAD'],
+                          cwd=dirname(realpath(__file__)),
+                          universal_newlines=True).strip()
+    version = open('VERSION').read().strip()
+
     with open(join(dirname(__file__), 'src/dynamite/_backend/config.pxi'), 'w') as f:
-
         f.write('DEF USE_CUDA = %d\n' % int(check_cuda()))
-
-        commit = check_output(['git', 'describe', '--always'],
-                              cwd=dirname(realpath(__file__)),
-                              universal_newlines=True).strip()
-        branch = check_output(['git', 'rev-parse', '--abbrev-ref', 'HEAD'],
-                              cwd=dirname(realpath(__file__)),
-                              universal_newlines=True).strip()
-
-        f.write('DEF DNM_VERSION = "%s"\n' % commit)
         f.write('DEF DNM_BRANCH = "%s"\n' % branch)
+        f.write('DEF DNM_COMMIT = "%s"\n' % commit)
+        f.write('DEF DNM_VERSION = "%s"\n' % version)
 
 def configure_paths():
 

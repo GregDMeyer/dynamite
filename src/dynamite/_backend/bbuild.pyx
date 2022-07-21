@@ -4,11 +4,14 @@ import numpy as np
 
 include "config.pxi"
 
-def get_build_version():
-    return DNM_VERSION
+def get_build_commit():
+    return DNM_COMMIT
 
 def get_build_branch():
     return DNM_BRANCH
+
+def get_build_version():
+    return DNM_VERSION
 
 cdef extern from "petsc.h":
     ctypedef int PetscInt
