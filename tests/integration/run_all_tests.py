@@ -30,9 +30,11 @@ def parse_command_line(cmd_argv=None):
     parser.add_argument('-v', type=int, default=0,
                         help='Verbosity of output from each test run')
 
-    parser.add_argument('--shell', action=argparse.BooleanOptionalAction,
-                        help='Whether to run the tests using shell matrices. '
-                        'If omitted, tests are repeated with shell on and off')
+    # for compatibility with Python < 3.9
+    if hasattr(argparse, 'BooleanOptionalAction'):
+        parser.add_argument('--shell', action=argparse.BooleanOptionalAction,
+                            help='Whether to run the tests using shell matrices. '
+                            'If omitted, tests are repeated with shell on and off')
 
     args = parser.parse_args(cmd_argv)
 
@@ -72,7 +74,7 @@ def main():
 
     const_options = ['-v', str(params.v), '-L', str(params.L)]
 
-    if params.shell is None:
+    if not hasattr(params, 'shell') or params.shell is None:
         run_options = [[], ['--shell']]
     elif params.shell:
         run_options = [['--shell']]
