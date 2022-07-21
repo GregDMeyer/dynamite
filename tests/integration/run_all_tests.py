@@ -11,7 +11,8 @@ def parse_command_line(cmd_argv=None):
     parser = argparse.ArgumentParser(description='Run all tests for dynamite.')
 
     parser.add_argument('--mpiexec', default='mpirun',
-                        help='Command to launch an MPI job')
+                        help='Command to launch an MPI job. Set to empty'
+                        'string to not use MPI.')
 
     parser.add_argument('--nprocs', default=None,
                         type=lambda l: [int(x) for x in l.split(',')],
@@ -38,8 +39,15 @@ def parse_command_line(cmd_argv=None):
     return args
 
 def run_test(mpiexec, nproc, fname, options, timeout=None):
-    cmd = mpiexec.split(' ')
-    cmd += ['-n', str(nproc), 'python3', fname] + options
+    if mpiexec:
+        cmd = mpiexec.split(' ')
+        cmd += ['-n', str(nproc)]
+    else:
+        cmd = []
+        if nproc > 1:
+            raise ValueError('Cannot run with nproc > 1 without MPI')
+
+    cmd += ['python3', fname] + options
     print(' '.join(cmd))
 
     try:
@@ -57,7 +65,7 @@ def main():
     params = parse_command_line()
 
     if params.nprocs is None:
-        if params.gpu:
+        if params.gpu or not params.mpiexec:
             params.nprocs = [1]
         else:
             params.nprocs = [1,3,4]

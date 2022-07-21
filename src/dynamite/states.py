@@ -234,14 +234,20 @@ class State:
         config._initialize()
         from petsc4py import PETSc
 
-        CW = PETSc.COMM_WORLD.tompi4py()
+        if PETSc.COMM_WORLD.size == 1:
+            # in this case it works without needing mpi4py
+            return int(time())
 
-        if CW.rank == 0:
-            seed = int(time())
         else:
-            seed = None
+            # otherwise we have to coordinate among the ranks
+            CW = PETSc.COMM_WORLD.tompi4py()
 
-        return CW.bcast(seed, root = 0)
+            if CW.rank == 0:
+                seed = int(time())
+            else:
+                seed = None
+
+            return CW.bcast(seed, root = 0)
 
     def set_random(self, seed = None, normalize = True):
         """

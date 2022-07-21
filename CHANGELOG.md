@@ -22,6 +22,7 @@
  - Ensure that the `L` of all of an operator's subspaces remains consistent
  - Ensure that product states passed as an integer to `State.str_to_state` correspond to valid states of the given length L
  - Small fixes and improvements to documentation
+ - Do not require `mpi4py` to be installed if running with only 1 rank
 
 ## 0.2.2 - 2022-07-01
 

@@ -5,6 +5,7 @@ from time import sleep
 from timeit import default_timer
 import operator
 
+
 class MPITestCase(ut.TestCase):
     '''
     Test class specifically for MPI tests. Currently just makes the output
@@ -16,13 +17,20 @@ class MPITestCase(ut.TestCase):
         method_name = self._testMethodName
         return class_name + '.' + method_name
 
+
 class MPITestRunner:
     '''
     A test runner designed to run well under several MPI processes.
     '''
 
     def __init__(self, name=None, failfast=False, verbose=1, module=None):
-        from mpi4py import MPI
+        try:
+            from mpi4py import MPI
+        except ImportError:
+            print('Unable to import mpi4py; assuming only 1 MPI rank.',
+                  file=sys.stderr)
+            MPI = FakeMPI()
+
         self.comm = MPI.COMM_WORLD
 
         if module is None:
@@ -41,6 +49,7 @@ class MPITestRunner:
         result.startTestRun()
         self.suite.run(result)
         result.stopTestRun()
+
 
 class MPITestResult(ut.TestResult):
     '''
@@ -238,6 +247,26 @@ def color_error_string(s):
         return pre + s + post
 
     return s
+
+
+class FakeMPI():
+    """
+    Mock mpi4py's MPI module, when mpi4py is not installed (assuming we only
+    have 1 rank).
+    """
+
+    class COMM_WORLD():
+        size = 1
+        rank = 0
+
+        def barrier():
+            pass
+
+        def allreduce(value, op):
+            return value
+
+        def gather(value, root):
+            return [value]
 
 
 def main(name=None, failfast=False, verbose=1, module=None):

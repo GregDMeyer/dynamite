@@ -1,6 +1,8 @@
 
 import mpi_test_runner as mtr
+from mpi4py import MPI
 import unittest as ut
+
 
 class Simple(mtr.MPITestCase):
 
@@ -11,17 +13,14 @@ class Simple(mtr.MPITestCase):
         self.fail()
 
     def test_fail_0(self):
-        from mpi4py import MPI
         if MPI.COMM_WORLD.rank == 0:
             self.fail()
 
     def test_fail_1(self):
-        from mpi4py import MPI
         if MPI.COMM_WORLD.rank == 1:
             self.fail()
 
     def test_fail_nonzero(self):
-        from mpi4py import MPI
         if MPI.COMM_WORLD.rank != 0:
             self.fail()
 
@@ -29,7 +28,6 @@ class Simple(mtr.MPITestCase):
         raise ValueError
 
     def test_error_nonzero(self):
-        from mpi4py import MPI
         if MPI.COMM_WORLD.rank != 0:
             raise ValueError
 
@@ -38,7 +36,6 @@ class Simple(mtr.MPITestCase):
             raise ValueError
 
     def test_mixed(self):
-        from mpi4py import MPI
         if MPI.COMM_WORLD.rank < 2:
             self.fail()
         else:

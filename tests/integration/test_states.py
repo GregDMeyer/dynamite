@@ -22,12 +22,16 @@ class RandomSeed(dtr.DynamiteTestCase):
         from dynamite import config
         config._initialize()
         from petsc4py import PETSc
-        comm = PETSc.COMM_WORLD.tompi4py()
+
         seed = State.generate_time_seed()
 
-        all_seeds = comm.gather(seed, root = 0)
+        if PETSc.COMM_WORLD.size > 1:
+            comm = PETSc.COMM_WORLD.tompi4py()
+            all_seeds = comm.gather(seed, root=0)
+        else:
+            all_seeds = [seed]
 
-        if comm.rank == 0:
+        if PETSc.COMM_WORLD.rank == 0:
             self.assertTrue(all(s == seed for s in all_seeds))
 
 class ToNumpy(dtr.DynamiteTestCase):
