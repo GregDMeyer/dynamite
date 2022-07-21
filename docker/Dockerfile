@@ -2,6 +2,8 @@
 ARG PLATFORM=cpu
 ARG PETSC_VERSION=3.17.3
 ARG SLEPC_VERSION=3.17.1
+ARG CUDA_VERSION=11.6.2
+ARG UBUNTU_VERSION=20.04
 
 
 FROM python:3.9-bullseye AS base-cpu
@@ -29,7 +31,7 @@ ARG PETSC_CONFIG_FLAGS
 ENV PETSC_CONFIG_FLAGS="$PETSC_CONFIG_FLAGS --download-scalapack=1 --with-mumps=1"
 
 
-FROM nvidia/cuda:11.6.0-devel-ubuntu20.04 AS base-gpu
+FROM nvidia/cuda:${CUDA_VERSION}-devel-ubuntu${UBUNTU_VERSION} AS base-gpu
 
 # install dependencies
 ONBUILD RUN apt-get update && \
@@ -155,7 +157,7 @@ ARG PETSC_ARCH=complex-opt
 ENV PETSC_ARCH=$PETSC_ARCH
 
 
-FROM nvidia/cuda:11.6.0-runtime-ubuntu20.04 AS release-base-gpu
+FROM nvidia/cuda:${CUDA_VERSION}-runtime-ubuntu${UBUNTU_VERSION} AS release-base-gpu
 
 ONBUILD RUN apt-get update && \
     \
