@@ -155,6 +155,7 @@ ONBUILD RUN apt-get update && \
 
 ARG PETSC_ARCH=complex-opt
 ENV PETSC_ARCH=$PETSC_ARCH
+ENV OMP_NUM_THREADS=1
 
 
 FROM nvidia/cuda:${CUDA_VERSION}-runtime-ubuntu${UBUNTU_VERSION} AS release-base-gpu
@@ -172,6 +173,7 @@ ONBUILD RUN apt-get update && \
 
 ARG PETSC_ARCH=cuda-opt
 ENV PETSC_ARCH=$PETSC_ARCH
+ENV OMP_NUM_THREADS=1
 
 
 FROM release-base-${PLATFORM} as release
