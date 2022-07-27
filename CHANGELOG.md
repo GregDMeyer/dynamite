@@ -17,6 +17,7 @@
  - `L` of operators and states is now stored in their subspaces
  - The value of `L` in a Subspace object now cannot be modified after it is set
  - Moved package source into `src/` directory
+ - Operators must share the same value of all settable properties (e.g. L, shell, etc.) in order to be added or multiplied together, rather than ambiguously inheriting one of the differing values
 
 ### Fixed
  - Ensure that the `L` of all of an operator's subspaces remains consistent

@@ -173,6 +173,99 @@ class UnaryBinary(ut.TestCase):
         dnm = sigmax() / 2
         self.check_same_msc(dnm.msc, [(1, 0, 0.5)])
 
+    def test_fail_shell(self):
+        o1 = sigmax(0)
+        o2 = sigmax(1)
+
+        o1.shell = True
+        with self.assertRaises(ValueError):
+            o1 + o2
+        with self.assertRaises(ValueError):
+            o1 * o2
+
+        o1.shell = False
+        o2.shell = True
+        with self.assertRaises(ValueError):
+            o1 + o2
+        with self.assertRaises(ValueError):
+            o1 * o2
+
+    def test_fail_L(self):
+        test_vals = [None, 4, 5]
+
+        for L1 in test_vals:
+            for L2 in test_vals:
+                if L1 is L2:
+                    continue
+
+                with self.subTest(L1=L1, L2=L2):
+                    o1 = sigmax(0)
+                    o2 = sigmax(1)
+
+                    if L1 is not None:
+                        o1.L = L1
+                    if L2 is not None:
+                        o2.L = L2
+
+                    with self.assertRaises(ValueError):
+                        o1 + o2
+                    with self.assertRaises(ValueError):
+                        o1 * o2
+
+    def test_fail_projection(self):
+        o1 = sigmax(0)
+        o2 = sigmax(1)
+
+        o1.allow_projection = True
+        with self.assertRaises(ValueError):
+            o1 + o2
+        with self.assertRaises(ValueError):
+            o1 * o2
+
+        o1.allow_projection = False
+        o2.allow_projection = True
+        with self.assertRaises(ValueError):
+            o1 + o2
+        with self.assertRaises(ValueError):
+            o1 * o2
+
+    def test_fail_subspaces(self):
+        from dynamite.subspaces import Parity
+
+        o1 = sigmax(0)
+        o2 = sigmax(1)
+
+        o1.subspace = Parity('even')
+        with self.assertRaises(ValueError):
+            o1 + o2
+        with self.assertRaises(ValueError):
+            o1 * o2
+
+    def test_fail_subspaces_2(self):
+        from dynamite.subspaces import Parity
+
+        o1 = sigmax(0)
+        o2 = sigmax(1)
+
+        o2.subspace = Parity('even')
+        with self.assertRaises(ValueError):
+            o1 + o2
+        with self.assertRaises(ValueError):
+            o1 * o2
+
+    def test_fail_subspaces_different(self):
+        from dynamite.subspaces import Parity
+
+        o1 = sigmax(0)
+        o2 = sigmax(1)
+
+        o1.subspace = Parity('odd')
+        o2.subspace = Parity('even')
+        with self.assertRaises(ValueError):
+            o1 + o2
+        with self.assertRaises(ValueError):
+            o1 * o2
+
 
 from dynamite.operators import op_sum, op_product
 

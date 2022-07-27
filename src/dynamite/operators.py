@@ -3,6 +3,7 @@ This module provides the building blocks for Hamiltonians, and
 defines their built-in behavior and operations.
 """
 
+from itertools import chain
 import numpy as np
 
 from . import config, validate, msc_tools
@@ -954,6 +955,8 @@ class Operator:
                             % (str(type(self)), str(type(x))))
 
     def _op_add(self, o):
+        self._check_compatible(o)
+
         rtn = self.copy()
         rtn.msc = msc_tools.msc_sum([self.msc, o.msc])
         rtn.tex = self.tex + ' + ' + o.tex
@@ -962,12 +965,54 @@ class Operator:
         return rtn
 
     def _op_mul(self, o):
+        self._check_compatible(o)
+
         rtn = self.copy()
         rtn.msc = msc_tools.msc_product([self.msc, o.msc])
         rtn.string = self.with_brackets('string') + '*' + o.with_brackets('string')
         rtn.tex = self.with_brackets('tex') + o.with_brackets('tex')
         rtn.brackets = ''
         return rtn
+
+    def _check_compatible(self, o):
+        """
+        Check that two operators are compatible to be combined (added or
+        multiplied).
+        """
+        if self.shell != o.shell:
+            raise ValueError("Operators must have the same value of the "
+                             "'shell' parameter to be combined. To set it "
+                             "globally, set dynamite.config.shell")
+
+        if self.allow_projection != o.allow_projection:
+            raise ValueError("Operators must have the same value of the "
+                             "'allow_projection' parameter to be combined.")
+
+        if self.L != o.L:
+            raise ValueError("Operators to be combined must have the same "
+                             "value of the spin chain length L. To set it "
+                             "globally, set dynamite.config.L")
+
+        subsp_1 = self.get_subspace_list()
+        subsp_2 = o.get_subspace_list()
+
+        subspaces_bad = False
+        if len(subsp_1) != len(subsp_2):
+            subspaces_bad = True
+        else:
+            for (i, (left_1, right_1)) in enumerate(subsp_1):
+                # for efficiency, start later
+                for (left_2, right_2) in chain(subsp_2[i:], subsp_2[:i]):
+                    if left_1.identical(left_2) and right_1.identical(right_2):
+                        break
+                else:
+                    subspaces_bad = True
+                    break
+
+        if subspaces_bad:
+            raise ValueError("Operators to be combined must have the same "
+                             "subspaces. To set a global default subspace, "
+                             "set dynamite.config.subspace")
 
     def dot(self, x, result = None):
         r'''
