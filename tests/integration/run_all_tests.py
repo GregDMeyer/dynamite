@@ -30,6 +30,9 @@ def parse_command_line(cmd_argv=None):
     parser.add_argument('-v', type=int, default=0,
                         help='Verbosity of output from each test run')
 
+    parser.add_argument('--skip-slow', action='store_true',
+                        help='Skip tests that are marked as slow')
+
     # for compatibility with Python < 3.9
     if hasattr(argparse, 'BooleanOptionalAction'):
         parser.add_argument('--shell', action=argparse.BooleanOptionalAction,
@@ -83,6 +86,10 @@ def main():
 
     if params.gpu:
         run_options += [v+['--gpu'] for v in run_options]
+
+    if params.skip_slow:
+        for opts in run_options:
+            opts.append('--skip-slow')
 
     for fname in fnames:
         for options in run_options:
