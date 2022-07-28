@@ -4,6 +4,7 @@ import sys
 from time import sleep
 from timeit import default_timer
 import operator
+from functools import wraps
 
 
 class MPITestCase(ut.TestCase):
@@ -12,10 +13,31 @@ class MPITestCase(ut.TestCase):
     prettier to be more compatible with the test runners below.
     '''
 
+    _skip_flags = None
+
+    @property
+    def skip_flags(self):
+        if self._skip_flags is None:
+            self._skip_flags = []
+        return self._skip_flags
+
     def __str__(self):
         class_name = type(self).__name__
         method_name = self._testMethodName
         return class_name + '.' + method_name
+
+
+def skip_flag(flag):
+    def rtn_decorator(func):
+        @wraps(func)
+        def modified_func(self, *args, **kwargs):
+            if flag in self.skip_flags:
+                self.skipTest(f'skipped due to flag "{flag}"')
+            func(self, *args, **kwargs)
+
+        return modified_func
+
+    return rtn_decorator
 
 
 class MPITestRunner:
@@ -23,7 +45,7 @@ class MPITestRunner:
     A test runner designed to run well under several MPI processes.
     '''
 
-    def __init__(self, name=None, failfast=False, verbose=1, module=None):
+    def __init__(self, name=None, failfast=False, verbose=1, module=None, skip_flags=None):
         try:
             from mpi4py import MPI
         except ImportError:
@@ -44,11 +66,25 @@ class MPITestRunner:
         else:
             self.suite = ut.defaultTestLoader.loadTestsFromModule(module)
 
+        if skip_flags is not None:
+            for test_case in flatten(self.suite):
+                for flag in skip_flags:
+                    test_case.skip_flags.append(flag)
+
     def run(self):
         result = MPITestResult(comm=self.comm, failfast=self.failfast, verbose=self.verbose)
         result.startTestRun()
         self.suite.run(result)
         result.stopTestRun()
+
+
+def flatten(test_suite):
+    if isinstance(test_suite, ut.TestCase):
+        yield test_suite
+    else:
+        for test in test_suite:
+            for t in flatten(test):
+                yield t
 
 
 class MPITestResult(ut.TestResult):
@@ -269,7 +305,7 @@ class FakeMPI():
             return [value]
 
 
-def main(name=None, failfast=False, verbose=1, module=None):
+def main(name=None, failfast=False, verbose=1, module=None, skip_flags=None):
     '''
     Run tests.
 
@@ -286,6 +322,9 @@ def main(name=None, failfast=False, verbose=1, module=None):
 
     module : module or None
         Module in which to find the tests. Defaults to __main__ if None.
+
+    skip_flags : list of str, optional
+        A list of flags to set marking tests to skip (using the @skip_flag decorator)
     '''
-    runner = MPITestRunner(name=name, failfast=failfast, verbose=verbose, module=module)
+    runner = MPITestRunner(name=name, failfast=failfast, verbose=verbose, module=module, skip_flags=skip_flags)
     runner.run()

@@ -7,6 +7,7 @@ import numpy as np
 
 import unittest as ut
 import dynamite_test_runner as dtr
+from mpi_test_runner import skip_flag
 
 from dynamite import config
 from dynamite.states import State
@@ -142,6 +143,7 @@ class Compare(dtr.DynamiteTestCase):
                 self.assertTrue(np.linalg.norm(np_col-col) < 1E-13,
                                 msg=f'difference found in column {i}:\ndiff: {np_col - col}')
 
+    @skip_flag('slow')
     def check_hamiltonian(self, H_name):
         H = getattr(hamiltonians, H_name)()
         self.compare_matrices(H)

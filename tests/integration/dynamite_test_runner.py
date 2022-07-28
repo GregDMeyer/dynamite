@@ -86,10 +86,14 @@ def parse_command_line(cmd_argv=None):
     parser.add_argument('--shell', action='store_true',
                         help='Run the tests using shell matrices')
 
-    parser.add_argument('--slepc_args', type=lambda s: s.strip().split(' '),
+    parser.add_argument('--slepc-args', type=lambda s: s.strip().split(' '),
                         help='Arguments to pass to SLEPc initialization')
 
+    parser.add_argument('--skip-slow', action='store_true',
+                        help='Skip tests that are marked as being slow.')
+
     return parser.parse_args(cmd_argv)
+
 
 def main(slepc_args=None):
     from dynamite import config
@@ -106,4 +110,9 @@ def main(slepc_args=None):
 
     config.initialize(slepc_args, gpu=args.gpu)
 
-    mtr.main(name=args.name, failfast=args.failfast, verbose=args.verbose)
+    if args.skip_slow:
+        skip_flags = ['slow']
+    else:
+        skip_flags = None
+
+    mtr.main(name=args.name, failfast=args.failfast, verbose=args.verbose, skip_flags=skip_flags)

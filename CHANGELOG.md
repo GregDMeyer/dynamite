@@ -12,6 +12,7 @@
  - `Operator.conserves` method returns whether the given subspace is conserved by the operator
  - When the matrix for an operator is built, subspaces are automatically checked for conservation/compatibility
  - `Operator.allow_projection` property allows the automatic subspace check to be turned off
+ - Ability to flag integration tests and skip them based on that flag
 
 ### Changed
  - `L` of operators and states is now stored in their subspaces

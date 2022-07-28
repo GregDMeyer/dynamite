@@ -78,6 +78,10 @@ class Example(mtr.MPITestCase):
         else:
             self.assertTrue(False)
 
+    @mtr.skip_flag('test_flag')
+    def test_skip_flag(self):
+        pass
+
 
 def parse_command_line():
 
@@ -98,4 +102,4 @@ def parse_command_line():
 
 if __name__ == '__main__':
     args = parse_command_line()
-    mtr.main(name=args.name, failfast=args.failfast, verbose=args.verbose)
+    mtr.main(name=args.name, failfast=args.failfast, verbose=args.verbose, skip_flags=['test_flag'])
