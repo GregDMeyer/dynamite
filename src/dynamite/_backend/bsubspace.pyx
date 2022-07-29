@@ -1,7 +1,10 @@
 # cython: language_level=3
+# distutils: language = c++
 
 import numpy as np
 cimport numpy as np
+
+from libcpp.unordered_set cimport unordered_set
 
 from .bbuild import dnm_int_t
 
@@ -220,17 +223,23 @@ def compute_rcm(PetscInt [:] masks, PetscInt [:] signs, np.complex128_t [:] coef
 
     cdef PetscInt full_dim = 2**L
     cdef PetscInt nnz = len(np.unique(masks))
-    cdef PetscInt map_idx, i, msc_idx, cur_mask, edge, sign
+    cdef PetscInt map_idx, i, msc_idx, cur_mask, edge, sign, state
+    cdef PetscInt nterms, max_states
     cdef np.complex128_t tot_coeff
+    cdef unordered_set[PetscInt] seen_states
 
-    state_rmap = {}
+    nterms = len(masks)
+    max_states = len(state_map)
+
+    # preallocate memory so we don't reallocate all the time
+    seen_states.reserve(max_states)
 
     map_idx = 0
     state_map[map_idx] = start
-    state_rmap[start] = map_idx
+    seen_states.insert(start)
     map_idx += 1
 
-    for i in range(state_map.size):
+    for i in range(max_states):
         if i == map_idx:
             break
 
@@ -238,23 +247,24 @@ def compute_rcm(PetscInt [:] masks, PetscInt [:] signs, np.complex128_t [:] coef
 
         cur_mask = masks[0]
         tot_coeff = 0
-        for msc_idx in range(masks.size):
+        for msc_idx in range(nterms):
 
             sign = __builtin_parityl(state & signs[msc_idx])
             tot_coeff += (1-2*sign)*coeffs[msc_idx]
 
-            if (msc_idx+1 == masks.size or masks[msc_idx+1] != cur_mask):
-                edge = state ^ cur_mask
-                if edge not in state_rmap and tot_coeff != 0:
-                    if map_idx >= state_map.size:
-                        raise RuntimeError('state_map size too small')
-                    state_map[map_idx] = edge
-                    state_rmap[edge] = map_idx
-                    map_idx += 1
+            if (msc_idx+1 == nterms or masks[msc_idx+1] != cur_mask):
+                if tot_coeff != 0:
+                    edge = state ^ cur_mask
+                    if not seen_states.count(edge):
+                        if map_idx >= max_states:
+                            raise RuntimeError('state_map size too small')
+                        state_map[map_idx] = edge
+                        seen_states.insert(edge)
+                        map_idx += 1
 
                 tot_coeff = 0
 
-                if msc_idx+1 < masks.size:
+                if msc_idx+1 < nterms:
                     cur_mask = masks[msc_idx+1]
 
     return map_idx

@@ -2,6 +2,6 @@
 config.pxi
 dnm_types.h
 bpetsc.c
-bsubspace.c
+bsubspace.cpp
 bbuild.c
 *.so
