@@ -8,6 +8,7 @@
  - `Operator.has_subspace` method returns whether a given subspace has been registered with the operator
  - `State.save` and `State.from_file` methods to allow saving states to disk and loading them later
  - `State.initialized` flag to track whether the state's vector has been filled with data
+ - `State.set_initialized` and `State.assert_initialized` methods to set and check the flag
  - Expanded Jupyter notebook tutorial
  - `Operator.conserves` method returns whether the given subspace is conserved by the operator
  - When the matrix for an operator is built, subspaces are automatically checked for conservation/compatibility

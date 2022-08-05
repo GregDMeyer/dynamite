@@ -9,7 +9,7 @@ import numpy as np
 from . import config, validate, msc_tools
 from .computations import evolve, eigsolve
 from .subspaces import Full, Explicit
-from .states import State, UninitializedError
+from .states import State
 from .tools import complex_enabled
 
 class Operator:
@@ -1032,8 +1032,7 @@ class Operator:
         dynamite.states.State
             The result
         '''
-        if not x.initialized:
-            raise UninitializedError("State vector data has not been set yet")
+        x.assert_initialized()
 
         self.establish_L()
 

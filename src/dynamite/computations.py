@@ -1,6 +1,6 @@
 
 from . import config
-from .states import State, UninitializedError
+from .states import State
 from .tools import complex_enabled
 from .msc_tools import dnm_int_t
 
@@ -56,8 +56,7 @@ def evolve(H, state, t, result=None, **kwargs):
     dynamite.states.State
         The result state
     """
-    if not state.initialized:
-        raise UninitializedError("State vector data has not been set yet")
+    state.assert_initialized()
 
     config._initialize()
     from slepc4py import SLEPc
@@ -273,8 +272,7 @@ def reduced_density_matrix(state, keep):
     numpy.ndarray[np.complex128]
         The density matrix
     """
-    if not state.initialized:
-        raise UninitializedError("State vector data has not been set yet")
+    state.assert_initialized()
 
     config._initialize()
     from ._backend import bpetsc

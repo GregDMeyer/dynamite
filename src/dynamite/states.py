@@ -7,20 +7,6 @@ import numpy as np
 from os import urandom
 from time import time
 import pickle
-import functools
-
-
-def _require_initialized(func):
-    '''
-    Decorator to make sure state has data before running the given function
-    '''
-    @functools.wraps(func)
-    def wrapper(self, *args, **kwargs):
-        if not self.initialized:
-            raise UninitializedError("State vector data has not been set yet")
-        return func(self, *args, **kwargs)
-
-    return wrapper
 
 
 class State:
@@ -139,6 +125,13 @@ class State:
         Mark that the state vector data has been set.
         '''
         self._initialized = True
+
+    def assert_initialized(self):
+        '''
+        Raise an exception if the vector has not been initialized
+        '''
+        if not self.initialized:
+            raise UninitializedError("State vector data has not been set yet")
 
     @classmethod
     def str_to_state(cls, s, L):
@@ -301,7 +294,6 @@ class State:
 
         self.set_initialized()
 
-    @_require_initialized
     def project(self, index, value):
         '''
         Project the state onto a subspace in which the qubit
@@ -319,6 +311,8 @@ class State:
         value : 0 or 1
             Which single-spin state to project onto
         '''
+        self.assert_initialized()
+
         if index < 0 or index >= self.subspace.L:
             raise ValueError("spin index out of range")
 
@@ -385,7 +379,6 @@ class State:
 
         return ret
 
-    @_require_initialized
     def to_numpy(self, to_all = False):
         """
         Return a numpy representation of the state.
@@ -396,9 +389,9 @@ class State:
             Whether to return the vector on all MPI ranks (True),
             or just rank 0 (False).
         """
+        self.assert_initialized()
         return self._to_numpy(self.vec, to_all)
 
-    @_require_initialized
     def save(self, fname):
         '''
         Save the state to disk. Note that this method saves the state
@@ -410,6 +403,8 @@ class State:
         fname : str
             The path to save the state to
         '''
+        self.assert_initialized()
+
         config._initialize()
         from petsc4py import PETSc
 
@@ -473,7 +468,6 @@ class State:
 
         return rtn
 
-    @_require_initialized
     def dot(self, x):
         '''
         Compute the inner product of two states.
@@ -490,11 +484,10 @@ class State:
         complex
             The value of the inner product
         '''
-        if not x.initialized:
-            raise UninitializedError("Argument's vector data has not been set yet")
+        self.assert_initialized()
+        x.assert_initialized()
         return self.vec.dot(x.vec)
 
-    @_require_initialized
     def norm(self):
         '''
         Compute the Euclidean norm of the state vector.
@@ -505,22 +498,23 @@ class State:
         float
             The vector norm
         '''
+        self.assert_initialized()
         return self.vec.norm()
 
-    @_require_initialized
     def normalize(self):
         '''
         Scale the vector such that the norm is 1.
         '''
+        self.assert_initialized()
         return self.vec.normalize()
 
-    @_require_initialized
     def __imul__(self, x):
+        self.assert_initialized()
         self.vec.scale(x)
         return self
 
-    @_require_initialized
     def __itruediv__(self, x):
+        self.assert_initialized()
         self.vec.scale(1/x)
         return self
 

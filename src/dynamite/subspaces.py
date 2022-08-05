@@ -405,10 +405,7 @@ class SpinConserve(Subspace):
         State
             The converted state
         """
-        if not state.initialized:
-            # this import has to be done here to avoid circular import
-            from .states import UninitializedError
-            raise UninitializedError("State vector data has not been set yet")
+        state.assert_initialized()
 
         if state.subspace.spinflip == 0 and sign is None:
             raise ValueError('must provide sign when converting to spinflip')
