@@ -154,6 +154,10 @@ You can either `install podman <https://podman.io/getting-started/installation>`
 Once you have that, you don't need to do anything else---the dynamite image will be downloaded
 automatically the first time you run the commands described above!
 
+.. note::
+
+   For security, it's a good idea (and more convenient) to run in rootless mode. See `the Podman docs <https://github.com/containers/podman/blob/main/docs/tutorials/rootless_tutorial.md>`_ or `the Docker docs <https://docs.docker.com/engine/security/rootless/>`_ about this topic.
+
 Mac + Windows
 -------------
 
@@ -171,6 +175,19 @@ To use dynamite, no setup is required---just run the commands given above!
 Do read however the note in the section :ref:`singularity-usage` above.
 
 Alternatively, the cluster may use Shifter to run containers---see your cluster's documentation.
+
+Troubleshooting
+===============
+
+I am having file permissions errors when I try to access my files from inside the container.
+--------------------------------------------------------------------------------------------
+
+This sometimes happens on Linux (and maybe Mac) because the user ID of the user running inside the container does not match the UID that owns the files (your user on the host). If you aren't worried about other users on your machine touching the files, the easiest solution is just to use ``chmod`` to set the files to be readable and writable by all users. If you don't want to do that, or it doesn't work, you can try mounting the volume into Docker with the ``z`` or ``Z`` flags---see `here <https://stackoverflow.com/questions/24288616/permission-denied-on-accessing-host-directory-in-docker>`_ for more information.
+
+I see a lot of errors like ``Read -1, expected 4096, errno = 1`` when I try to use MPI in the container.
+--------------------------------------------------------------------------------------------------------
+
+This is due to Docker restricting a capability that MPI needs. Try adding the ``--cap-add=SYS_PTRACE`` flag to your ``docker run`` command.
 
 Installing other packages in your container
 ===========================================
