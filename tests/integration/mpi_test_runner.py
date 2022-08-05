@@ -26,18 +26,9 @@ class MPITestCase(ut.TestCase):
         method_name = self._testMethodName
         return class_name + '.' + method_name
 
-
-def skip_flag(flag):
-    def rtn_decorator(func):
-        @wraps(func)
-        def modified_func(self, *args, **kwargs):
-            if flag in self.skip_flags:
-                self.skipTest(f'skipped due to flag "{flag}"')
-            func(self, *args, **kwargs)
-
-        return modified_func
-
-    return rtn_decorator
+    def skip_on_flag(self, flag):
+        if flag in self.skip_flags:
+            self.skipTest(f'skipped due to flag "{flag}"')
 
 
 class MPITestRunner:

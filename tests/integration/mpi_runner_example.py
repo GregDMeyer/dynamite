@@ -78,9 +78,8 @@ class Example(mtr.MPITestCase):
         else:
             self.assertTrue(False)
 
-    @mtr.skip_flag('test_flag')
     def test_skip_flag(self):
-        pass
+        self.skip_on_flag('test_flag')
 
 
 def parse_command_line():
