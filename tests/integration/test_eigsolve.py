@@ -18,19 +18,21 @@ class Checker(dtr.DynamiteTestCase):
         self.assertTrue(np.isclose(x, y, rtol = rtol, atol = atol),
                         msg = '\n%s\n%s' % (str(x), str(y)))
 
-    def check_all(self, H, evals, evecs, tol = 1E-15):
+    def check_all(self, H, evals, evecs, tol=1E-15, evec_tol=None):
         for val, vec in zip(evals, evecs):
-            self.check_is_evec(H, vec, val, tol)
+            self.check_is_evec(H, vec, val, tol, evec_tol)
 
         # check that eigenvectors are orthogonal
         for ev1, ev2 in itertools.combinations(evecs, 2):
             self.assertLess(np.abs(ev1.dot(ev2)), tol)
 
-    def check_is_evec(self, H, vec, val, tol = 1E-10):
+    def check_is_evec(self, H, vec, val, tol=1E-10, evec_tol=None):
         '''
         Check if evec is an eigenvector of H with eigenvalue eval,
-        by computing for normalized eigenvector:
-            norm(H*evec - eval*evec) < tol
+        by computing two quantities:
+
+         - evec*H*evec - eval < tol
+         - || (1/eval)*H*evec - evec || < tol
 
         Parameters
         ----------
@@ -43,21 +45,45 @@ class Checker(dtr.DynamiteTestCase):
         val : float
             The eigenvalue
 
-        tol : float
+        tol : float, optional
             The tolerance for the above comparison
+
+        evec_tol : float, optional
+            The tolerance for eigenvectors. Defaults to tol if not set
         '''
         self.assertTrue(isinstance(vec, State))
+
+        if evec_tol is None:
+            evec_tol = tol
+
+        prod = H*vec
+        self.assertLess(
+            abs(val - vec.dot(prod)),
+            tol
+        )
 
         # apparently binary operators don't work very well in petsc4py
         # so I have to do this manually
         # self.assertLess(((H*vec).vec - val*vec.vec).norm(), tol)
+        from dynamite import config
+        config._initialize()
+        from petsc4py import PETSc
 
-        # the norm doesn't depend on other processes values, so we can just
-        # assert independently
+        prod.vec.scale(1/val)
+
         istart, iend = vec.vec.getOwnershipRange()
-        local_prod = np.array((H*vec).vec[istart:iend])
-        local_evec = val*np.array(vec.vec[istart:iend])
-        self.assertLess(np.linalg.norm(local_prod-local_evec), tol)
+        local_prod = np.array(prod.vec[istart:iend])
+        local_evec = np.array(vec.vec[istart:iend])
+
+        local_norm = np.linalg.norm(local_prod-local_evec)
+
+        if PETSc.COMM_WORLD.size == 1:
+            norm = local_norm
+        else:
+            CW = PETSc.COMM_WORLD.tompi4py()
+            norm = CW.allreduce(local_norm)
+
+        self.assertLess(norm, evec_tol)
 
 class Analytic(Checker):
     '''
@@ -95,9 +121,9 @@ class Hamiltonians(Checker):
             with self.subTest(H=H_name):
                 H = getattr(hamiltonians, H_name)()
 
-                with self.subTest(which = 'smallest'):
-                    evals, evecs = H.eigsolve(nev = 5, getvecs = True, tol = 1E-12)
-                    self.check_all(H, evals, evecs, tol = 1E-10)
+                with self.subTest(which='smallest'):
+                    evals, evecs = H.eigsolve(nev=5, getvecs=True, tol=1E-12)
+                    self.check_all(H, evals, evecs, tol=1E-12, evec_tol=1E-11)
 
     def test_all_target(self):
         if config.shell:
@@ -107,10 +133,16 @@ class Hamiltonians(Checker):
             with self.subTest(H=H_name):
                 H = getattr(hamiltonians, H_name)()
 
-                for target in [0.01, 0.9]:
+                lowest_eval = H.eigsolve(which='smallest')[0]
+                highest_eval = H.eigsolve(which='largest')[0]
+
+                self.assertLess(lowest_eval, highest_eval)
+
+                for rel_target in [0.25, 0.75]:
+                    target = lowest_eval + rel_target*(highest_eval-lowest_eval)
                     with self.subTest(target=target):
                         evals, evecs = H.eigsolve(nev=5, getvecs=True, tol=1E-12, target=target)
-                        self.check_all(H, evals, evecs, tol=1E-9)
+                        self.check_all(H, evals, evecs, tol=1E-11, evec_tol=1E-10)
 
 class ZeroDiagonal(Checker):
 
