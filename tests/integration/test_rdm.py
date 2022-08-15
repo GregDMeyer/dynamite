@@ -220,6 +220,9 @@ class FullSpace(Checker):
             with self.subTest(n_trace=n_trace):
                 keep = list(range(n_trace, self.state.L))
 
+                if len(keep) > self.state.L//2 and 'slow' in self.skip_flags:
+                    continue
+
                 if full_np is not None: # process 0
                     full_reshaped = full_np.reshape((full_np.size//(2**n_trace), -1))
                     correct = np.dot(full_reshaped, np.conj(full_reshaped.T))
@@ -243,6 +246,9 @@ class FullSpace(Checker):
         for n_keep in range(1, self.state.L-1):
             with self.subTest(n_keep=n_keep):
                 keep = list(range(0, n_keep))
+
+                if len(keep) > self.state.L//2 and 'slow' in self.skip_flags:
+                    continue
 
                 if full_np is not None: # process 0
                     full_reshaped = full_np.reshape((full_np.size//(2**n_keep), -1))
