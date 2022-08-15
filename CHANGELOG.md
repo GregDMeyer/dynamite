@@ -14,6 +14,7 @@
  - When the matrix for an operator is built, subspaces are automatically checked for conservation/compatibility
  - `Operator.allow_projection` property allows the automatic subspace check to be turned off
  - Ability to flag integration tests and skip them based on that flag
+ - Automatically disable thread-based parallelism when running with more than one MPI rank
 
 ### Changed
  - `L` of operators and states is now stored in their subspaces

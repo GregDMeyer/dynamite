@@ -1,6 +1,7 @@
 
 from os import environ
 import slepc4py
+from threadpoolctl import threadpool_limits
 from . import validate
 from ._backend import bbuild
 
@@ -96,6 +97,12 @@ class _Config:
         self._gpu = gpu
 
         from petsc4py import PETSc
+
+        # disable extra thread-level parallelism that can interfere with MPI
+        # parallelism
+        if PETSc.COMM_WORLD.size != 1:
+            threadpool_limits(limits=1)
+
         if version_check and PETSc.COMM_WORLD.rank == 0:
             check_version()
 
