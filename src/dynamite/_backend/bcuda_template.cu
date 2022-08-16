@@ -89,6 +89,8 @@ PetscErrorCode C(BuildContext_CUDA,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
   PetscCall(C(CopySubspaceData_CUDA,RIGHT_SUBSPACE)(
     (C(data,RIGHT_SUBSPACE)**)&(ctx->right_subspace_data),
     (C(data,RIGHT_SUBSPACE)*)right_subspace_data));
+
+  return 0;
 }
 
 PetscErrorCode C(MatDestroyCtx_GPU,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A)
@@ -131,7 +133,7 @@ PetscErrorCode C(MatMult_GPU,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, Vec x, Vec 
 
   PetscCall(VecGetSize(b, &size));
 
-  err = cudaThreadSynchronize();CHKERRCUDA(err);
+  err = cudaDeviceSynchronize();CHKERRCUDA(err);
 
   C(device_MatMult,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))<<<GPU_BLOCK_NUM,GPU_BLOCK_SIZE>>>(
     size,
@@ -145,7 +147,7 @@ PetscErrorCode C(MatMult_GPU,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, Vec x, Vec 
     xarray,
     barray);
 
-  err = cudaThreadSynchronize();CHKERRCUDA(err);
+  err = cudaDeviceSynchronize();CHKERRCUDA(err);
 
   PetscCall(VecCUDARestoreArrayRead(x, &xarray));
   PetscCall(VecCUDARestoreArray(b, &barray));
@@ -272,7 +274,7 @@ PetscErrorCode C(MatNorm_GPU,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, NormType ty
     (C(data,RIGHT_SUBSPACE)*) ctx->right_subspace_data,
     d_maxs);
 
-  err = cudaThreadSynchronize();CHKERRCUDA(err);
+  err = cudaDeviceSynchronize();CHKERRCUDA(err);
 
   err = cudaMemcpy(h_maxs, d_maxs, sizeof(PetscReal)*GPU_BLOCK_NUM, cudaMemcpyDeviceToHost);CHKERRCUDA(err);
 
