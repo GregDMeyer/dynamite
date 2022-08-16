@@ -42,7 +42,7 @@ def evolve(H, state, t, result=None, **kwargs):
 
     algo : string, optional
         Allowed options: 'krylov' or 'expokit'. Which SLEPc algorithm to
-        use to compute the matrix exponential.
+        use to compute the matrix exponential. Default is 'expokit'.
 
     ncv : int, optional
         The Krylov subspace size to use. Increasing subspace size can
@@ -88,6 +88,8 @@ def evolve(H, state, t, result=None, **kwargs):
 
     if 'algo' in kwargs:
         mfn.setType(kwargs['algo'])
+    else:
+        mfn.setType('expokit')
 
     if 'ncv' in kwargs:
         mfn.setDimensions(kwargs['ncv'])

@@ -21,6 +21,7 @@
  - The value of `L` in a Subspace object now cannot be modified after it is set
  - Moved package source into `src/` directory
  - Operators must share the same value of all settable properties (e.g. L, shell, etc.) in order to be added or multiplied together, rather than ambiguously inheriting one of the differing values
+ - Changed default SLEPc solver for computation of time evolution to 'expokit', which seems to be faster and more stable
 
 ### Fixed
  - Ensure that the `L` of all of an operator's subspaces remains consistent
