@@ -22,7 +22,7 @@ def parse_args(argv=None):
     parser.add_argument('-L', type=int, required=True,
                         help='Size of the spin chain.')
 
-    parser.add_argument('-H', choices=['MBL','long_range','SYK','ising','XX'],
+    parser.add_argument('-H', choices=['MBL', 'long_range', 'SYK', 'ising', 'XX', 'heisenberg'],
                         help='Hamiltonian to use')
 
     parser.add_argument('--shell', action='store_true',
@@ -140,6 +140,9 @@ def build_hamiltonian(params):
 
     elif params.H == 'XX':
         rtn = index_sum(sigmax(0)*sigmax(1))
+
+    elif params.H == 'heisenberg':
+        rtn = index_sum(sigmax(0)*sigmax(1) + sigmay(0)*sigmay(1) + sigmaz(0)*sigmaz(1))
 
     else:
         raise ValueError('Unrecognized Hamiltonian.')
