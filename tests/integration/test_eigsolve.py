@@ -59,7 +59,7 @@ class Checker(dtr.DynamiteTestCase):
         prod = H*vec
         self.assertLess(
             abs(val - vec.dot(prod)),
-            tol
+            max(tol, abs(val)*tol)  # max of relative and absolute error
         )
 
         # apparently binary operators don't work very well in petsc4py
@@ -155,7 +155,9 @@ class ZeroDiagonal(Checker):
         if config.shell:
             self.skipTest("solving for target not supported with shell matrices")
 
-        H = op_sum(0.1*i*sigmax(i) for i in range(config.L))
+        # coefficients that aren't commensurate but also not random for
+        # repeatability
+        H = op_sum(np.sin(i)*sigmax(i) for i in range(config.L))
         for target in [0.011, 0.999]:
             with self.subTest(target=target):
                 evals, evecs = H.eigsolve(nev=5, getvecs=True, tol=1E-12, target=target)
