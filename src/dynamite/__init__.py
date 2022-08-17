@@ -213,7 +213,7 @@ def check_version():
 
     # another process is doing this at the same time,
     # or we don't have write permission here
-    except (FileExistsError, PermissionError):
+    except (FileExistsError, PermissionError, OSError):
         return
 
     # finally do the check
