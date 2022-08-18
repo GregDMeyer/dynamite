@@ -1,7 +1,7 @@
 
 # Changelog
 
-## 0.2.3 - IN PROGRESS
+## 0.2.3 - 2022-08-17
 
 ### Added
  - `Subspace.identical` method determines whether two subspaces are exactly the same (both equal and of the same type)
