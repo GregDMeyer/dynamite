@@ -218,30 +218,27 @@ def check_version():
 
     # finally do the check
 
-    branch = bbuild.get_build_branch()
-    url = 'https://api.github.com/repos/GregDMeyer/dynamite/git/refs/heads/{branch}'
-    url = url.format(branch=branch)
+    url = 'https://api.github.com/repos/GregDMeyer/dynamite/git/refs/heads/'
+    url += bbuild.get_build_branch()
 
     try:
         with request.urlopen(url, timeout=1) as url_req:
-            try:
-                data = json.load(url_req)
-            except TypeError: # python < 3.6
-                data = json.loads(url_req.readall().decode('utf-8'))
-
-            commit = data['object']['sha']
-
-        build_commit = bbuild.get_build_version()
-        if not commit.startswith(build_commit):
-            if 'DNM_DOCKER' in environ:
-                update_msg = 'Please pull the latest image from DockerHub.'
-            else:
-                update_msg = 'Please update!'
-
-            print('Changes have been pushed to GitHub since dynamite was '
-                  'installed.\n' + update_msg, file=stderr)
+            data = json.load(url_req)
 
     # in general, catching all exceptions is a bad idea. but here, no matter
     # what happens we just want to give up on the check
     except:
-        pass
+        return
+
+    commit = data['object']['sha']
+
+    if not commit.startswith(bbuild.get_build_commit()):
+        print('Changes have been pushed to GitHub since dynamite was '
+              'installed.\n', file=stderr)
+
+        if 'DNM_DOCKER' in environ:
+            update_msg = 'Please pull the latest image from DockerHub.'
+        else:
+            update_msg = 'Please update!'
+
+        print(update_msg, file=stderr)
