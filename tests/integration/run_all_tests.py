@@ -85,7 +85,8 @@ def main():
         run_options = [[]]
 
     if params.gpu:
-        run_options += [v+['--gpu'] for v in run_options]
+        for opts in run_options:
+            opts.append('--gpu')
 
     if params.skip_slow:
         for opts in run_options:
