@@ -1,6 +1,14 @@
 
 # Changelog
 
+## 0.2.4 - IN PROGRESS
+
+### Added
+
+### Changed
+
+### Fixed
+
 ## 0.2.3 - 2022-08-17
 
 ### Added
