@@ -92,8 +92,17 @@ class ParityTests(EvolveChecker):
 
     # TODO: actually check output
 
+
+class Arguments(dtr.DynamiteTestCase):
+    def test_unknown_arg(self):
+        H = identity()
+        state = State(state=0)
+        with self.assertRaises(TypeError):
+            H.evolve(state, t=1.0, not_valid_arg=True)
+
+
 @ut.skipIf(complex_enabled(), 'complex numbers enabled')
-class FailTest(dtr.DynamiteTestCase):
+class RealBuildFail(dtr.DynamiteTestCase):
     def test_fail(self):
         H = identity()
         full_state = State(state=0)

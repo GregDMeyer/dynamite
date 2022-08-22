@@ -8,6 +8,7 @@
 ### Changed
 
 ### Fixed
+ - An exception is now raised if an unknown keyword argument is passed to `computations.evolve()`
 
 ## 0.2.3 - 2022-08-17
 

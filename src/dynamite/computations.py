@@ -6,7 +6,7 @@ from .msc_tools import dnm_int_t
 
 import numpy as np
 
-def evolve(H, state, t, result=None, **kwargs):
+def evolve(H, state, t, result=None, tol=None, ncv=None, algo=None):
     r"""
     Evolve a quantum state according to the Schrodinger equation
     under the Hamiltonian H. The units are natural, that is, the
@@ -40,16 +40,16 @@ def evolve(H, state, t, result=None, **kwargs):
         be somewhat close to ``tol``. There is no guarantee that it will
         actually be smaller.
 
-    algo : string, optional
-        Allowed options: 'krylov' or 'expokit'. Which SLEPc algorithm to
-        use to compute the matrix exponential. Default is 'expokit'.
-
     ncv : int, optional
         The Krylov subspace size to use. Increasing subspace size can
         increase performance by reducing the number of iterations necessary,
         but also linearly increases memory usage and the number of matrix
         multiplies performed. Optimizing this parameter can significantly
         affect performance.
+
+    algo : string, optional
+        Allowed options: 'krylov' or 'expokit'. Which SLEPc algorithm to
+        use to compute the matrix exponential. Default is 'expokit'.
 
     Returns
     -------
@@ -86,16 +86,16 @@ def evolve(H, state, t, result=None, **kwargs):
 
     f.setScale(-1j*t)
 
-    if 'algo' in kwargs:
-        mfn.setType(kwargs['algo'])
+    if algo is not None:
+        mfn.setType(algo)
     else:
         mfn.setType('expokit')
 
-    if 'ncv' in kwargs:
-        mfn.setDimensions(kwargs['ncv'])
+    if ncv is not None:
+        mfn.setDimensions(ncv)
 
-    if 'tol' in kwargs:
-        mfn.setTolerances(kwargs['tol'])
+    if tol is not None:
+        mfn.setTolerances(tol)
 
     mfn.setFromOptions()
     mfn.setOperator(H.get_mat(subspaces=(state.subspace, state.subspace)))
