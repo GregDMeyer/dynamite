@@ -166,8 +166,6 @@ class TestParity(ut.TestCase):
 
 class TestSpinConserve(ut.TestCase):
 
-    #TODO: test validation functions for L and k
-
     def test_dimension(self):
         # each tuple is (L, k, dim)
         test_cases = [
@@ -378,7 +376,6 @@ class TestSpinConserve(ut.TestCase):
                 self.assertEqual(sp1, sp2)
 
 
-# TODO: see if we can enfore state_map being correct
 class TestRCM(ut.TestCase):
 
     def setUp(self):
@@ -497,8 +494,6 @@ class TestExplicit(ut.TestCase):
                 self.assertTrue(np.all(
                     s.idx_to_state(np.arange(len(states))) == np.array(states)
                 ))
-
-                # TODO: test index out of range
 
     def test_compare_parity(self):
         p = Parity('even')
@@ -631,7 +626,6 @@ class Checksum(ut.TestCase):
 
         self.assertNotEqual(chksum0, chksum1)
 
-    # TODO: Auto tests?
 
 if __name__ == '__main__':
     ut.main()

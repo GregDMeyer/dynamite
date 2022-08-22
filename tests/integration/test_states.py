@@ -331,7 +331,6 @@ class Uninitialized(dtr.DynamiteTestCase):
         with self.assertRaises(UninitializedError):
             reduced_density_matrix(s0, [])
 
-# TODO: check state setting. e.g. setting an invalid state should fail (doesn't for Full subspace)
 
 if __name__ == '__main__':
     dtr.main()

@@ -9,7 +9,6 @@ ARG UBUNTU_VERSION=20.04
 FROM python:3.9-bullseye AS base-cpu
 
 # install dependencies
-# TODO: it would be great to install scalapack here as well, it doesn't seem to work though :-(
 ONBUILD RUN apt-get update && \
     \
     DEBIAN_FRONTEND="noninteractive" \

@@ -98,8 +98,6 @@ class Analytic(Checker):
     def test_uniform_field(self):
         H = index_sum(sigmax())
 
-        # TODO: check eigenvectors here
-
         with self.subTest(which = 'smallest'):
             evals, evecs = H.eigsolve(nev = 2,
                                       getvecs = True,
@@ -168,8 +166,6 @@ class ParityTests(Checker):
     def test_exceptions(self):
         H = identity()
         s = Parity('even')
-        s.L = H.L
-        # TODO: automatically set L somehow?
 
         H.eigsolve()
         with self.assertRaises(ValueError):
@@ -180,7 +176,6 @@ class ParityTests(Checker):
         H.eigsolve()
         H.eigsolve(subspace=s)
 
-    # TODO: actually check results
 
 if __name__ == '__main__':
     dtr.main()

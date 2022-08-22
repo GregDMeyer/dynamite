@@ -23,7 +23,7 @@ class Explicit(dtr.DynamiteTestCase):
         config.L = self.old_L
 
     def compare(self, check, correct):
-        eps = 1E-10  # TODO: should compute this from machine epsilon
+        eps = 1E-10
 
         if check[0,0] != -1: #  process 0
             valid = np.allclose(check, correct, atol=eps, rtol=0)
@@ -186,7 +186,7 @@ class Checker(dtr.DynamiteTestCase):
         check = reduced_density_matrix(self.state, keep)
 
         if check[0,0] != -1: # process 0
-            eps = 1E-10  # TODO: should compute this from machine epsilon
+            eps = 1E-10
             correct = np.array(correct, dtype=np.complex128)
             valid = np.allclose(check, correct, atol=eps, rtol=0)
             self.assertTrue(valid, msg = '\ncheck: %s\ncorrect: %s'

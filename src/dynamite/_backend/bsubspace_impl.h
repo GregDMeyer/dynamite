@@ -3,7 +3,6 @@
 
 #include <petsc.h>
 
-// TODO: include this in a different header?
 #ifdef PETSC_USE_64BIT_INDICES
   #define builtin_parity __builtin_parityl
   #define builtin_popcount __builtin_popcountl
@@ -15,7 +14,6 @@
 #endif
 
 /* define a struct & enum to hold subspace information */
-// TODO: more descriptive name?
 typedef enum _subspace_type
 {
   FULL,

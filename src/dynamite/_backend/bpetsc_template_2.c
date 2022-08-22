@@ -653,7 +653,6 @@ void sum_term(
  * doing a good enough job unswitching it so I write a macro
  * to unswitch it manually.
  */
-/* TODO: include sign flips due to parity bit in lookup table */
 /**********/
 #define INNER_LOOP(sign_flip,add_func,parity_check)                     \
   for (cache_idx=0; cache_idx<VECSET_CACHE_SIZE; ) {                    \

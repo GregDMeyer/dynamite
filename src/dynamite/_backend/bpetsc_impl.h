@@ -41,9 +41,6 @@ PetscErrorCode BuildMat(const msc_t *msc, subspaces_t *subspaces, shell_impl she
 
 PetscErrorCode CheckConserves(const msc_t *msc, subspaces_t *subspaces, PetscInt *result);
 
-/* define a type for context destroying functions, and we keep that in the context */
-// TODO
-
 PetscErrorCode BuildContext(const msc_t *msc,
                             const void* left_subspace_data,
                             const void* right_subspace_data,

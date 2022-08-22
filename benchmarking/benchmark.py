@@ -13,7 +13,6 @@ from dynamite.subspaces import Full, Parity, SpinConserve, Auto
 from dynamite.tools import track_memory, get_max_memory_usage
 from dynamite.computations import reduced_density_matrix
 
-# TODO: write tests for the benchmarks
 
 def parse_args(argv=None):
 

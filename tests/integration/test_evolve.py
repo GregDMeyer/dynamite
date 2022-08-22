@@ -90,8 +90,6 @@ class ParityTests(EvolveChecker):
         H.evolve(sub_state, t=1.0)
         H.evolve(full_state, t=1.0)
 
-    # TODO: actually check output
-
 
 class Arguments(dtr.DynamiteTestCase):
     def test_unknown_arg(self):
@@ -109,7 +107,6 @@ class RealBuildFail(dtr.DynamiteTestCase):
         with self.assertRaises(ValueError):
             H.evolve(full_state, t=1.0)
 
-# TODO: check imaginary time evolution
 
 if __name__ == '__main__':
     dtr.main()

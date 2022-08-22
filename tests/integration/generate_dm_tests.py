@@ -38,7 +38,6 @@ def get_ent_entropy(dm):
     '''
     return qtp.entropy_vn(dm)
 
-# TODO: compute Renyi entropy
 
 if __name__ == '__main__':
 

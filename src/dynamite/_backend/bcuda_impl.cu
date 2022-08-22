@@ -15,9 +15,6 @@
 
 /* subspace functions for the GPU */
 
-// TODO: use constant memory for the subspace data
-// TODO: should pass each subspace data member individually to kernel?
-
 PetscErrorCode CopySubspaceData_CUDA_Full(data_Full** out_p, const data_Full* in) {
   cudaError_t err;
   err = cudaMalloc((void **) out_p, sizeof(data_Full));CHKERRCUDA(err);

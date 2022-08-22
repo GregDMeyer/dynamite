@@ -13,7 +13,6 @@ from dynamite.operators import Operator, sigmax, sigmay, sigmaz
 from dynamite.operators import sigma_plus, sigma_minus, identity, zero
 from dynamite import msc_tools
 
-# TODO: add test: get_length on identity should fail without explicit L
 
 class Fundamental(ut.TestCase):
 
@@ -830,8 +829,6 @@ class MSC(ut.TestCase):
     '''
     Test operator MSC setters, getters, etc.
     '''
-    # TODO: need to isolate dtype from backend for testing
-    # probably can mock it
     dtype = msc_tools.msc_dtype
 
     def test_set_list(self):

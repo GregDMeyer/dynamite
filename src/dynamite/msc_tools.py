@@ -360,7 +360,6 @@ def deserialize(data):
     ])
     msc = np.ndarray(msc_size, dtype = dt)
 
-    # TODO: can I do this without making a copy in the calls to np.frombuffer?
     mv = memoryview(data)
     start = stop + 1
     int_msc_bytes = msc_size * int_size // 8

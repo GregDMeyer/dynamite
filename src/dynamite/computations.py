@@ -201,8 +201,6 @@ def eigsolve(H, getvecs=False, nev=1, which='smallest', target=None, tol=None, s
     eps.setProblemType(SLEPc.EPS.ProblemType.HEP)
 
     if target is not None:
-        # shift-invert not supported for shell matrices
-        # TODO: can use a different preconditioner so shift-invert works!
         which = 'target'
 
         if H.shell:

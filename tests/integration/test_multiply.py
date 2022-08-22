@@ -257,7 +257,7 @@ class Subspaces(dtr.DynamiteTestCase):
 
                         self.compare_to_full(H, *xs, sp)
 
-# TODO: write tests where this is not just the identity
+
 class Projection(dtr.DynamiteTestCase):
 
     def check_projection(self, from_subspace, to_subspace):

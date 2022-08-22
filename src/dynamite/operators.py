@@ -405,8 +405,6 @@ class Operator:
 
     ### text representations
 
-    # TODO: perhaps encapsulate the string/tex methods into their own class
-
     @property
     def string(self):
         '''
@@ -883,9 +881,6 @@ class Operator:
             Calling it for too large a matrix will not be informative and probably run
             out of memory, so this is a small safeguard.
         '''
-        # TODO: should subspaces really be passed as an argument like that? or should we somehow
-        # reference subspaces from the list, like with an index?
-
         if any(dim > max_size for dim in self.dim):
             raise ValueError('Matrix too big to spy. Either build a smaller operator, or adjust '
                              'the maximum spy size with the argument "max_size"')
@@ -1280,7 +1275,6 @@ def index_sum(op, size = None, start = 0, boundary = 'open'):
         rtn.string += ')'
 
     # add i to the indices for TeX representation
-    # TODO: use different letters if we have sum of sums
     sub_tex = op.with_brackets(which = 'tex')
     sub_tex = sub_tex.replace('{IDX', '{IDXi+').replace('{IDXi+0','{IDXi')
 
@@ -1326,7 +1320,6 @@ def index_product(op, size = None, start = 0):
     rtn.string = 'index_product(' + op.string + ', sites %d - %d)' % (start, stop-1)
 
     # add i to the indices for TeX representation
-    # TODO: use different letters if we have sum of sums
     sub_tex = op.with_brackets(which = 'tex')
     sub_tex = sub_tex.replace('{IDX', '{IDXi+').replace('{IDXi+0','{IDXi')
     rtn.tex = r'\prod_{i=%d}^{%d}' % (start, stop-1) + sub_tex
@@ -1398,7 +1391,6 @@ def identity():
     """
     o = Operator()
     o.msc = [(0, 0, 1)]
-    # TODO: do a fancy double-lined 1?
     o.tex = '1'
     o.string = '1'
     return o
