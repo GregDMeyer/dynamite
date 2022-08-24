@@ -41,4 +41,8 @@ def intlog2(x):
         count[x != 0] += 1
         x >>= 1
         mx >>= 1
-    return count
+
+    if not(x.shape):
+        return int(count)
+    else:
+        return count
