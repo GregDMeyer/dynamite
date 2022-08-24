@@ -122,7 +122,9 @@ class State:
 
     def set_initialized(self):
         '''
-        Mark that the state vector data has been set.
+        Mark that the state vector data has been set. This method does not
+        normally need to be called by the user, unless the vector data is
+        set manually by directly accessing the underlying PETSc vector.
         '''
         self._initialized = True
 
