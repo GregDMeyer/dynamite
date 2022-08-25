@@ -11,6 +11,7 @@ import numpy as np
 
 from dynamite.operators import Operator, sigmax, sigmay, sigmaz
 from dynamite.operators import sigma_plus, sigma_minus, identity, zero
+from dynamite.operators import _OperatorStringRep
 from dynamite import msc_tools
 
 
@@ -518,34 +519,54 @@ class IndexProduct(ut.TestCase):
     def test_size_0(self):
         self.assertEqual(index_product(sigmaz(0), size=0), identity())
 
+
 class WithBrackets(ut.TestCase):
     '''
     Test classmethod _with_brackets
     '''
 
     def test_string_parens(self):
-        out = Operator._with_brackets('σx + σy', '()', False)
+        class Op:
+            string = 'σx + σy'
+            brackets = '()'
+        out = _OperatorStringRep.with_brackets(Op, 'string')
         self.assertEqual(out, '(σx + σy)')
 
     def test_string_square(self):
-        out = Operator._with_brackets('σx + σy', '[]', False)
+        class Op:
+            string = 'σx + σy'
+            brackets = '[]'
+        out = _OperatorStringRep.with_brackets(Op, 'string')
         self.assertEqual(out, '[σx + σy]')
 
     def test_string_none(self):
-        out = Operator._with_brackets('σx + σy', '', False)
+        class Op:
+            string = 'σx + σy'
+            brackets = ''
+        out = _OperatorStringRep.with_brackets(Op, 'string')
         self.assertEqual(out, 'σx + σy')
 
     def test_tex_parens(self):
-        out = Operator._with_brackets(r'\sigma_{x} + \sigma_{y}', '()', True)
+        class Op:
+            tex = r'\sigma_{x} + \sigma_{y}'
+            brackets = '()'
+        out = _OperatorStringRep.with_brackets(Op, 'tex')
         self.assertEqual(out, r'\left(\sigma_{x} + \sigma_{y}\right)')
 
     def test_tex_square(self):
-        out = Operator._with_brackets(r'\sigma_{x} + \sigma_{y}', '[]', True)
+        class Op:
+            tex = r'\sigma_{x} + \sigma_{y}'
+            brackets = '[]'
+        out = _OperatorStringRep.with_brackets(Op, 'tex')
         self.assertEqual(out, r'\left[\sigma_{x} + \sigma_{y}\right]')
 
     def test_tex_none(self):
-        out = Operator._with_brackets(r'\sigma_{x} + \sigma_{y}', '', True)
+        class Op:
+            tex = r'\sigma_{x} + \sigma_{y}'
+            brackets = ''
+        out = _OperatorStringRep.with_brackets(Op, 'tex')
         self.assertEqual(out, r'\sigma_{x} + \sigma_{y}')
+
 
 class Properties(ut.TestCase):
 
@@ -804,26 +825,27 @@ class Properties(ut.TestCase):
 
     def test_brackets(self):
         o = sigmaz()
-        o.string = 'str'
-        o.tex = 'tex'
+        o._string_rep.string = 'str'
+        o._string_rep.tex = 'tex'
 
-        o.brackets = '()'
-        self.assertEqual(o.brackets, '()')
-        self.assertEqual(o.with_brackets(which = 'string'), '(str)')
-        self.assertEqual(o.with_brackets(which = 'tex'), r'\left(tex\right)')
+        o._string_rep.brackets = '()'
+        self.assertEqual(o._string_rep.brackets, '()')
+        self.assertEqual(o._string_rep.with_brackets('string'), '(str)')
+        self.assertEqual(o._string_rep.with_brackets('tex'), r'\left(tex\right)')
 
-        o.brackets = '[]'
-        self.assertEqual(o.brackets, '[]')
-        self.assertEqual(o.with_brackets(which = 'string'), '[str]')
-        self.assertEqual(o.with_brackets(which = 'tex'), r'\left[tex\right]')
+        o._string_rep.brackets = '[]'
+        self.assertEqual(o._string_rep.brackets, '[]')
+        self.assertEqual(o._string_rep.with_brackets('string'), '[str]')
+        self.assertEqual(o._string_rep.with_brackets('tex'), r'\left[tex\right]')
 
-        o.brackets = ''
-        self.assertEqual(o.brackets, '')
-        self.assertEqual(o.with_brackets(which = 'string'), 'str')
-        self.assertEqual(o.with_brackets(which = 'tex'), 'tex')
+        o._string_rep.brackets = ''
+        self.assertEqual(o._string_rep.brackets, '')
+        self.assertEqual(o._string_rep.with_brackets('string'), 'str')
+        self.assertEqual(o._string_rep.with_brackets('tex'), 'tex')
 
         with self.assertRaises(ValueError):
-            o.brackets = '<>'
+            o._string_rep.brackets = '<>'
+
 
 class MSC(ut.TestCase):
     '''

@@ -30,11 +30,6 @@ def msc(x):
     x = np.array(x, copy=False, dtype=msc_dtype)
     return x
 
-def brackets(x):
-    if x not in ['()', '[]', '']:
-        raise ValueError("Brackets must be one of '()', '[]', or ''")
-    return x
-
 def shell(s):
     if not isinstance(s, bool):
         raise ValueError("Shell must be set to True or False. To use GPU shell matrices, "

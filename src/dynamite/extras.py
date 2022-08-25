@@ -11,9 +11,9 @@ def commutator(o1, o2):
         The commutator
     """
     rtn = o1*o2 - o2*o1
-    rtn.string = '[%s, %s]' % (o1.string, o2.string)
-    rtn.tex = r'\left[ %s, %s \right]' % (o1.tex, o2.tex)
-    rtn.brackets = ''
+    rtn._string_rep.string = '[%s, %s]' % (o1.string, o2.string)
+    rtn._string_rep.tex = r'\left[ %s, %s \right]' % (o1.tex, o2.tex)
+    rtn._string_rep.brackets = ''
     return rtn
 
 def majorana(idx):
@@ -48,8 +48,8 @@ def majorana(idx):
     if b_idx > 0:
         rtn = index_product(sigmaz(), size=b_idx) * rtn
 
-    rtn.string = 'χ[%d]' % idx
-    rtn.tex = r'\chi_{IDX%d}' % idx
-    rtn.brackets = ''
+    rtn._string_rep.string = 'χ[%d]' % idx
+    rtn._string_rep.tex = r'\chi_{IDX%d}' % idx
+    rtn._string_rep.brackets = ''
 
     return rtn
