@@ -38,6 +38,7 @@ MOCK_MODULES = ['slepc4py',
                 'numpy',
                 'scipy',
                 'scipy.sparse',
+                'threadpoolctl',
                 'dynamite._backend.bbuild',
                 'dynamite._backend.bpetsc',
                 'dynamite._backend.bsubspace']
