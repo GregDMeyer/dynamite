@@ -431,9 +431,10 @@ class Operator:
 
     def serialize(self):
         '''
-        Serialize the operator's MSC representation into a string of bytes.
-        The byte string ONLY contains the MSC representation and the spin chain
-        length. It does not save any other information, such as subspaces etc.
+        Serialize the operator into a string of bytes.
+        The byte string ONLY contains dynamite's internal representation of
+        the operator. It does not include any other information, such as
+        subspaces etc.
 
         Returns
         -------
@@ -442,27 +443,6 @@ class Operator:
 
         '''
         return msc_tools.serialize(self.msc)
-
-    @classmethod
-    def load(cls, filename):
-        '''
-        Load the operator in file ``filename`` and return the corresponding
-        object.
-
-        Parameters
-        ----------
-        filename : str
-            The path of the file to load.
-
-        Returns
-        -------
-        dynamite.operators.Load
-            The operator as a dynamite object.
-        '''
-        with open(filename, 'rb') as f:
-            bytestring = f.read()
-            op = cls.from_bytes(bytestring)
-        return op
 
     @classmethod
     def from_bytes(cls, data):
@@ -489,33 +469,41 @@ class Operator:
 
     def save(self, filename):
         """
-        Save the MSC representation of the operator to disk.
-        Can be loaded again through :class:`Load`.
-
-        .. note::
-            If one calls this method in parallel, one MUST call :meth:`dynamite.config.initialize`
-            first, or all processes will try to simultaneously write to the same file!
+        Save the operator to disk. Can be loaded again via the
+        :meth:`Operator.load` method. Only saves the operator itself, not any
+        associated subspaces or other data.
 
         Parameters
         ----------
         filename : str
             The path to the file to save the operator in.
         """
-
-        if config.initialized:
-            from petsc4py import PETSc
-            do_save = PETSc.COMM_WORLD.rank == 0
-        else:
-            # this should be the case when not running under MPI
-            do_save = True
-
-        # only process 0 should save
-        if do_save:
+        config._initialize()
+        from petsc4py import PETSc
+        if PETSc.COMM_WORLD.rank == 0:
             with open(filename, mode='wb') as f:
                 f.write(self.serialize())
 
-        if config.initialized:
-            PETSc.COMM_WORLD.barrier()
+    @classmethod
+    def load(cls, filename):
+        '''
+        Load the operator in file ``filename`` and return the corresponding
+        object.
+
+        Parameters
+        ----------
+        filename : str
+            The path of the file to load.
+
+        Returns
+        -------
+        dynamite.operators.Load
+            The operator as a dynamite object.
+        '''
+        with open(filename, 'rb') as f:
+            bytestring = f.read()
+            op = cls.from_bytes(bytestring)
+        return op
 
     ### interface with PETSc
 
