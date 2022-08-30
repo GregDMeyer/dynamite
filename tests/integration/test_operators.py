@@ -8,6 +8,7 @@ from dynamite import config
 from dynamite.tools import complex_enabled
 from dynamite.subspaces import Full, Parity, SpinConserve, Auto
 from dynamite.operators import index_sum, sigmax, sigmay, sigmaz
+from dynamite.operators import Operator
 
 import hamiltonians
 
@@ -170,6 +171,22 @@ class SubspaceConservation(dtr.DynamiteTestCase):
                             subspace,
                             Full()
                         ))
+
+
+class SaveLoad(dtr.DynamiteTestCase):
+
+    def test_save_load(self):
+        for H_name in hamiltonians.get_names(complex_enabled()):
+            if 'slow' in self.skip_flags and H_name == 'syk':
+                continue
+
+            with self.subTest(H=H_name):
+                H = getattr(hamiltonians, H_name)()
+
+                fname = '/tmp/test_save.dnm'
+                H.save(fname)
+                H_new = Operator.load(fname)
+                self.assertEqual(H, H_new)
 
 
 if __name__ == '__main__':
