@@ -77,6 +77,33 @@ class Fundamental(ut.TestCase):
                         [1,  0]])
         self.check_same(dnm, npy)
 
+
+class SizeExceptions(ut.TestCase):
+
+    def test_fundamental(self):
+        ops = [sigmax, sigmay, sigmaz, sigma_plus, sigma_minus]
+        for op in ops:
+            with self.subTest(op=op.__name__):
+                with self.assertRaises(ValueError):
+                    op(63)
+
+                if msc_tools.msc_dtype['masks'].itemsize == 4:
+                    with self.assertRaises(ValueError):
+                        op(31)
+
+
+    def test_translations(self):
+        ops = [index_sum, index_product]
+        for op in ops:
+            with self.subTest(op=op.__name__):
+                with self.assertRaises(ValueError):
+                    op(sigmax(), size=64)
+
+                if msc_tools.msc_dtype['masks'].itemsize == 4:
+                    with self.assertRaises(ValueError):
+                        op(sigmax(), size=32)
+
+
 class UnaryBinary(ut.TestCase):
     '''
     Check the unary and binary operator methods.

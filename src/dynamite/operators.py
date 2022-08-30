@@ -1275,6 +1275,8 @@ def index_sum(op, size = None, start = 0, boundary = 'open'):
         else:
             size = op.L
 
+    size = validate.L(size)
+
     if boundary == 'open':
         stop = start + size - op.max_spin_idx
         if stop <= start:
@@ -1339,6 +1341,8 @@ def index_product(op, size = None, start = 0):
     if size == 0:
         return identity()
 
+    size = validate.L(size)
+
     stop = start + size - op.max_spin_idx
 
     rtn = Operator()
@@ -1358,6 +1362,8 @@ def sigmax(i=0):
     r"""
     The Pauli :math:`\sigma_x` operator on site :math:`i`.
     """
+    i = validate.spin_index(i)
+
     o = Operator()
     o.msc = [(1<<i, 0, 1)]
     o._string_rep.tex = r'\sigma^x_{IDX'+str(i)+'}'
@@ -1368,6 +1374,8 @@ def sigmay(i=0):
     r"""
     The Pauli :math:`\sigma_y` operator on site :math:`i`.
     """
+    i = validate.spin_index(i)
+
     o = Operator()
     o.msc = [(1<<i, 1<<i, 1j)]
     o._string_rep.tex = r'\sigma^y_{IDX'+str(i)+'}'
@@ -1378,6 +1386,8 @@ def sigmaz(i=0):
     r"""
     The Pauli :math:`\sigma_z` operator on site :math:`i`.
     """
+    i = validate.spin_index(i)
+
     o = Operator()
     o.msc = [(0, 1<<i, 1)]
     o._string_rep.tex = r'\sigma^z_{IDX'+str(i)+'}'
@@ -1393,6 +1403,8 @@ def sigma_plus(i=0):
         :math:`\sigma_+ = \left( \begin{array}{cc} 0 & 2 \\ 0 & 0 \\ \end{array} \right)`,
         so :math:`S_+ = \left( \begin{array}{cc} 0 & 1 \\ 0 & 0 \\ \end{array} \right) = \frac{1}{2} \sigma_+`
     """
+    i = validate.spin_index(i)
+
     o = sigmax(i) + 1j*sigmay(i)
     o._string_rep.tex = r'\sigma^+_{IDX'+str(i)+'}'
     o._string_rep.string = 'σ+'+str(i).join('[]')
@@ -1407,6 +1419,8 @@ def sigma_minus(i=0):
         :math:`\sigma_- = \left( \begin{array}{cc} 0 & 0 \\ 2 & 0 \\ \end{array} \right)`,
         so :math:`S_- = \left( \begin{array}{cc} 0 & 0 \\ 1 & 0 \\ \end{array} \right) = \frac{1}{2} \sigma_-`
     """
+    i = validate.spin_index(i)
+
     o = sigmax(i) - 1j*sigmay(i)
     o._string_rep.tex = r'\sigma^-_{IDX'+str(i)+'}'
     o._string_rep.string = 'σ-'+str(i).join('[]')

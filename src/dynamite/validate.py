@@ -4,11 +4,7 @@ from .msc_tools import msc_dtype
 
 
 def L(x):
-    try:
-        if int(x) != x or x < 0:
-            raise ValueError()
-    except:
-        raise ValueError('Spin chain length L must be a nonnegative integer (got %s)' % str(x))
+    _assert_int_like(x)
 
     if x > 63:
         raise ValueError('Spin chain lengths greater than 63 not supported.')
@@ -19,7 +15,31 @@ def L(x):
                          'using 32 bit integers. Rebuild PETSc with the option '
                          '"--with-64-bit-indices".')
 
-    return x
+    return int(x)
+
+
+def spin_index(x):
+    _assert_int_like(x)
+
+    if x > 62:
+        raise ValueError('Spin chain lengths greater than 63 not supported.')
+
+    int_t = msc_dtype['masks']
+    if int_t == np.int32 and x > 30:
+        raise ValueError('Spin chain lengths greater than 31 not supported when '
+                         'using 32 bit integers. Rebuild PETSc with the option '
+                         '"--with-64-bit-indices".')
+
+    return int(x)
+
+
+def _assert_int_like(x):
+    try:
+        if int(x) != x or x < 0:
+            raise ValueError()
+    except:
+        msg = f'Value must be a nonnegative integer (got "{x}")'
+        raise ValueError(msg) from None
 
 
 def subspace(s):
