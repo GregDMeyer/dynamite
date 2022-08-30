@@ -6,6 +6,8 @@
 ### Added
 
 ### Changed
+ - Moved `operators.load_from_file` into the Operator class, as `operators.Operator.load`
+ - Moved `operators.from_bytes` into the Operator class, as `operators.Operator.from_bytes`
 
 ### Fixed
  - An exception is now raised if an unknown keyword argument is passed to `computations.evolve()`

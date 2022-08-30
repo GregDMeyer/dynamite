@@ -901,7 +901,6 @@ class MSC(ut.TestCase):
                                        np.array([(1,2,3)], dtype=self.dtype)))
 
 
-from dynamite.operators import from_bytes
 class FromBytes(ut.TestCase):
 
     def test_simple(self):
@@ -916,7 +915,7 @@ class FromBytes(ut.TestCase):
         }]
 
         for t in test_cases:
-            op = from_bytes(t['serial'])
+            op = Operator.from_bytes(t['serial'])
             self.assertTrue(np.array_equal(op.msc, t['MSC']))
 
 if __name__ == '__main__':

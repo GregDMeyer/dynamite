@@ -443,6 +443,50 @@ class Operator:
         '''
         return msc_tools.serialize(self.msc)
 
+    @classmethod
+    def load(cls, filename):
+        '''
+        Load the operator in file ``filename`` and return the corresponding
+        object.
+
+        Parameters
+        ----------
+        filename : str
+            The path of the file to load.
+
+        Returns
+        -------
+        dynamite.operators.Load
+            The operator as a dynamite object.
+        '''
+        with open(filename, 'rb') as f:
+            bytestring = f.read()
+            op = cls.from_bytes(bytestring)
+        return op
+
+    @classmethod
+    def from_bytes(cls, data):
+        """
+        Load operator from a byte string generated with the
+        :meth:`Operator.serialize` method.
+
+        Parameters
+        ----------
+        data : bytes
+            The byte string containing the serialized object.
+
+        Returns
+        -------
+        Operator
+            The operator.
+        """
+        o = Operator()
+        msc = msc_tools.deserialize(data)
+        o.msc = msc
+        o._string_rep.string = '[operator from bytes]'
+        o._string_rep.tex = r'\left[\text{operator from bytes}\right]'
+        return o
+
     def save(self, filename):
         """
         Save the MSC representation of the operator to disk.
@@ -1106,44 +1150,19 @@ class _OperatorStringRep:
 
 def load_from_file(filename):
     '''
-    Load the operator in file ``filename`` and return the corresponding object.
-
-    Parameters
-    ----------
-    filename : str
-        The path of the file to load.
-
-    Returns
-    -------
-    dynamite.operators.Load
-        The operator as a dynamite object.
+    DEPRECATED: use dynamite.operators.Operator.load
     '''
-    with open(filename, 'rb') as f:
-        bytestring = f.read()
-        op = from_bytes(bytestring)
-    return op
+    raise DeprecationWarning("operators.load_from_file is deprecated; "
+                             "use operators.Operator.load")
+
 
 def from_bytes(data):
     """
-    Load operator from a byte string generated with the :meth:`Operator.serialize`
-    method.
-
-    Parameters
-    ----------
-    data : bytes
-        The byte string containing the serialized object.
-
-    Returns
-    -------
-    Operator
-        The operator.
+    DEPRECATED: use dynamite.operators.Operator.from_bytes
     """
-    o = Operator()
-    msc = msc_tools.deserialize(data)
-    o.msc = msc
-    o._string_rep.string = '[operator from bytes]'
-    o._string_rep.tex = r'\left[\text{operator from bytes}\right]'
-    return o
+    raise DeprecationWarning("operators.from_bytes is deprecated; "
+                             "use operators.Operator.from_bytes")
+
 
 def op_sum(terms, nshow = 3):
     r"""
