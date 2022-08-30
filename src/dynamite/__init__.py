@@ -16,7 +16,6 @@ class _Config:
     mock_backend = False
     _L = None
     _shell = False
-    _info_level = 0
     _subspace = None
     _gpu = False
 
