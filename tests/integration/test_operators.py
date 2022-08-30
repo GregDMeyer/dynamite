@@ -6,6 +6,7 @@ import dynamite_test_runner as dtr
 
 from dynamite import config
 from dynamite.tools import complex_enabled
+from dynamite.msc_tools import msc_dtype
 from dynamite.subspaces import Full, Parity, SpinConserve, Auto
 from dynamite.operators import index_sum, sigmax, sigmay, sigmaz
 from dynamite.operators import Operator
@@ -188,6 +189,25 @@ class SaveLoad(dtr.DynamiteTestCase):
                 H_new = Operator.load(fname)
                 self.assertEqual(H, H_new)
 
+    def test_load_int64_fail(self):
+        test_string = b'1\n64\n\x00\x00\x00\x02\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00?\xf0\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00'
+
+        have_int64 = msc_dtype['masks'].itemsize == 8
+        if have_int64:
+            self.assertEqual(
+                Operator.from_bytes(test_string),
+                sigmax(33)
+            )
+        else:
+            with self.assertRaises(ValueError):
+                Operator.from_bytes(test_string)
+
+    def test_load_int64_success(self):
+        test_string = b'1\n64\n\x00\x00\x00\x00\x00\x00\x00\x04\x00\x00\x00\x00\x00\x00\x00\x00?\xf0\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00'
+        self.assertEqual(
+            Operator.from_bytes(test_string),
+            sigmax(2)
+        )
 
 if __name__ == '__main__':
     dtr.main()

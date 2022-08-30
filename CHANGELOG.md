@@ -11,6 +11,7 @@
 
 ### Fixed
  - An exception is now raised if an unknown keyword argument is passed to `computations.evolve()`
+ - Ensure compatibility when saving operators to disk using a 64 bit dynamite install but loading with a 32 bit install
 
 ## 0.2.3 - 2022-08-17
 

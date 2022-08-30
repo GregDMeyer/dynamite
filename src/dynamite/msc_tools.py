@@ -326,7 +326,7 @@ def serialize(msc):
 
 def deserialize(data):
     '''
-    Reverse the _serialize operation.
+    Reverse the serialize operation.
 
     Parameters
     ----------
@@ -353,25 +353,28 @@ def deserialize(data):
     else:
         raise ValueError('Invalid int_size. Perhaps file is corrupt.')
 
-    dt = np.dtype([
-        ('masks', int_t),
-        ('signs', int_t),
-        ('coeffs', np.complex128)
-    ])
-    msc = np.ndarray(msc_size, dtype = dt)
+    msc = np.ndarray(msc_size, dtype=msc_dtype)
 
     mv = memoryview(data)
     start = stop + 1
     int_msc_bytes = msc_size * int_size // 8
 
-    msc['masks'] = np.frombuffer(mv[start:start+int_msc_bytes],
-                                 dtype = np.dtype(int_t).newbyteorder('B'))
+    masks = np.frombuffer(mv[start:start+int_msc_bytes],
+                          dtype=np.dtype(int_t).newbyteorder('B'))
+
+    # operator was saved using 64 bit dynamite, but loaded using 32
+    if int_size == 64 and msc_dtype['masks'].itemsize == 4:
+        if np.count_nonzero(masks >> 31):
+            raise ValueError('dynamite must be built with 64-bit indices'
+                             'to load operator on more than 31 spins.')
+
+    msc['masks'] = masks
     start += int_msc_bytes
     msc['signs'] = np.frombuffer(mv[start:start+int_msc_bytes],
-                                 dtype = np.dtype(int_t).newbyteorder('B'))
+                                 dtype=np.dtype(int_t).newbyteorder('B'))
     start += int_msc_bytes
     msc['coeffs'] = np.frombuffer(mv[start:],
-                                  dtype = np.dtype(np.complex128).newbyteorder('B'))
+                                  dtype=np.dtype(np.complex128).newbyteorder('B'))
 
     return msc
 
