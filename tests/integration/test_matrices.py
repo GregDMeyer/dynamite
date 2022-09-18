@@ -158,6 +158,7 @@ class Compare(dtr.DynamiteTestCase):
         self.compare_matrices(H)
 
     def test_heisenberg_spinconserve(self):
+        self.skip_on_flag('slow')
         if config.L % 2 != 0:
             self.skipTest("only for even L")
 

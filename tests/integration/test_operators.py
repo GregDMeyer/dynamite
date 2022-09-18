@@ -108,6 +108,8 @@ class SubspaceConservation(dtr.DynamiteTestCase):
     def test_auto(self):
         for k in (config.L//2, config.L//4):
             for H_name in hamiltonians.get_names(complex_enabled()):
+                if H_name == 'syk' and 'slow' in self.skip_flags:
+                    continue
                 H = getattr(hamiltonians, H_name)()
                 subspace = Auto(H, 'U'*k + 'D'*(config.L-k))
                 with self.subTest(H=H_name, L=config.L, k=k):

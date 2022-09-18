@@ -219,7 +219,7 @@ class FullSpace(Checker):
         for n_trace in range(1, self.state.L-1):
             with self.subTest(n_trace=n_trace):
                 keep = list(range(n_trace, self.state.L))
-
+                
                 if len(keep) > self.state.L//2 and 'slow' in self.skip_flags:
                     continue
 

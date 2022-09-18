@@ -56,18 +56,27 @@ class Hamiltonians(EvolveChecker):
         for H_name in hamiltonians.get_names():
             if H_name in skip:
                 continue
-
+            if H_name == 'syk' and 'slow' in self.skip_flags:
+                continue
             with self.subTest(H = H_name):
                 H = getattr(hamiltonians, H_name)()
                 self.evolve_check(H, t)
 
     def test_zero(self):
-        self.evolve_all(0.0)
+        if config.L < 20:
+            self.evolve_all(0.0)
+        else:
+            self.evolve_all(0.0, skip={'long_range', 'localized', 'syk'})
 
     def test_short(self):
-        self.evolve_all(0.1)
+        if config.L < 20:
+            self.evolve_all(0.1)
+        else:
+            self.evolve_all(0.1, skip={'long_range', 'localized', 'syk'})
 
     def test_long(self):
+        self.skip_on_flag('slow')
+
         # otherwise this takes forever
         old_L = config.L
         config.L = max(4, config.L - 4)
