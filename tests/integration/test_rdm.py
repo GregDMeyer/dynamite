@@ -220,7 +220,7 @@ class FullSpace(Checker):
             with self.subTest(n_trace=n_trace):
                 keep = list(range(n_trace, self.state.L))
 
-                if len(keep) > self.state.L//2 and 'slow' in self.skip_flags:
+                if len(keep) > self.state.L//2 and self.skip_flags['small_only']:
                     continue
 
                 if full_np is not None: # process 0
@@ -247,7 +247,7 @@ class FullSpace(Checker):
             with self.subTest(n_keep=n_keep):
                 keep = list(range(0, n_keep))
 
-                if len(keep) > self.state.L//2 and 'slow' in self.skip_flags:
+                if len(keep) > self.state.L//2 and self.skip_flags['small_only']:
                     continue
 
                 if full_np is not None: # process 0

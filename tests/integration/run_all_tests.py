@@ -30,8 +30,13 @@ def parse_command_line(cmd_argv=None):
     parser.add_argument('-v', type=int, default=0,
                         help='Verbosity of output from each test run')
 
-    parser.add_argument('--skip-slow', action='store_true',
-                        help='Skip tests that are marked as slow')
+    parser.add_argument('--skip-small', action='store_true',
+                        help='Skip tests that are marked as being only for '
+                             'small L.')
+
+    parser.add_argument('--skip-medium', action='store_true',
+                        help='Skip tests that are marked as being only for '
+                             'small or moderate L.')
 
     # for compatibility with Python < 3.9
     if hasattr(argparse, 'BooleanOptionalAction'):
@@ -88,9 +93,13 @@ def main():
         for opts in run_options:
             opts.append('--gpu')
 
-    if params.skip_slow:
+    if params.skip_small:
         for opts in run_options:
-            opts.append('--skip-slow')
+            opts.append('--skip-small')
+
+    if params.skip_medium:
+        for opts in run_options:
+            opts.append('--skip-medium')
 
     for fname in fnames:
         for options in run_options:

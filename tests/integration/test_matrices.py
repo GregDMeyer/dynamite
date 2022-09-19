@@ -153,12 +153,12 @@ class Compare(dtr.DynamiteTestCase):
                                 msg=f'difference found in column {i}:\ndiff: {np_col - col}')
 
     def check_hamiltonian(self, H_name):
-        self.skip_on_flag('slow')
+        self.skip_on_flag('small_only')
         H = getattr(hamiltonians, H_name)()
         self.compare_matrices(H)
 
     def test_heisenberg_spinconserve(self):
-        self.skip_on_flag('slow')
+        self.skip_on_flag('small_only')
         if config.L % 2 != 0:
             self.skipTest("only for even L")
 

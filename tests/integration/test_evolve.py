@@ -56,32 +56,36 @@ class Hamiltonians(EvolveChecker):
         for H_name in hamiltonians.get_names():
             if H_name in skip:
                 continue
-            if H_name == 'syk' and 'slow' in self.skip_flags:
+            if H_name == 'syk' and self.skip_flags['small_only']:
                 continue
             with self.subTest(H = H_name):
                 H = getattr(hamiltonians, H_name)()
                 self.evolve_check(H, t)
 
     def test_zero(self):
-        if config.L < 20:
-            self.evolve_all(0.0)
+        if self.skip_flags['medium_only']:
+            skip = {'long_range', 'localized', 'syk'}
         else:
-            self.evolve_all(0.0, skip={'long_range', 'localized', 'syk'})
+            skip = {}
+
+        self.evolve_all(0.0, skip=skip)
 
     def test_short(self):
-        if config.L < 20:
-            self.evolve_all(0.1)
+        if self.skip_flags['medium_only']:
+            skip = {'long_range', 'localized', 'syk'}
         else:
-            self.evolve_all(0.1, skip={'long_range', 'localized', 'syk'})
+            skip = {}
+
+        self.evolve_all(0.1, skip=skip)
 
     def test_long(self):
-        self.skip_on_flag('slow')
+        skip = {'syk'}
+        if self.skip_flags['medium_only']:
+            skip.add('long_range')
+            skip.add('localized')
 
         # otherwise this takes forever
-        old_L = config.L
-        config.L = max(4, config.L - 4)
-        self.evolve_all(50.0, skip={'syk'})
-        config.L = old_L
+        self.evolve_all(50.0, skip)
 
 @ut.skipIf(not complex_enabled(), 'complex numbers not enabled')
 class ParityTests(EvolveChecker):

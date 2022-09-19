@@ -89,8 +89,13 @@ def parse_command_line(cmd_argv=None):
     parser.add_argument('--slepc-args', type=lambda s: s.strip().split(' '),
                         help='Arguments to pass to SLEPc initialization')
 
-    parser.add_argument('--skip-slow', action='store_true',
-                        help='Skip tests that are marked as being slow.')
+    parser.add_argument('--skip-small', action='store_true',
+                        help='Skip tests that are marked as being only for '
+                             'small L.')
+
+    parser.add_argument('--skip-medium', action='store_true',
+                        help='Skip tests that are marked as being only for '
+                             'small or moderate L.')
 
     return parser.parse_args(cmd_argv)
 
@@ -110,9 +115,15 @@ def main(slepc_args=None):
 
     config.initialize(slepc_args, gpu=args.gpu)
 
-    if args.skip_slow:
-        skip_flags = ['slow']
-    else:
-        skip_flags = None
+    skip_flags = {
+        'small_only': False,
+        'medium_only': False,
+    }
+
+    if args.skip_small or args.skip_medium:
+        skip_flags['small_only'] = True,
+
+    if args.skip_medium:
+        skip_flags['medium_only'] = True,
 
     mtr.main(name=args.name, failfast=args.failfast, verbose=args.verbose, skip_flags=skip_flags)

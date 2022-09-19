@@ -101,4 +101,4 @@ def parse_command_line():
 
 if __name__ == '__main__':
     args = parse_command_line()
-    mtr.main(name=args.name, failfast=args.failfast, verbose=args.verbose, skip_flags=['test_flag'])
+    mtr.main(name=args.name, failfast=args.failfast, verbose=args.verbose, skip_flags={'test_flag': True})

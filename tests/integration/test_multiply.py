@@ -62,9 +62,9 @@ class FullSpace(dtr.DynamiteTestCase):
 class FullHamiltonians(dtr.DynamiteTestCase):
     def check_hamiltonian(self, H_name):
         if H_name == 'syk':
-            self.skip_on_flag('slow')
-        if H_name == 'long_range' and config.L > 22:
-            self.skip_on_flag('slow')
+            self.skip_on_flag('small_only')
+        if H_name == 'long_range':
+            self.skip_on_flag('medium_only')
         H = getattr(hamiltonians, H_name)()
         bra, ket = H.create_states()
 
@@ -251,7 +251,7 @@ class Subspaces(dtr.DynamiteTestCase):
 
     def check_hamiltonian(self, H_name):
         if H_name == 'syk':
-            self.skip_on_flag('slow')
+            self.skip_on_flag('small_only')
         for space in [1, 2]:
             for sort in [True, False]:
                 with self.subTest(space=space):

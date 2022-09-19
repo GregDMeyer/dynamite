@@ -117,7 +117,7 @@ class Analytic(Checker):
 class Hamiltonians(Checker):
 
     def test_all_smallest(self):
-        self.skip_on_flag('slow')
+        self.skip_on_flag('small_only')
         for H_name in hamiltonians.get_names(complex_enabled()):
             with self.subTest(H=H_name):
                 H = getattr(hamiltonians, H_name)()

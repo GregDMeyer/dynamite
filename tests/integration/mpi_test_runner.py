@@ -18,8 +18,12 @@ class MPITestCase(ut.TestCase):
     @property
     def skip_flags(self):
         if self._skip_flags is None:
-            self._skip_flags = []
+            self._skip_flags = {}
         return self._skip_flags
+
+    @skip_flags.setter
+    def skip_flags(self, value):
+        self._skip_flags = value
 
     def __str__(self):
         class_name = type(self).__name__
@@ -27,7 +31,7 @@ class MPITestCase(ut.TestCase):
         return class_name + '.' + method_name
 
     def skip_on_flag(self, flag):
-        if flag in self.skip_flags:
+        if self.skip_flags[flag]:
             self.skipTest(f'skipped due to flag "{flag}"')
 
 
@@ -59,8 +63,7 @@ class MPITestRunner:
 
         if skip_flags is not None:
             for test_case in flatten(self.suite):
-                for flag in skip_flags:
-                    test_case.skip_flags.append(flag)
+                test_case.skip_flags = skip_flags
 
     def run(self):
         result = MPITestResult(comm=self.comm, failfast=self.failfast, verbose=self.verbose)

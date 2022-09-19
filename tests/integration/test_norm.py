@@ -20,7 +20,7 @@ class Hamiltonians(dtr.DynamiteTestCase):
         from petsc4py import PETSc
 
         for H_name in hamiltonians.get_names(complex_enabled()):
-            if H_name == 'syk' and config.L >= 18:
+            if H_name == 'syk' and self.skip_flags['small_only']:
                 continue
             with self.subTest(H = H_name):
                 H = getattr(hamiltonians, H_name)()
