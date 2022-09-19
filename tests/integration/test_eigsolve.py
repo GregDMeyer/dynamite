@@ -147,7 +147,7 @@ class ZeroDiagonal(Checker):
     def test_smallest(self):
         H = op_sum(0.1*i*sigmax(i) for i in range(config.L))
         evals, evecs = H.eigsolve(nev=5, getvecs=True, tol=1E-12)
-        self.check_all(H, evals, evecs, tol=1E-10)
+        self.check_all(H, evals, evecs, tol=1E-11, evec_tol=1E-9)
 
     def test_target(self):
         if config.shell:
@@ -159,7 +159,7 @@ class ZeroDiagonal(Checker):
         for target in [0.011, 0.999]:
             with self.subTest(target=target):
                 evals, evecs = H.eigsolve(nev=5, getvecs=True, tol=1E-12, target=target)
-                self.check_all(H, evals, evecs, tol=1E-9)
+                self.check_all(H, evals, evecs, tol=1E-11, evec_tol=1E-9)
 
 class ParityTests(Checker):
 
