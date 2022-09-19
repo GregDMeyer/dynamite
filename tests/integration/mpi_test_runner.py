@@ -318,14 +318,4 @@ def main(name=None, failfast=False, verbose=1, module=None, skip_flags=None):
         A list of flags to set marking tests to skip (using the @skip_flag decorator)
     '''
     runner = MPITestRunner(name=name, failfast=failfast, verbose=verbose, module=module, skip_flags=skip_flags)
-    profile_info = False
-    if profile_info:
-        import cProfile, pstats, io
-        from pstats import SortKey
-        pr = cProfile.Profile()
-        pr.enable()
-        runner.run()
-        pr.disable()
-        pr.print_stats(sort='cumtime')
-    else:
-        runner.run()
+    runner.run()
