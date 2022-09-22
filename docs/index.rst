@@ -3,8 +3,8 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-dynamite: fast full quantum dynamics
-====================================
+dynamite: fast numerics for quantum spin chains
+===============================================
 
 Welcome to **dynamite**, which provides a simple interface
 to fast evolution of quantum dynamics and eigensolving. Behind the
