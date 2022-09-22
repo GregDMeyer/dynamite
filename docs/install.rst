@@ -42,7 +42,7 @@ following. There is a configuration script that comes with dynamite which should
 
 Note that you may want to adjust some of the build options. Just take a look at
 the script and modify as desired. There are also a couple other scripts in that
-directory for debug builds (if you will be modifying dynamite) and CUDA support.
+directory for debug builds (if you will be modifying dynamite) and GPU support.
 
 If all goes well, ``configure`` will tell you to run a ``make`` command. Copy
 the command and run it. It should look like:

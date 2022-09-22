@@ -46,7 +46,6 @@ Features
 
    containers.rst
    install.rst
-   tips.rst
    FAQ.rst
    dynamite.rst
 
