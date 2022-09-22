@@ -2,6 +2,8 @@
 Integration tests for operators.
 '''
 
+import numpy as np
+
 import dynamite_test_runner as dtr
 
 from dynamite import config
@@ -208,6 +210,43 @@ class SaveLoad(dtr.DynamiteTestCase):
             Operator.from_bytes(test_string),
             sigmax(2)
         )
+
+
+class MSCConsistency(dtr.DynamiteTestCase):
+
+    def setUp(self):
+        config._initialize()
+        from petsc4py import PETSc
+        if PETSc.COMM_WORLD.size == 1:
+            self.skipTest(
+                "test only applicable for >1 rank"
+            )
+
+    def test_index_fail(self):
+        config._initialize()
+        from petsc4py import PETSc
+
+        # different operator on each rank
+        op = sigmax(PETSc.COMM_WORLD.rank % config.L)
+
+        with self.assertRaises(RuntimeError):
+            op.build_mat()
+
+    def test_random_coeff_fail(self):
+        config._initialize()
+        from petsc4py import PETSc
+
+        # different seed on each rank
+        rng = np.random.default_rng(
+            seed=PETSc.COMM_WORLD.rank
+        )
+
+        H = hamiltonians.long_range()
+        op = rng.random()*H
+
+        with self.assertRaises(RuntimeError):
+            op.build_mat()
+
 
 if __name__ == '__main__':
     dtr.main()

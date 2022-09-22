@@ -4,6 +4,7 @@
 ## 0.2.4 - IN PROGRESS
 
 ### Added
+ - Dynamite now automatically checks that an operator is the same across all MPI ranks before building it (thus catching bugs due to e.g. different random number generator seeds on different ranks)
 
 ### Changed
  - Moved `operators.load_from_file` into the Operator class, as `operators.Operator.load`

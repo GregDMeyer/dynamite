@@ -4,6 +4,7 @@ defines their built-in behavior and operations.
 """
 
 from itertools import chain
+from zlib import crc32
 import numpy as np
 
 from . import config, validate, msc_tools
@@ -550,6 +551,7 @@ class Operator:
         from ._backend import bpetsc
 
         self.reduce_msc()
+        self._check_consistent_msc()
 
         if not self.allow_projection and not self.conserves(*subspaces):
             raise ValueError("Constructing the operator's matrix on this "
@@ -577,6 +579,25 @@ class Operator:
         )
 
         self._mats[subspaces] = mat
+
+    def _check_consistent_msc(self):
+        config._initialize()
+        from petsc4py import PETSc
+
+        # msc cannot be inconsistent with only 1 rank
+        if PETSc.COMM_WORLD.size == 1:
+            return
+
+        comm = PETSc.COMM_WORLD.tompi4py()
+
+        checksum = crc32(self.msc.data)
+        all_checksums = comm.allgather(checksum)
+
+        if not all(v == all_checksums[0] for v in all_checksums):
+            msg = "operator is inconsistent across MPI ranks. Was it " + \
+                "constructed using non-deterministic code, such as random " + \
+                "numbers with inconsistent seeds?"
+            raise RuntimeError(msg)
 
     def _get_mask_offsets(self):
         """
