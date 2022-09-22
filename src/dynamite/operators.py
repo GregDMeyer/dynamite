@@ -485,6 +485,8 @@ class Operator:
             with open(filename, mode='wb') as f:
                 f.write(self.serialize())
 
+        PETSc.COMM_WORLD.barrier()
+
     @classmethod
     def load(cls, filename):
         '''
