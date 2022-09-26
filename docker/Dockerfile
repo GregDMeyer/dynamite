@@ -94,8 +94,7 @@ RUN DNM_CUDA_ARCH=$CUDA_ARCH ./$PETSC_ARCH.py ${PETSC_CONFIG_FLAGS} && \
 
 from build as mpi4py
 
-# mpi4py is useful and required for the tests
-# but we don't include it in GPU builds
+# mpi4py is not included in GPU builds
 ARG PLATFORM
 RUN if [ "$PLATFORM" = "cpu" ] ; then pip3 install --no-cache-dir mpi4py ; fi
 
@@ -119,18 +118,9 @@ RUN ./configure && make
 
 from petsc as dynamite-build
 
-# install python packages
-WORKDIR /home/dnm
-COPY requirements.txt requirements.txt
-RUN pip3 install --no-cache-dir -r requirements.txt
-
-RUN pip3 install --no-cache-dir $PETSC_DIR/src/binding/petsc4py
-
 COPY --from=slepc /opt/slepc /opt/slepc
 ENV SLEPC_DIR=/opt/slepc
-RUN pip3 install --no-cache-dir $SLEPC_DIR/src/binding/slepc4py
 
-# install dynamite!
 RUN mkdir /home/dnm/dynamite
 WORKDIR /home/dnm/dynamite
 

@@ -72,31 +72,21 @@ paste that, and run it. It should look like:
 Building dynamite
 -----------------
 
-Dynamite requires Python 3, as well as some packages you can install with pip.
-Before you install them, make sure ``PETSC_DIR`` and ``PETSC_ARCH``
-environment variables are still set from the above exports (or re-set them). You
-should also set ``SLEPC_DIR``:
+Make sure ``PETSC_DIR`` and ``PETSC_ARCH`` environment variables are still set
+from the above exports (or re-set them). You should also set ``SLEPC_DIR``:
 
 .. code:: bash
 
     export SLEPC_DIR=<your_slepc_installation_directory>
 
-I also suggest using a `virtual environment <https://docs.python.org/3/library/venv.html>`_,
-to keep all of the packages tidy.
+To keep all your Python packages tidy, I suggest using a
+`virtual environment <https://docs.python.org/3/library/venv.html>`_.
 
-Now, you can install everything by running
+Now, you can install everything by simply running
 
 .. code:: bash
 
-    pip install $PETSC_DIR/src/binding/petsc4py
-    pip install $SLEPC_DIR/src/binding/slepc4py
     cd dynamite
-    pip install -r requirements.txt
-
-Finally, install dynamite:
-
-.. code:: bash
-
     pip install ./
 
 Now you should be all set to use dynamite! If you want to work on the dynamite
