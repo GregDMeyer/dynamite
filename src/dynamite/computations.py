@@ -103,22 +103,20 @@ def evolve(H, state, t, result=None, tol=None, ncv=None, algo=None):
     mfn.solve(state.vec,result.vec)
 
     conv = mfn.getConvergedReason()
-    if conv <= 0:
-        if conv == -1:
-            raise RuntimeError('solver reached maximum number of iterations without '
-                               'converging. perhaps try increasing the max iterations with '
-                               'the options to config.initialize ["-mfn_max_it","<maxits>"].')
-        elif conv == -2:
-            raise RuntimeError('solver failed to converge with MFN_DIVERGED_BREAKDOWN.')
-
-        else:
-            raise RuntimeError('solver failed to converge.')
+    if conv == SLEPc.MFN.ConvergedReason.DIVERGED_ITS:
+        raise MaxIterationsError('solver reached maximum number of iterations without '
+                                 'converging. perhaps try increasing the max iterations with '
+                                 'the options to config.initialize ["-mfn_max_it","<maxits>"].')
+    elif conv == SLEPc.MFN.ConvergedReason.DIVERGED_BREAKDOWN:
+        raise ConvergenceError('solver failed to converge with MFN_DIVERGED_BREAKDOWN.')
+    elif conv <= 0:
+        raise ConvergenceError('solver failed to converge.')
 
     result.set_initialized()
 
     return result
 
-def eigsolve(H, getvecs=False, nev=1, which='smallest', target=None, tol=None, subspace=None):
+def eigsolve(H, getvecs=False, nev=1, which='smallest', target=None, tol=None, subspace=None, max_its=None):
     r"""
     Solve for a subset of the eigenpairs of the Hamiltonian.
 
@@ -225,11 +223,28 @@ def eigsolve(H, getvecs=False, nev=1, which='smallest', target=None, tol=None, s
         'target':SLEPc.EPS.Which.TARGET_MAGNITUDE,
         }[which])
 
-    eps.setTolerances(tol = tol)
+    eps.setTolerances(tol=tol, max_it=max_its)
 
     eps.setFromOptions()
     eps.solve()
     nconv = eps.getConverged()
+    reason = eps.getConvergedReason()
+
+    if reason == SLEPc.EPS.ConvergedReason.DIVERGED_ITS:
+        _, max_its = eps.getTolerances()
+        raise MaxIterationsError('eigensolver reached maximum number of '
+                                 'iterations without converging. Try '
+                                 'increasing the maximum iterations of the '
+                                 'eigensolver via the "max_its" argument to '
+                                 f'eigsolve() (current value: {max_its})')
+    elif reason == SLEPc.EPS.ConvergedReason.DIVERGED_BREAKDOWN:
+        raise ConvergenceError('eigsolver failed to converge with reason '
+                               'EPS_DIVERGED_BREAKDOWN')
+    elif reason == SLEPc.EPS.ConvergedReason.DIVERGED_SYMMETRY_LOST:
+        raise ConvergenceError('eigsolver failed to converge with reason '
+                               'EPS_DIVERGED_SYMMETRY_LOST')
+    elif reason <= 0 or nconv < nev:
+        raise ConvergenceError('eigsolver failed to converge')
 
     evals = np.ndarray((nconv,), dtype=np.float)
     evecs = []
@@ -475,3 +490,9 @@ def estimate_compute_time(t,ncv,nrm,tol=1E-7):
     tstep = get_tstep(ncv,nrm,tol)
     iters = np.ceil(t/tstep)
     return ncv*iters
+
+class ConvergenceError(Exception):
+    pass
+
+class MaxIterationsError(ConvergenceError):
+    pass

@@ -11,6 +11,8 @@ from dynamite.operators import index_sum, sigmax, identity, op_sum
 from dynamite.states import State
 from dynamite.subspaces import Parity
 from dynamite.tools import complex_enabled
+from dynamite.computations import MaxIterationsError
+
 
 class Checker(dtr.DynamiteTestCase):
 
@@ -175,6 +177,19 @@ class ParityTests(Checker):
 
         H.eigsolve()
         H.eigsolve(subspace=s)
+
+
+class ConvergenceFail(dtr.DynamiteTestCase):
+
+    def test_iterations(self):
+        H = hamiltonians.localized()
+
+        eigs = H.eigsolve(nev=1)
+        self.assertGreaterEqual(len(eigs), 1)
+
+        # make sure that setting iterations to 2 causes failure
+        with self.assertRaises(MaxIterationsError):
+            H.eigsolve(nev=1, max_its=2)
 
 
 if __name__ == '__main__':

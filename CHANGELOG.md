@@ -5,6 +5,8 @@
 
 ### Added
  - Dynamite now automatically checks that an operator is the same across all MPI ranks before building it (thus catching bugs due to e.g. different random number generator seeds on different ranks)
+ - `computations.eigsolve()` now takes a `max_its` flag to adjust the solver's iteration limit
+ - More descriptive error messages when solvers fail to converge
 
 ### Changed
  - Moved `operators.load_from_file` into the Operator class, as `operators.Operator.load`

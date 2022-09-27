@@ -11,6 +11,8 @@ from dynamite.operators import sigmax, index_product, identity
 from dynamite.states import State
 from dynamite.subspaces import Parity
 from dynamite.tools import complex_enabled
+from dynamite.computations import MaxIterationsError
+
 
 @ut.skipIf(not complex_enabled(), 'complex numbers not enabled')
 class EvolveFail(dtr.DynamiteTestCase):
@@ -19,7 +21,7 @@ class EvolveFail(dtr.DynamiteTestCase):
         bra, ket = H.create_states()
         ket.set_random(seed=0)
 
-        with self.assertRaises(RuntimeError):
+        with self.assertRaises(MaxIterationsError):
             H.evolve(ket, t=10, result=bra)
 
 
