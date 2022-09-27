@@ -79,13 +79,11 @@ class Hamiltonians(EvolveChecker):
         self.evolve_all(0.1, skip=skip)
 
     def test_long(self):
-        skip = {'syk'}
-        if self.skip_flags['medium_only']:
-            skip.add('long_range')
-            skip.add('localized')
+        # skip all hamiltonians for this test on medium-only
+        self.skip_on_flag('medium_only')
 
-        # otherwise this takes forever
-        self.evolve_all(50.0, skip)
+        # otherwise just skip syk
+        self.evolve_all(50.0, skip={'syk'})
 
 @ut.skipIf(not complex_enabled(), 'complex numbers not enabled')
 class ParityTests(EvolveChecker):
