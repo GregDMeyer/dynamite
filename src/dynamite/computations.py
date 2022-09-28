@@ -6,7 +6,7 @@ from .msc_tools import dnm_int_t
 
 import numpy as np
 
-def evolve(H, state, t, result=None, tol=None, ncv=None, algo=None):
+def evolve(H, state, t, result=None, tol=None, ncv=None, algo=None, max_its=None):
     r"""
     Evolve a quantum state according to the Schrodinger equation
     under the Hamiltonian H. The units are natural, that is, the
@@ -51,6 +51,9 @@ def evolve(H, state, t, result=None, tol=None, ncv=None, algo=None):
         Allowed options: 'krylov' or 'expokit'. Which SLEPc algorithm to
         use to compute the matrix exponential. Default is 'expokit'.
 
+    max_its : int, optional
+        Maximum number of iterations for the solver.
+
     Returns
     -------
     dynamite.states.State
@@ -94,8 +97,7 @@ def evolve(H, state, t, result=None, tol=None, ncv=None, algo=None):
     if ncv is not None:
         mfn.setDimensions(ncv)
 
-    if tol is not None:
-        mfn.setTolerances(tol)
+    mfn.setTolerances(tol=tol, max_it=max_its)
 
     mfn.setFromOptions()
     mfn.setOperator(H.get_mat(subspaces=(state.subspace, state.subspace)))
