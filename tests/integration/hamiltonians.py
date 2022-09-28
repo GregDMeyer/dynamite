@@ -72,7 +72,11 @@ def syk(L = None):
     # only compute the majoranas once
     majoranas = [majorana(i) for i in range(L*2)]
 
-    H = op_sum(op_product(majoranas[idx] for idx in idxs).scale(np.random.uniform(-1,1))
-               for idxs in combinations(range(L*2),4))
+    def gen_products(L):
+        for idxs in combinations(range(L*2), 4):
+            p = op_product(majoranas[idx] for idx in idxs)
+            p.scale(np.random.uniform(-1, 1))
+            yield p
 
+    H = op_sum(gen_products(L))
     return H

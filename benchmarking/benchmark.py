@@ -131,8 +131,13 @@ def build_hamiltonian(params):
         # only compute the majoranas once
         majoranas = [majorana(i) for i in range(params.L*2)]
 
-        rtn = op_sum(op_product(majoranas[idx] for idx in idxs).scale(uniform(-1,1))
-                     for idxs in combinations(range(params.L*2),4))
+        def gen_products(L):
+            for idxs in combinations(range(L*2), 4):
+                p = op_product(majoranas[idx] for idx in idxs)
+                p.scale(uniform(-1, 1))
+                yield p
+
+        rtn = op_sum(gen_products(params.L))
 
     elif params.H == 'ising':
         rtn = index_sum(sigmaz(0)*sigmaz(1)) + 0.2*index_sum(sigmax())

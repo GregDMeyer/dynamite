@@ -1049,7 +1049,6 @@ class Operator:
         self._string_rep.string = coeff_str + self._string_rep.with_brackets('string')
         self._string_rep.tex = coeff_str + self._string_rep.with_brackets('tex')
         self._string_rep.brackets = ''
-        return self
 
     def _num_mul(self, x):
         rtn = self.copy()

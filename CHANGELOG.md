@@ -12,6 +12,7 @@
  - Moved `operators.load_from_file` into the Operator class, as `operators.Operator.load`
  - Moved `operators.from_bytes` into the Operator class, as `operators.Operator.from_bytes`
  - Switched to using `pyproject.toml` for package metadata and build configuration
+ - `operators.Operator.scale()` no longer returns the operator it's called on, to avoid confusion about whether a new operator is being created
 
 ### Fixed
  - An exception is now raised if an unknown keyword argument is passed to `computations.evolve()`
