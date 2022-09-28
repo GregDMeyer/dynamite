@@ -11,6 +11,8 @@ from dynamite.operators import sigmax, index_product, identity
 from dynamite.states import State
 from dynamite.subspaces import Parity
 from dynamite.tools import complex_enabled
+from dynamite.computations import MaxIterationsError
+
 
 @ut.skipIf(not complex_enabled(), 'complex numbers not enabled')
 class Analytic(dtr.DynamiteTestCase):
@@ -31,14 +33,14 @@ class Analytic(dtr.DynamiteTestCase):
 
 @ut.skipIf(not complex_enabled(), 'complex numbers not enabled')
 class EvolveChecker(dtr.DynamiteTestCase):
-    def evolve_check(self, H, t):
+    def evolve_check(self, H, t, **kwargs):
         bra, ket = H.create_states()
         ket.set_random(seed = 0)
 
         H_np = H.to_numpy()
         ket_np = ket.to_numpy()
 
-        H.evolve(ket, t=t, result=bra)
+        H.evolve(ket, t=t, result=bra, **kwargs)
         self.assertLess(np.abs(1 - bra.norm()), 1E-9)
         bra_check = bra.to_numpy()
 
@@ -49,7 +51,7 @@ class EvolveChecker(dtr.DynamiteTestCase):
 @ut.skipIf(not complex_enabled(), 'complex numbers not enabled')
 class Hamiltonians(EvolveChecker):
 
-    def evolve_all(self, t, skip=None):
+    def evolve_all(self, t, skip=None, **kwargs):
         if skip is None:
             skip = set()
 
@@ -60,7 +62,7 @@ class Hamiltonians(EvolveChecker):
                 continue
             with self.subTest(H = H_name):
                 H = getattr(hamiltonians, H_name)()
-                self.evolve_check(H, t)
+                self.evolve_check(H, t, **kwargs)
 
     def test_zero(self):
         if self.skip_flags['medium_only']:
@@ -82,8 +84,14 @@ class Hamiltonians(EvolveChecker):
         # skip all hamiltonians for this test on medium-only
         self.skip_on_flag('medium_only')
 
+        # on small_only, only skip syk
+        if self.skip_flags['small_only']:
+            skip = {'syk'}
+        else:
+            skip = {}
+
         # otherwise just skip syk
-        self.evolve_all(50.0, skip={'syk'})
+        self.evolve_all(50.0, skip=skip, max_its=500)
 
 @ut.skipIf(not complex_enabled(), 'complex numbers not enabled')
 class ParityTests(EvolveChecker):
@@ -117,6 +125,17 @@ class RealBuildFail(dtr.DynamiteTestCase):
         full_state = State(state=0)
         with self.assertRaises(ValueError):
             H.evolve(full_state, t=1.0)
+
+
+@ut.skipIf(not complex_enabled(), 'complex numbers not enabled')
+class EvolveFail(dtr.DynamiteTestCase):
+    def test_evolve_fail(self):
+        H = hamiltonians.localized()
+        bra, ket = H.create_states()
+        ket.set_random(seed=0)
+
+        with self.assertRaises(MaxIterationsError):
+            H.evolve(ket, t=10, result=bra, max_its=2)
 
 
 if __name__ == '__main__':
