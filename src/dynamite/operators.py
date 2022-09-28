@@ -1041,7 +1041,7 @@ class Operator:
         try:
             self.msc['coeffs'] *= x
         except (ValueError, TypeError):
-            raise ValueError('Error attempting to multiply operator by type "%s"' % str(type(x)))
+            raise TypeError(f'Cannot scale operator by type {type(x)}')
 
         # coefficient up to 3 digits of precision, with trailing zeros removed
         coeff_str = f'{x:.3f}'.rstrip('0').rstrip('.')

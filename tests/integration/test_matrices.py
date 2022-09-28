@@ -113,6 +113,16 @@ class Fundamental(dtr.DynamiteTestCase):
         if o_np is not None:
             self.assertTrue(np.array_equal(o_np, correct))
 
+    def test_scale(self):
+        o = sigmax() + sigmaz()
+        o.L = 1
+        o.scale(0.5)
+        o_np = petsc_mat_to_np(o.get_mat())
+        correct = np.array([[0.5, 0.5],
+                            [0.5,-0.5]])
+        if o_np is not None:
+            self.assertTrue(np.array_equal(o_np, correct))
+
     def test_nonhermitian_error(self):
         o = sigma_plus()
         with self.assertRaises(ValueError):

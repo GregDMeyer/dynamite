@@ -248,5 +248,13 @@ class MSCConsistency(dtr.DynamiteTestCase):
             op.build_mat()
 
 
+class Exceptions(dtr.DynamiteTestCase):
+
+    def test_scale(self):
+        op = sigmax()
+        with self.assertRaises(TypeError):
+            op.scale('hi')
+
+
 if __name__ == '__main__':
     dtr.main()
