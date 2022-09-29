@@ -500,5 +500,74 @@ class Uninitialized(dtr.DynamiteTestCase):
             reduced_density_matrix(s0, [])
 
 
+class StringMPI(dtr.DynamiteTestCase):
+
+    def test_get_nonzero_elements(self):
+        s = State()
+        s.vec.set(0.1)
+        s.set_initialized()
+
+        check = s._get_nonzero_elements()
+
+        correct = [
+            (0, 0.1),
+            (1, 0.1),
+            (2, 0.1),
+            (0, 0),  # marks omitted values
+            (len(s)-1, 0.1),
+        ]
+
+        self.assertTrue(
+            all(
+                idx == correct_idx and val == correct_val
+                for ((idx, val), (correct_idx, correct_val)) in zip(check, correct)
+            ),
+            msg=f'\ncheck:\n{check}\n\ncorrect:\n{correct}'
+        )
+
+    def test_get_nonzero_elements_middle(self):
+        s = State(state='0'*(config.L-1)+'1')  # middle element
+        result = s._get_nonzero_elements()
+
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0][0], len(s)//2)
+        self.assertEqual(result[0][1], 1)
+
+    def test_get_nonzero_elements_middle_many(self):
+        s = State()
+        start, end = s.vec.getOwnershipRange()
+        dim = s.subspace.get_dimension()
+
+        fill_start = max(start, dim//4)
+        fill_end = min(end, 3*dim//4)
+
+        if fill_start < fill_end:
+            s.vec[fill_start:fill_end] = 0.001*np.arange(fill_start, fill_end)
+
+        s.vec.assemblyBegin()
+        s.vec.assemblyEnd()
+        s.set_initialized()
+
+        check = s._get_nonzero_elements()
+
+        nonzero_start = dim//4
+        nonzero_end = 3*dim//4
+        correct = [
+            (nonzero_start, 0.001*nonzero_start),
+            (nonzero_start+1, 0.001*(nonzero_start+1)),
+            (nonzero_start+2, 0.001*(nonzero_start+2)),
+            (0, 0),  # marks omitted values
+            (nonzero_end-1, 0.001*(nonzero_end-1)),
+        ]
+
+        self.assertTrue(
+            all(
+                idx == correct_idx and val == correct_val
+                for ((idx, val), (correct_idx, correct_val)) in zip(check, correct)
+            ),
+            msg=f'\ncheck:\n{check}\n\ncorrect:\n{correct}'
+        )
+
+
 if __name__ == '__main__':
     dtr.main()

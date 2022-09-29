@@ -59,6 +59,10 @@ class State:
         self._vec = None  # create when first used
         self._initialized = False
 
+        # whether to use binary or letters/arrows for
+        # string representation
+        self.repr_binary = True
+
         if state is not None:
             if state == 'random':
                 self.set_random(seed=seed)
@@ -164,12 +168,13 @@ class State:
             if len(s) != L:
                 raise ValueError('state string must have length L')
 
-            if not all(c in ['U','D'] for c in str(s)):
-                raise ValueError('only character U and D allowed in state')
+            if not all(c in ['U', 'D', '0', '1'] for c in str(s)):
+                raise ValueError('only character U, D, 0, or 1 allowed in '
+                                 'state string')
 
             state = 0
             for i,c in enumerate(s):
-                if c == 'D':
+                if c in ('D', '1'):
                     state += 1<<i
 
         else:
@@ -186,15 +191,17 @@ class State:
 
     def set_product(self, s):
         """
-        Initialize to a product state. Can be specified either be an integer whose binary
-        representation represents the spin configuration (0=↑, 1=↓) of a product state, or a string
-        of the form ``"DUDDU...UDU"`` (D=↓, U=↑). If it is a string, the string's length must
-        equal ``L``.
+        Initialize to a product state. Can be specified either be an integer
+        whose binary representation represents the spin configuration
+        (0=↑, 1=↓) of a product state, or a string of the form
+        ``"DUDDU...UDU"`` (D=↓, U=↑) or ``"10110...010"`` (1=↓, 0=↑). If it is
+        a string, the string's length must equal ``L``.
 
         .. note:
-            In integer representation, the least significant bit represents spin 0. So, if you look
-            at a binary representation of the integer (for example with Python's `bin` function)
-            spin 0 will be the rightmost bit!
+            In integer representation, the least significant bit represents
+            spin 0. So, if you look at a binary representation of the integer
+            (for example with Python's `bin` function) spin 0 will be the
+            rightmost bit!
 
         Parameters
         ----------
@@ -220,6 +227,11 @@ class State:
 
         self.vec.assemblyBegin()
         self.vec.assemblyEnd()
+
+        if isinstance(s, str) and any(c in ('0', '1') for c in s):
+            self.repr_binary = True
+        else:
+            self.repr_binary = False
 
         self.set_initialized()
 
@@ -393,6 +405,162 @@ class State:
         """
         self.assert_initialized()
         return self._to_numpy(self.vec, to_all)
+
+    def _get_nonzero_elements(self):
+        '''
+        Get a list of the indices and values corresponding to nonzero
+        vector elements. If there are more than 10 nonzero elements, only
+        the first three and final one are returned, separated by a tuple
+        (0, 0) to mark omitted elements. This function is used for the
+        pretty printing functions defined below.
+
+        It's complicated because the nonzero elements could be on any MPI rank
+        but we want every rank to get the same result.
+        '''
+        self.assert_initialized()
+
+        # get the functions we need, but without requiring mpi4py
+        # if we're running on only 1 rank
+        config._initialize()
+        from petsc4py import PETSc
+        if PETSc.COMM_WORLD.size > 1:
+            allgather = PETSc.COMM_WORLD.tompi4py().allgather
+
+            start, end = self.vec.getOwnershipRange()
+            local_vec = np.ndarray((end-start,), dtype=np.complex128)
+            local_vec[:] = self.vec[start:end]
+
+        else:
+            allgather = lambda x: [x]
+            start = 0
+            local_vec = self.vec
+
+        local_nonzero = np.count_nonzero(local_vec)
+        all_nonzero = allgather(local_nonzero)
+        if sum(all_nonzero) > 10:
+            elements_omitted = True
+
+            # only take the first 3 and final 1
+            n_nonzero_preceding = 0
+            for rank in range(0, PETSc.COMM_WORLD.rank):
+                n_nonzero_preceding += all_nonzero[rank]
+
+            n_nonzero_after = 0
+            for rank in range(PETSc.COMM_WORLD.size-1, PETSc.COMM_WORLD.rank, -1):
+                n_nonzero_after += all_nonzero[rank]
+
+            local_take_indices = []
+            local_nonzero_indices = None
+
+            if n_nonzero_preceding < 3:
+                n_local_take = min(3-n_nonzero_preceding, local_nonzero)
+                local_nonzero_indices = np.flatnonzero(local_vec)
+                local_take_indices += list((start+local_nonzero_indices)[:n_local_take])
+
+            if n_nonzero_after == 0 and local_nonzero:
+                # we own the final element
+                if local_nonzero_indices is None:
+                    local_nonzero_indices = np.flatnonzero(local_vec)
+
+                # we are the last portion with a nonzero element---take it
+                local_take_indices.append(start+local_nonzero_indices[-1])
+
+            local_take_values = [self.vec[i] for i in local_take_indices]
+
+            indices = allgather(local_take_indices)
+            values = allgather(local_take_values)
+
+        else:
+            elements_omitted = False
+
+            # otherwise take everything
+            nonzero_local_idxs = np.flatnonzero(local_vec)
+            indices = allgather(start+nonzero_local_idxs)
+            values = allgather([self.vec[start+i] for i in nonzero_local_idxs])
+
+        # flatten
+        indices = [val for ary in indices for val in ary]
+        values = [val for ary in values for val in ary]
+
+        if elements_omitted:
+            indices.insert(-1, 0)
+            values.insert(-1, 0)
+
+        return list(zip(indices, values))
+
+    @classmethod
+    def _get_coeff_strs(cls, nonzeros):
+        if all(v in (0, 1) for _, v in nonzeros):
+            coeffs = ['']*len(nonzeros)
+        else:
+            if all(v.imag == 0 for _, v in nonzeros):
+                format_str = '{v.real:0.3f}'
+            else:
+                format_str = '({v.real:0.3f}+{v.imag:0.3f}j)'
+
+            coeffs = []
+            for _, v in nonzeros:
+                if v == 0:
+                    coeffs.append('')
+                else:
+                    coeffs.append(format_str.format(v=v))
+
+        return coeffs
+
+    def _idx_to_str(self, idx):
+        int_rep = self.subspace.idx_to_state(idx)[0]
+
+        if self.repr_binary:
+            alphabet = '01'
+        else:
+            alphabet = 'UD'
+
+        rtn = ''
+        for i in range(self.L):
+            rtn += alphabet[(int_rep >> i) & 1]
+
+        return rtn
+
+    def __str__(self):
+        if not self.initialized:
+            return '<State with uninitialized contents>'
+
+        nonzeros = self._get_nonzero_elements()
+
+        if not nonzeros:
+            return '<zero vector>'
+
+        coeff_strs = self._get_coeff_strs(nonzeros)
+        state_strs = []
+        for idx, v in nonzeros:
+            if v == 0:
+                state_strs.append('...')
+            else:
+                state_strs.append('|'+self._idx_to_str(idx)+'>')
+
+        return ' + '.join(c+s for c, s in zip(coeff_strs, state_strs))
+
+    def _repr_latex_(self):
+        if not self.initialized:
+            return '<State with uninitialized contents>'
+
+        nonzeros = self._get_nonzero_elements()
+
+        if not nonzeros:
+            return '<zero vector>'
+
+        coeff_strs = self._get_coeff_strs(nonzeros)
+        state_strs = []
+        for idx, v in nonzeros:
+            if v == 0:
+                state_strs.append(r'\cdots')
+            else:
+                state_str = self._idx_to_str(idx)
+                state_str = state_str.replace('U', r'\uparrow')
+                state_str = state_str.replace('D', r'\downarrow')
+                state_strs.append(r'\left|'+state_str+r'\right>')
+
+        return '$'+' + '.join(c+s for c, s in zip(coeff_strs, state_strs))+'$'
 
     def save(self, fname):
         '''

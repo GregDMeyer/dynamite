@@ -8,12 +8,14 @@
  - `computations.eigsolve()` and `computations.evolve()` now take a `max_its` flag to adjust the solver's iteration limit
  - More descriptive error messages when solvers fail to converge
  - Methods `.scale()`, `.axpy()`, `.scale_and_sum()`, `+`, `+=`, `*`, `*=` for the `states.State` class, allowing states to be summed together and multiplied by scalars
+ - More descriptive output when `str()` is called on `states.State` class, and LaTeX representation of states in Jupyter
 
 ### Changed
  - Moved `operators.load_from_file` into the Operator class, as `operators.Operator.load`
  - Moved `operators.from_bytes` into the Operator class, as `operators.Operator.from_bytes`
  - Switched to using `pyproject.toml` for package metadata and build configuration
  - `operators.Operator.scale()` no longer returns the operator it's called on, to avoid confusion about whether a new operator is being created
+ - Initial product states can be specified with either the characters `U` and `D` or `0` and `1` (previously only `U` and `D` were allowed)
 
 ### Fixed
  - An exception is now raised if an unknown keyword argument is passed to `computations.evolve()`
