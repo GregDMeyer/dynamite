@@ -510,15 +510,76 @@ class State:
         self.assert_initialized()
         return self.vec.normalize()
 
-    def __imul__(self, x):
+    def scale(self, c):
+        '''
+        Scale the vector.
+
+        Parameters
+        ----------
+
+        c : float
+            The value to scale by
+        '''
         self.assert_initialized()
-        self.vec.scale(x)
+        self.vec.scale(c)
+
+    def __imul__(self, c):
+        self.scale(c)
         return self
 
-    def __itruediv__(self, x):
-        self.assert_initialized()
-        self.vec.scale(1/x)
+    def __mul__(self, c):
+        rtn = self.copy()
+        rtn *= c
+        return rtn
+
+    # multiplication is commutative between a
+    # vector and a scalar (mat-vec is handled
+    # by the Operator class)
+    def __rmul__(self, c):
+        return self*c
+
+    def __itruediv__(self, c):
+        self.scale(1/c)
         return self
+
+    def axpy(self, alpha, x):
+        '''
+        When ``y.axpy(alpha, x)`` is called, it scales the vector x
+        by the scalar alpha, and sums the result into y. In other words,
+        it computes ``y = alpha*x + y``.
+        '''
+        self.scale_and_sum(alpha, 1, x)
+
+    def scale_and_sum(self, alpha, beta, x):
+        '''
+        Also known as "axpby", when ``y.scale_and_sum(alpha, beta, x)`` is
+        called, it computes ``y = alpha*x + beta*y``.
+        '''
+        self.assert_initialized()
+        x.assert_initialized()
+
+        if not self.subspace == x.subspace:
+            raise ValueError('subspaces do not match')
+
+        self.vec.axpby(alpha, beta, x.vec)
+
+    def __iadd__(self, x):
+        if isinstance(x, State):
+            self.axpy(1.0, x)
+
+        else:  # assume x is a number
+            self.assert_initialized()
+            self.vec.shift(x)
+
+        return self
+
+    def __add__(self, x):
+        rtn = self.copy()
+        rtn += x
+        return rtn
+
+    def __radd__(self, x):
+        return self + x  # all addition to states is commutative
 
     def __len__(self):
         return self.subspace.get_dimension()

@@ -123,43 +123,211 @@ class PetscMethods(dtr.DynamiteTestCase):
 
         self.assertTrue(np.array_equal(result, np.arange(start, end)))
 
-    def test_scale(self):
+    def check_local_vector(self, result_vec, fn, *arg_vecs):
+        start, end = result_vec.getOwnershipRange()
+        local_arg_vecs = []
+        for vec in arg_vecs:
+            local_arg_vecs.append(
+                np.array(vec[start:end])
+            )
+
+        # apply the function (in a vectorized manner)
+        # to the local portion of each arg_vec
+        correct_local_vec = fn(*local_arg_vecs)
+
+        # machine epsilon, but with a bunch of operations on top of it
+        tol_scale = 1E-13
+
+        tol = tol_scale*np.abs(correct_local_vec)
+        diffs = np.abs(result_vec[start:end]-correct_local_vec)
+
+        max_diff_idx = np.argmax(diffs/tol)
+        msg = f'failed at index {max_diff_idx}: '
+        msg += f'{diffs[max_diff_idx]} > {tol[max_diff_idx]} '
+        msg += f'(abs({tol_scale}*{correct_local_vec[max_diff_idx]}))'
+        self.assertTrue(np.all(diffs < tol), msg=msg)
+
+    def test_imul(self):
         vals = [2, 3.14]
         for val in vals:
             with self.subTest(val=val):
                 state = State(state='random')
-                start, end = state.vec.getOwnershipRange()
-                pre_values = np.ndarray((end-start,), dtype=np.complex128)
-                pre_values[:] = state.vec[start:end]
+                orig = state.copy()
 
                 state *= val
 
-                for i in range(start, end):
-                    self.assertEqual(state.vec[i], val*pre_values[i-start])
+                self.check_local_vector(
+                    state.vec,
+                    lambda x: val*x,
+                    orig.vec
+                )
 
-    def test_scale_divide(self):
+    def test_idiv(self):
         val = 3.14
         state = State(state='random')
-        start, end = state.vec.getOwnershipRange()
-        pre_values = np.ndarray((end-start,), dtype=np.complex128)
-        pre_values[:] = state.vec[start:end]
+        orig = state.copy()
 
         state /= val
 
-        for i in range(start, end):
-            self.assertEqual(state.vec[i], (1/val)*pre_values[i-start])
+        inv_val = 1/val
+        self.check_local_vector(
+            state.vec,
+            lambda x: inv_val*x,
+            orig.vec
+        )
 
-    def test_scale_exception_ary(self):
+    def test_imul_exception_ary(self):
         val = np.array([3.1, 4])
         state = State(state='U'*config.L)
         with self.assertRaises(TypeError):
             state *= val
 
-    def test_scale_exception_vec(self):
+    def test_imul_exception_vec(self):
         state1 = State(state='U'*config.L)
         state2 = State(state='U'*config.L)
         with self.assertRaises(TypeError):
             state1 *= state2
+
+    def test_scale(self):
+        vals = [2, 3.14, 0.5j]
+        for val in vals:
+            with self.subTest(val=val):
+                state = State(state='random')
+                orig = state.copy()
+                state.scale(val)
+                self.check_local_vector(
+                    state.vec,
+                    lambda x: val*x,
+                    orig.vec
+                )
+
+    def test_axpy(self):
+        alphas = [1.0, 3.14, 0.5j]
+        for alpha in alphas:
+            with self.subTest(alpha=alpha):
+                x = State(state='random')
+                y = State(state='random')
+                orig_y = y.copy()
+
+                y.axpy(alpha, x)
+
+                self.check_local_vector(
+                    y.vec,
+                    lambda x, y: y + alpha*x,
+                    x.vec,
+                    orig_y.vec
+                )
+
+    def test_scale_and_sum(self):
+        alphas = [1.0, 3.14, 0.5j]
+        for alpha in alphas:
+            for beta in alphas:
+                with self.subTest(alpha=alpha, beta=beta):
+                    x = State(state='random')
+                    y = State(state='random')
+                    orig_y = y.copy()
+
+                    y.scale_and_sum(alpha, beta, x)
+
+                    self.check_local_vector(
+                        y.vec,
+                        lambda x, y: alpha*x + beta*y,
+                        x.vec,
+                        orig_y.vec
+                    )
+
+    def test_iadd_vector(self):
+        x = State(state='random')
+        y = State(state='random')
+        orig_y = y.copy()
+
+        y += x
+
+        self.check_local_vector(
+            y.vec,
+            lambda x, y: x + y,
+            x.vec,
+            orig_y.vec
+        )
+
+    def test_iadd_value(self):
+        vals = [3.14, 0.5j]
+        for val in vals:
+            with self.subTest(val=val):
+                state = State(state='random')
+                orig = state.copy()
+                state += val
+                self.check_local_vector(
+                    state.vec,
+                    lambda x: val+x,
+                    orig.vec
+                )
+
+    def test_add_vector(self):
+        x = State(state='random')
+        y = State(state='random')
+
+        z = x+y
+
+        self.check_local_vector(
+            z.vec,
+            lambda x, y: x + y,
+            x.vec,
+            y.vec
+        )
+
+    def test_add_value(self):
+        val = 3.14
+        state = State(state='random')
+        result = state + val
+        self.check_local_vector(
+            result.vec,
+            lambda x: val+x,
+            state.vec
+        )
+
+    def test_radd_value(self):
+        val = 3.14
+        state = State(state='random')
+        result = val + state
+        self.check_local_vector(
+            result.vec,
+            lambda x: val+x,
+            state.vec
+        )
+
+    def test_add_subspace_fail(self):
+        x = State(state='random', subspace=Parity('odd'))
+        y = State(state='random', subspace=Parity('even'))
+        with self.assertRaises(ValueError):
+            y += x
+
+    def test_mul_vector(self):
+        x = State(state='random')
+        y = State(state='random')
+
+        with self.assertRaises(TypeError):
+            x*y
+
+    def test_mul_value(self):
+        val = 3.14
+        state = State(state='random')
+        result = state * val
+        self.check_local_vector(
+            result.vec,
+            lambda x: val*x,
+            state.vec
+        )
+
+    def test_rmul_value(self):
+        val = 3.14
+        state = State(state='random')
+        result = val * state
+        self.check_local_vector(
+            result.vec,
+            lambda x: val*x,
+            state.vec
+        )
 
 
 class Projection(dtr.DynamiteTestCase):
