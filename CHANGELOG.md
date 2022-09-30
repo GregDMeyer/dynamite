@@ -9,6 +9,7 @@
  - More descriptive error messages when solvers fail to converge
  - Methods `.scale()`, `.axpy()`, `.scale_and_sum()`, `+`, `+=`, `-`, `-=`, `*`, `*=` for the `states.State` class, allowing states to be summed together and multiplied by scalars
  - More descriptive output when `str()` is called on `states.State` class, and LaTeX representation of states in Jupyter
+ - `State.set_all_by_function()` which takes a user-supplied function and applies it to set each element of a state vector
 
 ### Changed
  - Moved `operators.load_from_file` into the Operator class, as `operators.Operator.load`

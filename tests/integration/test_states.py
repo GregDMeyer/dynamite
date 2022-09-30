@@ -2,6 +2,7 @@
 Integration tests for states.
 '''
 
+import math
 import numpy as np
 
 import dynamite_test_runner as dtr
@@ -136,7 +137,7 @@ class PetscMethods(dtr.DynamiteTestCase):
         correct_local_vec = fn(*local_arg_vecs)
 
         # machine epsilon, but with a bunch of operations on top of it
-        tol_scale = 1E-13
+        tol_scale = 5E-12
 
         tol = tol_scale*np.abs(correct_local_vec)
         diffs = np.abs(result_vec[start:end]-correct_local_vec)
@@ -632,6 +633,88 @@ class StringMPI(dtr.DynamiteTestCase):
             ),
             msg=f'\ncheck:\n{check}\n\ncorrect:\n{correct}'
         )
+
+
+class FullStateSetting(dtr.DynamiteTestCase):
+
+    def test_constant(self):
+        s = State()
+
+        def val_fn(idx):
+            return np.full(idx.shape, 0.1)
+
+        start, end = s.vec.getOwnershipRange()
+
+        for vectorize in (True, False):
+            with self.subTest(vectorize=vectorize):
+                s.set_all_by_function(val_fn, vectorize=vectorize)
+
+                self.assertTrue(all(v == 0.1 for v in s.vec[start:end]))
+
+    def test_val(self):
+        s = State()
+
+        def val_fn(idx):
+            return 0.001*idx
+
+        start, end = s.vec.getOwnershipRange()
+
+        for vectorize in (True, False):
+            with self.subTest(vectorize=vectorize):
+                s.set_all_by_function(val_fn, vectorize=vectorize)
+
+                self.assertTrue(all(
+                    v == (start+i)*0.001
+                    for i, v in enumerate(s.vec[start:end])
+                ))
+
+    def test_phase(self):
+        s = State()
+
+        def val_fn(idx):
+            return 0.01*np.exp(1j*idx)
+
+        start, end = s.vec.getOwnershipRange()
+
+        for vectorize in (True, False):
+            with self.subTest(vectorize=vectorize):
+                s.set_all_by_function(val_fn, vectorize=vectorize)
+
+                self.assertTrue(all(
+                    v == val_fn(start+i)
+                    for i, v in enumerate(s.vec[start:end])
+                ))
+
+    def test_subspace(self):
+        s = State(subspace=SpinConserve(config.L, config.L//2))
+
+        def val_fn(state):
+            # 1 if last spin is down, 0 if it's up
+            return (state >> (config.L-1)) & 1
+
+        one_start = math.comb(config.L-1, config.L//2)
+
+        start, end = s.vec.getOwnershipRange()
+
+        for vectorize in (True, False):
+            with self.subTest(vectorize=vectorize):
+                s.set_all_by_function(val_fn, vectorize=vectorize)
+
+                for i, v in enumerate(s.vec[start:end]):
+                    if (i+start) >= one_start:
+                        if v != 1:
+                            msg = f'value {v} at index {i+start}'
+                            break
+                    elif v != 0:
+                        msg = f'value {v} at index {i+start}'
+                        break
+                else:
+                    msg = ''
+
+                self.assertTrue(
+                    not msg,
+                    msg=msg,
+                )
 
 
 if __name__ == '__main__':

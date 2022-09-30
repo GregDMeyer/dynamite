@@ -308,6 +308,47 @@ class State:
 
         self.set_initialized()
 
+    def set_all_by_function(self, val_fn, vectorize=False):
+        '''
+        Evaluate the given function along the entire vector, and set
+        each vector element to the result. ``val_fn`` should take a single
+        argument, which is an integer representation of a state (ones place
+        represents spin 0), and return the corresponding vector element value.
+        Ideally ``val_fn`` should be written so that it can be applied to a
+        vector of indices instead of a single index, and returns a
+        corresponding vector of values, in which case ``vectorize`` can be set
+        to ``True`` to significantly improve performance.
+
+        Parameters
+        ----------
+
+        val_fn : function
+            A function taking an index and outputting a complex number
+
+        vectorize : bool, optional
+            Whether to apply ``val_fn`` in a vectorized manner
+        '''
+        istart, iend = self.vec.getOwnershipRange()
+        block_size = 1024
+
+        for block_start in range(istart, iend, block_size):
+            block_end = min(iend, block_start+block_size)
+            idxs = np.arange(block_start, block_end)
+
+            states = self.subspace.idx_to_state(idxs)
+
+            if vectorize:
+                self.vec[block_start:block_end] = val_fn(states)
+
+            else:
+                for idx, state in zip(idxs, states):
+                    self.vec[idx] = val_fn(state)
+
+        self.vec.assemblyBegin()
+        self.vec.assemblyEnd()
+
+        self.set_initialized()
+
     def project(self, index, value):
         '''
         Project the state onto a subspace in which the qubit
