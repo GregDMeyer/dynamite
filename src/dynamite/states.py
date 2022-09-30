@@ -328,7 +328,7 @@ class State:
         argument, which is an integer representation of a state (ones place
         represents spin 0), and return the corresponding vector element value.
         Ideally ``val_fn`` should be written so that it can be applied to a
-        vector of indices instead of a single index, and returns a
+        vector of integers instead of a single integer, and returns a
         corresponding vector of values, in which case ``vectorize`` can be set
         to ``True`` to significantly improve performance.
 
@@ -336,7 +336,8 @@ class State:
         ----------
 
         val_fn : function
-            A function taking an index and outputting a complex number
+            A function taking an integer (representing a product state) and
+            outputting a complex number
 
         vectorize : bool, optional
             Whether to apply ``val_fn`` in a vectorized manner
