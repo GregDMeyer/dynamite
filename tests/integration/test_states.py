@@ -716,6 +716,22 @@ class FullStateSetting(dtr.DynamiteTestCase):
                     msg=msg,
                 )
 
+    def test_uniform(self):
+        s_init = State(state='uniform')
+
+        s_method = State()
+        s_method.set_uniform()
+
+        for name, s in (('init', s_init), ('method', s_method)):
+            with self.subTest(which=name):
+                const = 1/np.sqrt(s.subspace.get_dimension())
+                start, end = s.vec.getOwnershipRange()
+                for i, v in enumerate(s.vec[start:end]):
+                    self.assertEqual(v, const,
+                                     msg=f'bad value {v} at index {i}')
+
+                self.assertEqual(s.norm(), 1)
+
 
 if __name__ == '__main__':
     dtr.main()

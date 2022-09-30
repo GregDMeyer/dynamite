@@ -25,9 +25,10 @@ class State:
         If not specified, defaults to config.subspace.
 
     state : int or str, optional
-        An initial product state to set the state to. Also accepts ``'random'``. The
-        state can also be initialized later with the :meth:`set_product` and
-        :meth:`set_random` methods.
+        An initial product state to set the state to. Also accepts ``'random'``
+        and ``'uniform'``. The state can also be initialized later with the
+        :meth:`set_product`, :meth:`set_uniform` and :meth:`set_random`
+        methods.
 
     seed : int, optional
         If the ``state`` argument is set to ``'random'``, the seed for the random number
@@ -66,6 +67,8 @@ class State:
         if state is not None:
             if state == 'random':
                 self.set_random(seed=seed)
+            elif state == 'uniform':
+                self.set_uniform()
             else:
                 self.set_product(state)
 
@@ -233,6 +236,16 @@ class State:
         else:
             self.repr_binary = False
 
+        self.set_initialized()
+
+    def set_uniform(self):
+        '''
+        Set the state to a uniform superposition over all basis states. If the
+        State object has its subspace set to something other than ``Full`` (the
+        default), the superposition will be over that subspace's basis states.
+        '''
+        const = 1/np.sqrt(self.subspace.get_dimension())
+        self.vec.set(const)
         self.set_initialized()
 
     @classmethod
