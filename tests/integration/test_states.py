@@ -236,6 +236,11 @@ class PetscMethods(dtr.DynamiteTestCase):
                         orig_y.vec
                     )
 
+    def test_scale_and_sum_same(self):
+        x = State(state='random')
+        with self.assertRaises(ValueError):
+            x.scale_and_sum(1, 1, x)
+
     def test_iadd_vector(self):
         x = State(state='random')
         y = State(state='random')
@@ -301,6 +306,66 @@ class PetscMethods(dtr.DynamiteTestCase):
         y = State(state='random', subspace=Parity('even'))
         with self.assertRaises(ValueError):
             y += x
+
+    def test_isub_vector(self):
+        x = State(state='random')
+        y = State(state='random')
+        orig_y = y.copy()
+
+        y -= x
+
+        self.check_local_vector(
+            y.vec,
+            lambda x, y: y-x,
+            x.vec,
+            orig_y.vec
+        )
+
+    def test_isub_value(self):
+        vals = [3.14, 0.5j]
+        for val in vals:
+            with self.subTest(val=val):
+                state = State(state='random')
+                orig = state.copy()
+                state -= val
+                self.check_local_vector(
+                    state.vec,
+                    lambda x: x-val,
+                    orig.vec
+                )
+
+    def test_sub_vector(self):
+        x = State(state='random')
+        y = State(state='random')
+
+        z = x-y
+
+        self.check_local_vector(
+            z.vec,
+            lambda x, y: x - y,
+            x.vec,
+            y.vec
+        )
+
+    def test_sub_value(self):
+        val = 3.14
+        state = State(state='random')
+        result = state - val
+        self.check_local_vector(
+            result.vec,
+            lambda x: x-val,
+            state.vec
+        )
+
+    def test_rsub_value(self):
+        val = 3.14
+        state = State(state='random')
+        result = val - state
+        self.check_local_vector(
+            result.vec,
+            lambda x: val-x,
+            state.vec
+        )
 
     def test_mul_vector(self):
         x = State(state='random')

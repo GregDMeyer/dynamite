@@ -7,7 +7,7 @@
  - Dynamite now automatically checks that an operator is the same across all MPI ranks before building it (thus catching bugs due to e.g. different random number generator seeds on different ranks)
  - `computations.eigsolve()` and `computations.evolve()` now take a `max_its` flag to adjust the solver's iteration limit
  - More descriptive error messages when solvers fail to converge
- - Methods `.scale()`, `.axpy()`, `.scale_and_sum()`, `+`, `+=`, `*`, `*=` for the `states.State` class, allowing states to be summed together and multiplied by scalars
+ - Methods `.scale()`, `.axpy()`, `.scale_and_sum()`, `+`, `+=`, `-`, `-=`, `*`, `*=` for the `states.State` class, allowing states to be summed together and multiplied by scalars
  - More descriptive output when `str()` is called on `states.State` class, and LaTeX representation of states in Jupyter
 
 ### Changed

@@ -729,6 +729,9 @@ class State:
         if not self.subspace == x.subspace:
             raise ValueError('subspaces do not match')
 
+        if self.vec is x.vec:
+            raise ValueError('x and y cannot be the same State object')
+
         self.vec.axpby(alpha, beta, x.vec)
 
     def __iadd__(self, x):
@@ -748,6 +751,25 @@ class State:
 
     def __radd__(self, x):
         return self + x  # all addition to states is commutative
+
+    def __isub__(self, x):
+        if isinstance(x, State):
+            self.axpy(-1.0, x)
+
+        else:
+            self += -x
+
+        return self
+
+    def __sub__(self, x):
+        rtn = self.copy()
+        rtn -= x
+        return rtn
+
+    def __rsub__(self, x):
+        rtn = self.copy()
+        rtn *= -1
+        return rtn + x
 
     def __len__(self):
         return self.subspace.get_dimension()
