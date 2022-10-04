@@ -118,8 +118,12 @@ RUN ./configure && make
 
 from petsc as dynamite-build
 
+RUN pip3 install --no-cache-dir $PETSC_DIR/src/binding/petsc4py
+
 COPY --from=slepc /opt/slepc /opt/slepc
 ENV SLEPC_DIR=/opt/slepc
+
+RUN pip3 install --no-cache-dir $SLEPC_DIR/src/binding/slepc4py
 
 RUN mkdir /home/dnm/dynamite
 WORKDIR /home/dnm/dynamite
