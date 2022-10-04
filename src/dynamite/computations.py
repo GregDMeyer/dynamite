@@ -369,7 +369,13 @@ def dm_entanglement_entropy(dm):
         The Von Neumann entropy
     '''
     w = np.linalg.eigvalsh(dm)
-    rtn = -np.sum(w * np.log(w, where=w>0))
+
+    # this is required because numpy leaves uninitialized data in the
+    # out vector unless you explicitly zero it :-(
+    log = np.zeros(w.shape)
+    np.log(w, where=w > 0, out=log)
+
+    rtn = -np.sum(w * log)
     return rtn
 
 def renyi_entropy(state, keep, alpha, method='eigsolve'):

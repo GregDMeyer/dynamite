@@ -23,6 +23,7 @@
  - An exception is now raised if an unknown keyword argument is passed to `computations.evolve()`
  - Ensure compatibility when saving operators to disk using a 64 bit dynamite install but loading with a 32 bit install
  - Ensure spin indices passed to operator constructors fall within valid range
+ - `computations.entanglement_entropy()` and `computations.dm_entanglement_entropy()` sometimes returned bad values due to uninitialized memory being included in the computation
 
 ## 0.2.3 - 2022-08-17
 
