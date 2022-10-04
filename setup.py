@@ -21,7 +21,8 @@ def main():
         ext_modules=cythonize(
             extensions(), include_path=get_cython_includes()
             ),
-        cmdclass={'build_ext': MakeBuildExt}
+        cmdclass={'build_ext': MakeBuildExt},
+        package_dir={'': 'src'}
     )
 
 
