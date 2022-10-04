@@ -12,7 +12,6 @@ configure_options = [
 
     # some optimization flags
     '--with-debugging=0',
-    '--with-fortran-kernels=1',
 
     # compiler optimization flags
     '--COPTFLAGS=-O3',

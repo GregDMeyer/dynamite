@@ -24,7 +24,6 @@ configure_option_dict = {
 
     # some PETSc optimization flags
     '--with-debugging': '0',
-    '--with-fortran-kernels': '1',
 
     # compiler optimization flags
     '--COPTFLAGS': '-O3',
