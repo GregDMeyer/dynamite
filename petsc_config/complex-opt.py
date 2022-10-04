@@ -21,11 +21,12 @@ configure_options = [
     # use native complex numbers for scalars. currently required for dynamite.
     '--with-scalar-type=complex',
 
-    # download extra packages for shift-invert eigensolving (solving for the middle
-    # of the spectrum). not required if you won't use that feature
+    # download extra packages for shift-invert eigensolving (solving for the
+    # middle of the spectrum) with MPI.
+    # not required if you won't use that feature
     #'--with-scalapack', # if you already have scalapack installed
-    #'--download-scalapack',
-    #'--download-mumps',
+    '--download-scalapack',
+    '--download-mumps',
 
     # required to work with spin chains larger than 31 spins
     #'--with-64-bit-indices',

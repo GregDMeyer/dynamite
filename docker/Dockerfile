@@ -27,7 +27,7 @@ ARG PETSC_ARCH=complex-opt
 ENV PETSC_ARCH=$PETSC_ARCH
 
 ARG PETSC_CONFIG_FLAGS
-ENV PETSC_CONFIG_FLAGS="$PETSC_CONFIG_FLAGS --download-scalapack=1 --with-mumps=1"
+ENV PETSC_CONFIG_FLAGS="$PETSC_CONFIG_FLAGS --download-mumps=0 --with-mumps=1"
 
 
 FROM nvidia/cuda:${CUDA_VERSION}-devel-ubuntu${UBUNTU_VERSION} AS base-gpu
