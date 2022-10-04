@@ -18,6 +18,7 @@
  - Switched to using `pyproject.toml` for package metadata and build configuration
  - `operators.Operator.scale()` no longer returns the operator it's called on, to avoid confusion about whether a new operator is being created
  - Initial product states can be specified with either the characters `U` and `D` or `0` and `1` (previously only `U` and `D` were allowed)
+ - `states.State.normalize()` now has no return value (previously returned the scale factor used for normalization)
 
 ### Fixed
  - An exception is now raised if an unknown keyword argument is passed to `computations.evolve()`

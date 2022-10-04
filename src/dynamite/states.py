@@ -731,7 +731,7 @@ class State:
         Scale the vector such that the norm is 1.
         '''
         self.assert_initialized()
-        return self.vec.normalize()
+        self.vec.normalize()
 
     def scale(self, c):
         '''
