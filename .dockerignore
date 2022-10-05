@@ -9,5 +9,7 @@ README.md
 build/
 **/dynamite.egg-info/
 **/__pycache__/
+**/.ipynb_checkpoints/
 **/*.so
 **/*.o
+**/.dynamite
