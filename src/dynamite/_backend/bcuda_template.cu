@@ -315,6 +315,10 @@ __global__ void C(device_MatNorm,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
   PetscScalar csum;
   PetscInt ket, bra, row_idx, mask_idx, term_idx, i;
 
+#if C(RIGHT_SUBSPACE,SP) == SpinConserve_SP
+  PetscInt s2i_sign;
+#endif
+
   /* first find this thread's max and put it in threadmax */
 
   threadmax[threadIdx.x] = 0;
@@ -324,6 +328,15 @@ __global__ void C(device_MatNorm,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
     for (mask_idx = 0; mask_idx < nmasks; ++mask_idx) {
       csum = 0;
       bra = ket ^ masks[mask_idx];
+
+#if C(RIGHT_SUBSPACE,SP) == SpinConserve_SP
+      if (C(S2I_CUDA,RIGHT_SUBSPACE)(bra, &s2i_sign, right_subspace_data) == -1) {
+#else
+      if (C(S2I_CUDA,RIGHT_SUBSPACE)(bra, right_subspace_data) == -1) {
+#endif
+	continue;
+      }
+
       /* sum all terms for this matrix element */
       for (term_idx = mask_offsets[mask_idx]; term_idx < mask_offsets[mask_idx+1]; ++term_idx) {
 #if defined(PETSC_USE_64BIT_INDICES)

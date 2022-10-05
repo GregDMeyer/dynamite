@@ -926,6 +926,14 @@ PetscErrorCode C(MatNorm_CPU,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
 
       bra = ket ^ ctx->masks[mask_idx];
 
+#if C(RIGHT_SUBSPACE,SP) == SpinConserve_SP
+      if (C(S2I,RIGHT_SUBSPACE)(bra, NULL, ctx->right_subspace_data) == -1) {
+#else
+      if (C(S2I,RIGHT_SUBSPACE)(bra, ctx->right_subspace_data) == -1) {
+#endif
+	continue;
+      }
+
       /* sum all terms for this matrix element */
       csum = 0;
       for (term_idx = ctx->mask_offsets[mask_idx];

@@ -221,6 +221,26 @@ class Operator:
         """
         return self.nnz/self.dim[1]
 
+    def infinity_norm(self, subspaces=None):
+        """
+        Computes the infinity norm of the operator's matrix, on the given
+        subspace(s). If subspace is not supplied, defaults to the operator's
+        default subspace (the most recently added one, or Full).
+
+        Parameters
+        ----------
+        subspaces : tuple(Subspace, Subspace), optional
+            The subspace pair on which to compute the infinity norm
+
+        Returns
+        -------
+        float
+            The norm
+        """
+        config._initialize()
+        from petsc4py import PETSc
+        return self.get_mat(subspaces=subspaces).norm(PETSc.NormType.INFINITY)
+
     @property
     def shell(self):
         """
