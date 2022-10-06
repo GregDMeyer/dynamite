@@ -12,6 +12,7 @@
  - `State.set_all_by_function()` which takes a user-supplied function and applies it to set each element of a state vector
  - `State.set_uniform()` to set the state to a uniform superposition
  - `Operator.infinity_norm()`
+ - The `run_all_tests.py` script (in `tests/integration`) now has an optional flag `--test-set <filename>`, which accepts a file listing tests to be run (instead of simply running all available tests)
 
 ### Changed
  - Moved `operators.load_from_file` into the Operator class, as `operators.Operator.load`

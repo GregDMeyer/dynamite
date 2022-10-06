@@ -1,0 +1,42 @@
+
+# a list of tests that runs for L=30 on one node in ~4.5 hrs,
+# using shell matrices and -bv_type=vecs option to SLEPc
+
+# I only include tests here that reasonably might have different behavior at L=30
+# than other spin sizes (for example, tests checking that exceptions are thrown for bad
+# argument type are not included)
+
+test_matrices.py MemoryUsage.test_XX
+test_matrices.py MemoryUsage.test_diagonal
+
+test_multiply.py Subspaces.test_parity_XX_even
+test_multiply.py Subspaces.test_parity_XX_odd
+test_multiply.py Subspaces.test_parity_YY_even
+test_multiply.py Subspaces.test_parity_YY_odd
+test_multiply.py Subspaces.test_spin_conserve_half_filling
+test_multiply.py Subspaces.test_spin_conserve_third_filling
+
+test_operators.py SubspaceConservation.test_change_parity
+test_operators.py SubspaceConservation.test_change_spinflip
+test_operators.py SubspaceConservation.test_full
+test_operators.py SubspaceConservation.test_full_to_others
+test_operators.py SubspaceConservation.test_spinconserve
+test_operators.py SubspaceConservation.test_spinconserve_spinflip_error
+test_operators.py SubspaceConservation.test_spinconserve_spinflip_false
+test_operators.py SubspaceConservation.test_spinconserve_spinflip_heisenberg
+
+test_states.py PetscMethods
+test_states.py Projection.test_full
+test_states.py Projection.test_index_exceptions
+test_states.py Projection.test_parity
+test_states.py Saving.test_save_auto
+test_states.py Saving.test_save_parity
+test_states.py Saving.test_save_simple
+test_states.py Saving.test_save_spinconserve
+test_states.py Saving.test_save_spinconserve_spinflip
+test_states.py ToNumpy.test_to_all
+test_states.py ToNumpy.test_to_zero
+
+test_subspaces.py ConfigLSetting.test_full
+test_subspaces.py ConfigLSetting.test_parity
+test_subspaces.py SpinFlipConversion.test_conversion

@@ -27,7 +27,7 @@ def parse_command_line(cmd_argv=None):
     parser.add_argument('-L', type=int, default=10,
                         help='Set spin chain length for tests of variable size')
 
-    parser.add_argument('-v', type=int, default=0,
+    parser.add_argument('-v', type=int,
                         help='Verbosity of output from each test run')
 
     parser.add_argument('--skip-small', action='store_true',
@@ -38,6 +38,10 @@ def parse_command_line(cmd_argv=None):
                         help='Skip tests that are marked as being only for '
                              'small or moderate L.')
 
+    parser.add_argument('--test-set',
+                        help='File containing a list of tests to run. See '
+                        'test_sets/README.md for details.')
+
     # for compatibility with Python < 3.9
     if hasattr(argparse, 'BooleanOptionalAction'):
         parser.add_argument('--shell', action=argparse.BooleanOptionalAction,
@@ -46,9 +50,16 @@ def parse_command_line(cmd_argv=None):
 
     args = parser.parse_args(cmd_argv)
 
+    # default depends on whether test-set has been supplied
+    if args.v is None:
+        if args.test_set is None:
+            args.v = 0
+        else:
+            args.v = 2
+
     return args
 
-def run_test(mpiexec, nproc, fname, options, timeout=None):
+def run_test(mpiexec, nproc, test_name, options, timeout=None):
     if mpiexec:
         cmd = mpiexec.split(' ')
         cmd += ['-n', str(nproc)]
@@ -57,7 +68,7 @@ def run_test(mpiexec, nproc, fname, options, timeout=None):
         if nproc > 1:
             raise ValueError('Cannot run with nproc > 1 without MPI')
 
-    cmd += ['python3', fname] + options
+    cmd += ['python3'] + test_name.split(' ') + options
     print(' '.join(cmd))
 
     try:
@@ -69,10 +80,30 @@ def run_test(mpiexec, nproc, fname, options, timeout=None):
 
     print()
 
-def main():
-    fnames = sorted(glob('test_*.py'))
 
+def get_test_list(fname):
+    rtn = []
+    with open(fname) as f:
+        for line in f:
+            # get rid of comments
+            line = line.split('#')[0]
+
+            line = line.strip()
+            if not line:
+                continue
+
+            rtn.append(line)
+
+    return rtn
+
+
+def main():
     params = parse_command_line()
+
+    if params.test_set is None:
+        test_names = sorted(glob('test_*.py'))
+    else:
+        test_names = get_test_list(params.test_set)
 
     if params.nprocs is None:
         if params.gpu or not params.mpiexec:
@@ -101,11 +132,11 @@ def main():
         for opts in run_options:
             opts.append('--skip-medium')
 
-    for fname in fnames:
+    for test_name in test_names:
         for options in run_options:
             for nproc in params.nprocs:
-                run_test(params.mpiexec, nproc, fname, options+const_options,
-                         timeout=params.timeout)
+                run_test(params.mpiexec, nproc, test_name,
+                         options+const_options, timeout=params.timeout)
 
 if __name__ == '__main__':
     main()
