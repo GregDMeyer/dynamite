@@ -99,6 +99,11 @@ You can see a list of all available images `on DockerHub <https://hub.docker.com
     If your cluster has a "scratch" filesystem, consider adding a line like the following to your ``.bashrc``
     or equivalent, to move the storage location: ``export SINGULARITY_CACHEDIR=<path to scratch>/.singularity``
 
+Shifter
+-------
+
+The dynamite images (both CPU and GPU) have also been tested with `Shifter <https://shifter.readthedocs.io/en/latest/>`_, which is another tool some HPC environments use to run containers. If your cluster uses Shifter, please consult the cluster's documentation for usage instructions.
+
 Jupyter containers
 ==================
 
