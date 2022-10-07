@@ -87,7 +87,10 @@ def evolve(H, state, t, result=None, tol=None, ncv=None, algo=None, max_its=None
     f = mfn.getFN()
     f.setType(SLEPc.FN.Type.EXP)
 
-    f.setScale(-1j*t)
+    scale = -1j*t
+    if scale.imag == 0:  # imaginary time evolution, scale is real
+        scale = scale.real
+    f.setScale(scale)
 
     if algo is not None:
         mfn.setType(algo)

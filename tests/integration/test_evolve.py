@@ -31,7 +31,6 @@ class Analytic(dtr.DynamiteTestCase):
         H.evolve(ket, t = np.pi/2, result = bra)
         self.assertLess(np.abs(1 - np.abs(bra.dot(bra_check))), 1E-9)
 
-@ut.skipIf(not complex_enabled(), 'complex numbers not enabled')
 class EvolveChecker(dtr.DynamiteTestCase):
     def evolve_check(self, H, t, **kwargs):
         bra, ket = H.create_states()
@@ -41,28 +40,51 @@ class EvolveChecker(dtr.DynamiteTestCase):
         ket_np = ket.to_numpy()
 
         H.evolve(ket, t=t, result=bra, **kwargs)
-        self.assertLess(np.abs(1 - bra.norm()), 1E-9)
+
+        if t.imag == 0:
+            self.assertLess(np.abs(1 - bra.norm()), 1E-9)
+
         bra_check = bra.to_numpy()
 
         if ket_np is not None:
             bra_np = linalg.expm_multiply(-1j*t*H_np, ket_np)
-            self.assertLess(np.abs(1 - bra_check.dot(bra_np.conj())), 1E-9)
+            inner_prod = bra_check.dot(bra_np.conj())
+            norm = bra.norm()
+            self.assertLess(np.abs(1 - (inner_prod/(norm**2))), 1E-9,
+                            msg=f'inner prod:{inner_prod}; norm^2:{norm**2}')
 
-@ut.skipIf(not complex_enabled(), 'complex numbers not enabled')
+
 class Hamiltonians(EvolveChecker):
 
     def evolve_all(self, t, skip=None, **kwargs):
         if skip is None:
             skip = set()
 
-        for H_name in hamiltonians.get_names():
+        for H_name in hamiltonians.get_names(include_complex=complex_enabled()):
             if H_name in skip:
                 continue
             if H_name == 'syk' and self.skip_flags['small_only']:
                 continue
-            with self.subTest(H = H_name):
-                H = getattr(hamiltonians, H_name)()
-                self.evolve_check(H, t, **kwargs)
+
+            evolve_types = []
+            if complex_enabled():
+                # since there is already a factor of i in
+                # the time evolution exponent, counterintuitively
+                # imaginary time evolution is the only one you can
+                # do without complex numbers
+                evolve_types += ['real']
+
+            if t < 20:  # imaginary doesn't converge for huge t
+                evolve_types += ['imaginary']
+
+            for evolve_type in evolve_types:
+                with self.subTest(H=H_name, evolve_type=evolve_type):
+                    t_factor = {
+                        'real': 1,
+                        'imaginary': -1j,
+                    }[evolve_type]
+                    H = getattr(hamiltonians, H_name)()
+                    self.evolve_check(H, t*t_factor, **kwargs)
 
     def test_zero(self):
         if self.skip_flags['medium_only']:
