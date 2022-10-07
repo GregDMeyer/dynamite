@@ -547,6 +547,16 @@ class IndexProduct(ut.TestCase):
         self.assertEqual(index_product(sigmaz(0), size=0), identity())
 
 
+class SumofProducts(ut.TestCase):
+
+    def test_tex(self):
+        op = index_sum(index_product(sigmax(), size=3), size=8)
+        self.assertEqual(
+            op._repr_latex_(),
+            r'$\sum_{j=0}^{5}\left[\prod_{i=0}^{2}\sigma^x_{j+i}\right]$'
+        )
+
+
 class WithBrackets(ut.TestCase):
     '''
     Test classmethod _with_brackets

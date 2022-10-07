@@ -5,6 +5,8 @@ defines their built-in behavior and operations.
 
 from itertools import chain
 from zlib import crc32
+import re
+from string import digits, ascii_lowercase
 import numpy as np
 
 from . import config, validate, msc_tools
@@ -1347,9 +1349,11 @@ def index_sum(op, size = None, start = 0, boundary = 'open'):
 
     # add i to the indices for TeX representation
     sub_tex = op._string_rep.with_brackets('tex')
-    sub_tex = sub_tex.replace('{IDX', '{IDXi+').replace('{IDXi+0', '{IDXi')
+    idx = _get_next_index(sub_tex)
+    sub_tex = sub_tex.replace('{IDX', '{IDX'+idx+'+')
+    sub_tex = sub_tex.replace('{IDX'+idx+'+0', '{IDX'+idx)
 
-    rtn._string_rep.tex = r'\sum_{i=%d}^{%d}' % (start, stop-1) + sub_tex
+    rtn._string_rep.tex = r'\sum_{'+idx+'=%d}^{%d}' % (start, stop-1) + sub_tex
     rtn._string_rep.brackets = '[]'
 
     return rtn
@@ -1394,11 +1398,28 @@ def index_product(op, size = None, start = 0):
 
     # add i to the indices for TeX representation
     sub_tex = op._string_rep.with_brackets('tex')
-    sub_tex = sub_tex.replace('{IDX', '{IDXi+').replace('{IDXi+0', '{IDXi')
-    rtn._string_rep.tex = r'\prod_{i=%d}^{%d}' % (start, stop-1) + sub_tex
+    idx = _get_next_index(sub_tex)
+    sub_tex = sub_tex.replace('{IDX', '{IDX'+idx+'+')
+    sub_tex = sub_tex.replace('{IDX'+idx+'+0', '{IDX'+idx)
+    rtn._string_rep.tex = r'\prod_{'+idx+'=%d}^{%d}' % (start, stop-1)
+    rtn._string_rep.tex += sub_tex
     rtn._string_rep.brackets = '[]'
 
     return rtn
+
+
+def _get_next_index(tex_str):
+    if '{IDX' not in tex_str:
+        return 'i'
+
+    max_idx = max(tex_str[m.end()] for m in re.finditer('{IDX', tex_str))
+
+    if max_idx in ascii_lowercase:
+        return ascii_lowercase[(ascii_lowercase.find(max_idx)+1) % 26]
+
+    else:
+        return 'i'
+
 
 def sigmax(i=0):
     r"""
