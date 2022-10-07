@@ -12,6 +12,8 @@ from dynamite.states import State, UninitializedError
 from dynamite.subspaces import Parity, SpinConserve, Auto
 from dynamite.operators import sigmaz, sigmax, sigmay, index_sum
 from dynamite.computations import reduced_density_matrix
+from dynamite.tools import complex_enabled
+
 
 class RandomSeed(dtr.DynamiteTestCase):
 
@@ -190,7 +192,9 @@ class PetscMethods(dtr.DynamiteTestCase):
             state1 *= state2
 
     def test_scale(self):
-        vals = [2, 3.14, 0.5j]
+        vals = [2, 3.14]
+        if complex_enabled():
+            vals += [0.5j]
         for val in vals:
             with self.subTest(val=val):
                 state = State(state='random')
@@ -203,7 +207,9 @@ class PetscMethods(dtr.DynamiteTestCase):
                 )
 
     def test_axpy(self):
-        alphas = [1.0, 3.14, 0.5j]
+        alphas = [1.0, 3.14]
+        if complex_enabled():
+            alphas += [0.5j]
         for alpha in alphas:
             with self.subTest(alpha=alpha):
                 x = State(state='random')
@@ -220,7 +226,9 @@ class PetscMethods(dtr.DynamiteTestCase):
                 )
 
     def test_scale_and_sum(self):
-        alphas = [1.0, 3.14, 0.5j]
+        alphas = [1.0, 3.14]
+        if complex_enabled():
+            alphas += [0.5j]
         for alpha in alphas:
             for beta in alphas:
                 with self.subTest(alpha=alpha, beta=beta):
@@ -257,7 +265,9 @@ class PetscMethods(dtr.DynamiteTestCase):
         )
 
     def test_iadd_value(self):
-        vals = [3.14, 0.5j]
+        vals = [3.14]
+        if complex_enabled():
+            vals += [0.5j]
         for val in vals:
             with self.subTest(val=val):
                 state = State(state='random')
@@ -323,7 +333,9 @@ class PetscMethods(dtr.DynamiteTestCase):
         )
 
     def test_isub_value(self):
-        vals = [3.14, 0.5j]
+        vals = [3.14]
+        if complex_enabled():
+            vals += [0.5j]
         for val in vals:
             with self.subTest(val=val):
                 state = State(state='random')
@@ -669,6 +681,9 @@ class FullStateSetting(dtr.DynamiteTestCase):
                 ))
 
     def test_phase(self):
+        if not complex_enabled():
+            self.skipTest("complex numbers not enabled")
+
         s = State()
 
         def val_fn(idx):
