@@ -216,7 +216,13 @@ class FullSpace(Checker):
 
         full_np = full_state.to_numpy()
 
-        for n_trace in range(1, self.state.L-1):
+        # do fewer if we're at really big sizes
+        if self.skip_flags['medium_only']:
+            test_trace = [(self.state.L+1)//2, 3*self.state.L//4, self.state.L-1]
+        else:
+            test_trace = range(1, self.state.L-1)
+
+        for n_trace in test_trace:
             with self.subTest(n_trace=n_trace):
                 keep = list(range(n_trace, self.state.L))
 
@@ -243,7 +249,12 @@ class FullSpace(Checker):
 
         full_np = full_state.to_numpy()
 
-        for n_keep in range(1, self.state.L-1):
+        if self.skip_flags['medium_only']:
+            test_keep = [1, self.state.L//4, self.state.L//2]
+        else:
+            test_keep = range(1, self.state.L-1)
+
+        for n_keep in test_keep:
             with self.subTest(n_keep=n_keep):
                 keep = list(range(0, n_keep))
 
