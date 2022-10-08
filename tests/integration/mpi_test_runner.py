@@ -154,13 +154,17 @@ class MPITestResult(ut.TestResult):
             self._print(test, '\n',   rank=0, verbose=2)
             self._print(msg,          rank=0, verbose=2)
 
-        duration =  default_timer() - self.start_time
+        duration = default_timer() - self.start_time
+        duration_hr = int(duration)//3600
+        duration_min = (int(duration)//60) % 60
+        duration_sec = duration % 60
 
         self._print(rank=0)
-        self._print("{} test{} run in {:.3f} s".format(
-            self.testsRun,
-            's' if self.testsRun != 1 else '',
-            duration), rank=0)
+        self._print(
+            f"{self.testsRun} test{'s' if self.testsRun != 1 else ''}"
+            f" run in {duration_hr}:{duration_min:02d}:{duration_sec:06.3f}",
+            rank=0
+        )
 
     def startTest(self, test):
         ut.TestResult.startTest(self, test)
