@@ -218,7 +218,7 @@ class FullSpace(Checker):
 
         # do fewer if we're at really big sizes
         if self.skip_flags['medium_only']:
-            test_trace = [(self.state.L+1)//2, 3*self.state.L//4, self.state.L-1]
+            test_trace = [(self.state.L+1)//3, 5*self.state.L//6, self.state.L-1]
         else:
             test_trace = range(1, self.state.L-1)
 
@@ -250,7 +250,7 @@ class FullSpace(Checker):
         full_np = full_state.to_numpy()
 
         if self.skip_flags['medium_only']:
-            test_keep = [1, self.state.L//4, self.state.L//2]
+            test_keep = [1, self.state.L//6, self.state.L//3]
         else:
             test_keep = range(1, self.state.L-1)
 
