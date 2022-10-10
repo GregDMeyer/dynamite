@@ -40,3 +40,5 @@ test_states.py ToNumpy.test_to_zero
 test_subspaces.py ConfigLSetting.test_full
 test_subspaces.py ConfigLSetting.test_parity
 test_subspaces.py SpinFlipConversion.test_conversion
+
+test_rdm.py --skip-medium
