@@ -21,9 +21,7 @@ cdef extern from "bsubspace_impl.h":
         void *right_data
 
     ctypedef enum subspace_type:
-        _FULL "FULL"
-        _PARITY "PARITY"
-        _EXPLICIT "EXPLICIT"
+        pass
 
 cdef extern from "bpetsc_impl.h":
 

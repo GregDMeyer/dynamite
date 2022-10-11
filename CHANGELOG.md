@@ -28,6 +28,7 @@
  - Ensure spin indices passed to operator constructors fall within valid range
  - `computations.entanglement_entropy()` and `computations.dm_entanglement_entropy()` sometimes returned bad values due to uninitialized memory being included in the computation
  - Imaginary time evolution is now possible (for entirely real Hamiltonians), when dynamite is built without complex numbers
+ - Edge case where matrix norm was incorrect for a few very specific operators, with SpinConserve + spinflip subspace
 
 ## 0.2.3 - 2022-08-17
 

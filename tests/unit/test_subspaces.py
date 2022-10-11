@@ -6,8 +6,10 @@ These tests should NOT require MPI.
 '''
 
 import unittest as ut
+from unittest.mock import Mock
 import numpy as np
 from dynamite.subspaces import Full, Parity, Explicit, Auto, SpinConserve
+from dynamite.msc_tools import msc_dtype
 from dynamite._backend.bsubspace import compute_rcm
 from dynamite._backend.bbuild import dnm_int_t
 
@@ -296,12 +298,9 @@ class TestSpinConserve(ut.TestCase):
             0b0011,
             0b0101,
             0b0110,
-            0b1001,
-            0b1010,
-            0b1100,
         ], dtype=dnm_int_t)
 
-        bad_state = 0b0111
+        bad_state = 0b1001
 
         nchoosek = SpinConserve._compute_nchoosek(L, k)
 
@@ -315,10 +314,7 @@ class TestSpinConserve(ut.TestCase):
 
         idxs = SpinConserve._state_to_idx(correct, L, k, nchoosek, spinflip=+1)
         for i, idx in enumerate(idxs):
-            if i < len(correct)//2:
-                self.assertEqual(i, idx)
-            else:
-                self.assertEqual(len(correct)-i-1, idx)
+            self.assertEqual(i, idx)
 
         correct[2] = bad_state
         idxs = SpinConserve._state_to_idx(correct, L, k, nchoosek, spinflip=+1)
@@ -332,26 +328,18 @@ class TestSpinConserve(ut.TestCase):
             0b0011,
             0b0101,
             0b0110,
-            0b1001,
-            0b1010,
-            0b1100,
         ], dtype=dnm_int_t)
 
-        bad_state = 0b0111
+        bad_state = 0b1001
 
         nchoosek = SpinConserve._compute_nchoosek(L, k)
 
-        idxs, signs = SpinConserve._state_to_idx(correct, L, k, nchoosek, spinflip=-1)
-        for i, (idx, sign) in enumerate(zip(idxs, signs)):
-            if i < len(correct)//2:
-                self.assertEqual(i, idx)
-                self.assertEqual(sign, +1)
-            else:
-                self.assertEqual(len(correct)-i-1, idx)
-                self.assertEqual(sign, -1)
+        idxs = SpinConserve._state_to_idx(correct, L, k, nchoosek, spinflip=-1)
+        for i, idx in enumerate(idxs):
+            self.assertEqual(i, idx)
 
         correct[2] = bad_state
-        idxs, signs = SpinConserve._state_to_idx(correct, L, k, nchoosek, spinflip=-1)
+        idxs = SpinConserve._state_to_idx(correct, L, k, nchoosek, spinflip=-1)
         self.assertEqual(idxs[2], -1)
 
     def test_spinflip_exception(self):
@@ -374,6 +362,131 @@ class TestSpinConserve(ut.TestCase):
                 sp1 = Auto(H, state, sort=True)
                 sp2 = SpinConserve(len(state), state.count('D'))
                 self.assertEqual(sp1, sp2)
+
+    @classmethod
+    def msc_from_array(cls, ary):
+        msc = [(int(m, 2), int(s, 2), c) for m, s, c in ary]
+        return np.array(msc, copy=False, dtype=msc_dtype)
+
+    def check_reduce_msc_equal(self, initial, correct, spinflip, L, conserves):
+        mock_subsp = Mock()
+        mock_subsp.spinflip = spinflip
+        mock_subsp.L = 4
+
+        check_msc, conserved = SpinConserve.reduce_msc(
+            mock_subsp,
+            self.msc_from_array(initial),
+            check_conserves=True
+        )
+        correct_msc = self.msc_from_array(correct)
+
+        self.assertTrue(
+            np.array_equal(check_msc, correct_msc),
+            msg=f'\n{check_msc}\n\n{correct_msc}\n'
+        )
+        self.assertEqual(conserved, conserves)
+
+    def test_reduce_msc_flip_sign(self):
+        initial = [
+            ('0011', '0000', 0.75),
+            ('1100', '0000', 0.25),
+        ]
+
+        for spinflip in (1, -1):
+            with self.subTest(spinflip=spinflip):
+                correct = [
+                    ('0011', '0000', 0.75+spinflip*0.25),
+                ]
+
+                self.check_reduce_msc_equal(
+                    initial, correct, spinflip, 4, True
+                )
+
+    def test_reduce_msc_flip_sign_cancel(self):
+        initial = [
+            ('0011', '0000', 1),
+            ('1100', '0000', 1),
+        ]
+
+        for spinflip in (1, -1):
+            with self.subTest(spinflip=spinflip):
+                if spinflip == 1:
+                    correct = [
+                        ('0011', '0000', 2),
+                    ]
+                else:
+                    correct = [
+                    ]
+
+                self.check_reduce_msc_equal(
+                    initial, correct, spinflip, 4, True
+                )
+
+    def test_reduce_msc_flip_odd_Z(self):
+        initial = [
+            ('0000', '0001', 1),
+            ('0000', '1101', 1),
+            ('0000', '1110', 1),
+        ]
+
+        for spinflip in (1, -1):
+            with self.subTest(spinflip=spinflip):
+                correct = [
+                ]
+
+                self.check_reduce_msc_equal(
+                    initial, correct, spinflip, 4, False
+                )
+
+    def test_reduce_msc_flip_even_Z(self):
+        initial = [
+            ('0000', '0011', 1),
+            ('0000', '1001', 1),
+            ('0000', '1111', 1),
+        ]
+
+        for spinflip in (1, -1):
+            with self.subTest(spinflip=spinflip):
+                correct = [
+                    ('0000', '0011', 1),
+                    ('0000', '1001', 1),
+                    ('0000', '1111', 1),
+                ]
+
+                self.check_reduce_msc_equal(
+                    initial, correct, spinflip, 4, True
+                )
+
+    def test_reduce_msc_flip_XZ(self):
+        initial = [
+            ('1100', '0011', 1),
+        ]
+
+        for spinflip in (1, -1):
+            with self.subTest(spinflip=spinflip):
+                correct = [
+                    ('0011', '0011', spinflip),
+                ]
+
+                self.check_reduce_msc_equal(
+                    initial, correct, spinflip, 4, True
+                )
+
+    def test_reduce_msc_flip_XYZ(self):
+        initial = [
+            ('0011', '0011', 0.75),
+            ('1100', '0011', 0.25),
+        ]
+
+        for spinflip in (1, -1):
+            with self.subTest(spinflip=spinflip):
+                correct = [
+                    ('0011', '0011', 0.75+spinflip*0.25),
+                ]
+
+                self.check_reduce_msc_equal(
+                    initial, correct, spinflip, 4, True
+                )
 
 
 class TestRCM(ut.TestCase):

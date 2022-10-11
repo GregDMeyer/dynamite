@@ -63,14 +63,7 @@ def msc_to_numpy(msc, dims, idx_to_state=None, state_to_idx=None, sparse=True):
     for row_idx in range(dims[0]):
         ket = idx_to_state(row_idx)
         bra = msc['masks'] ^ ket
-        s2i_result = state_to_idx(bra)
-
-        if isinstance(s2i_result, tuple):
-            col_idx, signs = s2i_result
-        else:
-            col_idx = s2i_result
-            signs = None
-
+        col_idx = state_to_idx(bra)
         good = np.nonzero(col_idx != -1)[0]
         nnew = len(good)
         if nnew == 0:
@@ -79,9 +72,6 @@ def msc_to_numpy(msc, dims, idx_to_state=None, state_to_idx=None, sparse=True):
         good_col_idx = col_idx[good]
         good_bras = bra[good]
         sign = 1 - 2*(parity(msc['signs'][good] & good_bras))
-
-        if signs is not None:
-            sign *= signs[good]
 
         nnew = len(good)
         data[mat_idx:mat_idx+nnew] = sign * msc['coeffs'][good]

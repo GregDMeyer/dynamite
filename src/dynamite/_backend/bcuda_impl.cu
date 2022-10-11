@@ -87,7 +87,7 @@ PetscErrorCode DestroySubspaceData_CUDA_SpinConserve(data_SpinConserve* data) {
   return 0;
 }
 
-__device__ PetscInt S2I_CUDA_SpinConserve(PetscInt state, PetscInt* sign, const data_SpinConserve* data) {
+__device__ PetscInt S2I_CUDA_SpinConserve(PetscInt state, const data_SpinConserve* data) {
   PetscInt n, k=0, idx=0;
 
   if (state >> data->L) return (PetscInt)(-1);
@@ -98,16 +98,6 @@ __device__ PetscInt S2I_CUDA_SpinConserve(PetscInt state, PetscInt* sign, const 
     k++;
     if (k <= n) idx += data->nchoosek[k*data->ld_nchoosek + n];
     state &= state-1;  // pop least significant bit off of state
-  }
-
-  *sign = 1;
-  PetscInt dim;
-  if (data->spinflip) {
-    dim = data->nchoosek[data->k*data->ld_nchoosek + data->L]/2;
-    if (idx >= dim) {
-      idx = 2*dim - idx - 1;
-      *sign = data->spinflip;
-    }
   }
 
   return idx;

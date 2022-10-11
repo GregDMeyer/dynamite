@@ -133,30 +133,32 @@ class SubspaceConservation(dtr.DynamiteTestCase):
                 op.conserves(Parity('odd'), Parity('even'))
             )
 
-    def test_change_spinflip(self):
-        """
-        Test operators that take us from one spinflip value to the other
-        """
-        L = config.L
-        if L % 2 != 0:
-            self.skipTest("only for even spin chain lengths")
-        k = config.L//2
+    # Switching the value of spinflip is currently not supported, but could be
+    # in the future
+    # def test_change_spinflip(self):
+    #     """
+    #     Test operators that take us from one spinflip value to the other
+    #     """
+    #     L = config.L
+    #     if L % 2 != 0:
+    #         self.skipTest("only for even spin chain lengths")
+    #     k = config.L//2
 
-        op = sigmaz()
+    #     op = sigmaz()
 
-        self.assertTrue(
-            op.conserves(
-                SpinConserve(config.L, k, spinflip='+'),
-                SpinConserve(config.L, k, spinflip='-')
-            )
-        )
+    #     self.assertTrue(
+    #         op.conserves(
+    #             SpinConserve(config.L, k, spinflip='+'),
+    #             SpinConserve(config.L, k, spinflip='-')
+    #         )
+    #     )
 
-        self.assertTrue(
-            op.conserves(
-                SpinConserve(config.L, k, spinflip='-'),
-                SpinConserve(config.L, k, spinflip='+')
-            )
-        )
+    #     self.assertTrue(
+    #         op.conserves(
+    #             SpinConserve(config.L, k, spinflip='-'),
+    #             SpinConserve(config.L, k, spinflip='+')
+    #         )
+    #     )
 
     def test_full_to_others(self):
         """

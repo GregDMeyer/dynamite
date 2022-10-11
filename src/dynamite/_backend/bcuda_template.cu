@@ -178,10 +178,6 @@ __global__ void C(device_MatMult,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
   PetscReal sign;
   PetscInt bra, ket, row_idx, col_idx, mask_idx, term_idx, this_start;
 
-#if C(RIGHT_SUBSPACE,SP) == SpinConserve_SP
-  PetscInt s2i_sign;
-#endif
-
   this_start = vec_start_index + threadIdx.x;
 
   for (row_idx = this_start; row_idx < vec_stop_index; row_idx += blockDim.x) {
@@ -206,31 +202,14 @@ __global__ void C(device_MatMult,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
         }
       }
 
-#if C(RIGHT_SUBSPACE,SP) == SpinConserve_SP
-      col_idx = C(S2I_CUDA,RIGHT_SUBSPACE)(bra, &s2i_sign, right_subspace_data);
-      tmp *= s2i_sign;
-#else
       col_idx = C(S2I_CUDA,RIGHT_SUBSPACE)(bra, right_subspace_data);
-#endif
 
       if (col_idx != -1) {
 	val += tmp * xarray[col_idx];
       }
     }
 
-#if C(RIGHT_SUBSPACE,SP) == SpinConserve_SP
-    // need to use atomics
-    if (right_subspace_data->spinflip) {
-      PetscReal* r = (PetscReal *)(&(barray[row_idx]));
-      PetscReal* c = r+1;
-      atomicAdd(r, val.real());
-      atomicAdd(c, val.imag());
-    } else {
-      barray[row_idx] = val;
-    }
-#else
     barray[row_idx] = val;
-#endif
 
   }
 }
@@ -315,10 +294,6 @@ __global__ void C(device_MatNorm,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
   PetscScalar csum;
   PetscInt ket, bra, row_idx, mask_idx, term_idx, i;
 
-#if C(RIGHT_SUBSPACE,SP) == SpinConserve_SP
-  PetscInt s2i_sign;
-#endif
-
   /* first find this thread's max and put it in threadmax */
 
   threadmax[threadIdx.x] = 0;
@@ -329,11 +304,7 @@ __global__ void C(device_MatNorm,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
       csum = 0;
       bra = ket ^ masks[mask_idx];
 
-#if C(RIGHT_SUBSPACE,SP) == SpinConserve_SP
-      if (C(S2I_CUDA,RIGHT_SUBSPACE)(bra, &s2i_sign, right_subspace_data) == -1) {
-#else
       if (C(S2I_CUDA,RIGHT_SUBSPACE)(bra, right_subspace_data) == -1) {
-#endif
 	continue;
       }
 

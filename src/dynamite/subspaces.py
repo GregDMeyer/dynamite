@@ -12,7 +12,8 @@ import math
 
 from . import validate, states, config
 from ._backend import bsubspace
-from .msc_tools import dnm_int_t
+from .msc_tools import dnm_int_t, combine_and_sort
+from .bitwise import parity
 
 class Subspace:
     '''
@@ -87,6 +88,31 @@ class Subspace:
         states are product states.
         """
         return self._product_state_basis
+
+    def reduce_msc(self, msc, check_conserves=False):
+        """
+        Return an equivalent (in the subspace) but simpler MSC representation
+        for the operator, by taking advantage of the subspace's symmetries.
+
+        Parameters
+        ----------
+
+        msc : dynamite.msc_tools.msc_dtype
+            The input MSC representation
+
+        check_conserves : bool
+            Whether to return whether the operator was conserved
+
+        Returns
+        -------
+
+        dynamite.msc_tools.msc_dtype
+            The reduced version
+
+        bool
+            Whether the operator was conserved during the operation
+        """
+        raise NotImplementedError
 
     @classmethod
     def _numeric_to_array(cls, x):
@@ -373,6 +399,32 @@ class SpinConserve(Subspace):
             return False
 
         return True
+
+    def reduce_msc(self, msc, check_conserves=False):
+        if self.spinflip == 0:
+            raise NotImplementedError("reduce_msc should not be called when "
+                                      "not using the additional spinflip "
+                                      "subspace")
+
+        msc = msc.copy()
+
+        # delete elements which do not commute with symmetry operator
+        keep = parity(msc['signs']) == 0
+        conserved = np.all(keep)
+        msc = msc[keep]
+
+        terms_to_mod = np.nonzero(msc['masks'] >> (self.L-1))
+        msc['masks'][terms_to_mod] ^= (1 << self.L) - 1
+
+        if self.spinflip == -1:
+            msc['coeffs'][terms_to_mod] *= -1
+
+        msc = combine_and_sort(msc)
+
+        if check_conserves:
+            return msc, conserved
+        else:
+            return msc
 
     @property
     def spinflip(self):

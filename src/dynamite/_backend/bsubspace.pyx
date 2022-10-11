@@ -49,7 +49,7 @@ cdef extern from "bsubspace_impl.h":
     void I2S_Parity_array(int n, const data_Parity* data, const PetscInt* idxs, PetscInt* states);
 
     PetscInt Dim_SpinConserve(const data_SpinConserve* data);
-    void S2I_SpinConserve_array(int n, const data_SpinConserve* data, const PetscInt* states, PetscInt* idxs, PetscInt* signs);
+    void S2I_SpinConserve_array(int n, const data_SpinConserve* data, const PetscInt* states, PetscInt* idxs);
     void I2S_SpinConserve_array(int n, const data_SpinConserve* data, const PetscInt* idxs, PetscInt* states);
 
     PetscInt Dim_Explicit(const data_Explicit* data);
@@ -196,17 +196,8 @@ def state_to_idx_Parity(PetscInt [:] states, CParity data):
 def state_to_idx_SpinConserve(PetscInt [:] states, CSpinConserve data):
     idxs_np = np.ndarray(states.size, dtype=dnm_int_t)
     cdef PetscInt [:] idxs = idxs_np
-    cdef PetscInt [:] signs
-
-    if data.data[0].spinflip == -1:
-        signs_np = np.ndarray(states.size, dtype=dnm_int_t)
-        signs = signs_np
-        S2I_SpinConserve_array(states.size, data.data, &states[0], &idxs[0], &signs[0])
-        return idxs_np, signs_np
-
-    else:
-        S2I_SpinConserve_array(states.size, data.data, &states[0], &idxs[0], NULL)
-        return idxs_np
+    S2I_SpinConserve_array(states.size, data.data, &states[0], &idxs[0])
+    return idxs_np
 
 def state_to_idx_Explicit(PetscInt [:] states, CExplicit data):
     idxs_np = np.ndarray(states.size, dtype = dnm_int_t)

@@ -384,16 +384,23 @@ class Operator:
         if right is None:
             right = left
 
-        if left.product_state_basis != right.product_state_basis:
-            raise ValueError('left and right subspaces incompatible---either '
-                             'both must be a product state basis or neither')
+        if not left.product_state_basis or not right.product_state_basis:
+            if left is not right:
+                raise ValueError('if left or right subspace is not a product '
+                                 'state basis, they must be identical')
 
         left.L = self.L
         right.L = self.L
 
         self.reduce_msc()
+        if not left.product_state_basis:
+            msc, conserved = left.reduce_msc(self.msc, check_conserves=True)
+            if not conserved:
+                return False
+        else:
+            msc = self.msc
 
-        masks, mask_offsets = self._get_mask_offsets()
+        masks, mask_offsets = self._get_mask_offsets(msc)
 
         config._initialize()
         from ._backend import bpetsc
@@ -401,8 +408,8 @@ class Operator:
         return bpetsc.check_conserves(
             masks=masks,
             mask_offsets=mask_offsets,
-            signs=np.ascontiguousarray(self.msc['signs']),
-            coeffs=np.ascontiguousarray(self.msc['coeffs']),
+            signs=np.ascontiguousarray(msc['signs']),
+            coeffs=np.ascontiguousarray(msc['coeffs']),
             left_type=left.to_enum(),
             left_data=left.get_cdata(),
             right_type=right.to_enum(),
@@ -575,7 +582,13 @@ class Operator:
         from ._backend import bpetsc
 
         self.reduce_msc()
-        self._check_consistent_msc()
+
+        if not subspaces[0].product_state_basis:
+            msc = self.subspace.reduce_msc(self.msc)
+        else:
+            msc = self.msc
+
+        self._check_consistent_msc(msc)
 
         if not self.allow_projection and not self.conserves(*subspaces):
             raise ValueError("Constructing the operator's matrix on this "
@@ -584,27 +597,28 @@ class Operator:
                              "behavior is desired, set the "
                              "Operator.allow_projection parameter to True.")
 
-        if not msc_tools.is_hermitian(self.msc):
+        if not msc_tools.is_hermitian(msc):
             raise ValueError('Building non-Hermitian matrices currently not supported.')
 
-        masks, mask_offsets = self._get_mask_offsets()
+        masks, mask_offsets = self._get_mask_offsets(msc)
 
         mat = bpetsc.build_mat(
-            masks = np.ascontiguousarray(masks),
-            mask_offsets = np.ascontiguousarray(mask_offsets),
-            signs = np.ascontiguousarray(self.msc['signs']),
-            coeffs = np.ascontiguousarray(self.msc['coeffs']),
-            left_type = subspaces[0].to_enum(),
-            left_data = subspaces[0].get_cdata(),
-            right_type = subspaces[1].to_enum(),
-            right_data = subspaces[1].get_cdata(),
-            shell = self.shell,
-            gpu = config.gpu
+            masks=np.ascontiguousarray(masks),
+            mask_offsets=np.ascontiguousarray(mask_offsets),
+            signs=np.ascontiguousarray(msc['signs']),
+            coeffs=np.ascontiguousarray(msc['coeffs']),
+            left_type=subspaces[0].to_enum(),
+            left_data=subspaces[0].get_cdata(),
+            right_type=subspaces[1].to_enum(),
+            right_data=subspaces[1].get_cdata(),
+            shell=self.shell,
+            gpu=config.gpu
         )
 
         self._mats[subspaces] = mat
 
-    def _check_consistent_msc(self):
+    @classmethod
+    def _check_consistent_msc(cls, msc):
         config._initialize()
         from petsc4py import PETSc
 
@@ -614,7 +628,7 @@ class Operator:
 
         comm = PETSc.COMM_WORLD.tompi4py()
 
-        checksum = crc32(self.msc.data)
+        checksum = crc32(msc.data)
         all_checksums = comm.allgather(checksum)
 
         if not all(v == all_checksums[0] for v in all_checksums):
@@ -623,20 +637,21 @@ class Operator:
                 "numbers with inconsistent seeds?"
             raise RuntimeError(msg)
 
-    def _get_mask_offsets(self):
+    @classmethod
+    def _get_mask_offsets(cls, msc):
         """
         Return an array of unique mask values, and the indices where each starts
         """
-        if not self.is_reduced:
-            raise RuntimeError('must reduce MSC first')
+        if not np.all(np.diff(msc['masks']) >= 0):
+            raise ValueError('msc must be sorted first')
 
-        masks, indices = np.unique(self.msc['masks'], return_index=True)
+        masks, indices = np.unique(msc['masks'], return_index=True)
 
         # need to add the last index
         mask_offsets = np.ndarray((indices.size+1,),
-                                  dtype=self.msc.dtype['masks'])
+                                  dtype=msc.dtype['masks'])
         mask_offsets[:-1] = indices
-        mask_offsets[-1] = self.msc.shape[0]
+        mask_offsets[-1] = msc.shape[0]
 
         return masks, mask_offsets
 
@@ -841,7 +856,14 @@ class Operator:
         if subspaces is None:
             subspaces = (self.left_subspace, self.right_subspace)
 
-        ary = msc_tools.msc_to_numpy(self.msc,
+        self.reduce_msc()
+
+        if not subspaces[0].product_state_basis:
+            msc = self.subspace.reduce_msc(self.msc)
+        else:
+            msc = self.msc
+
+        ary = msc_tools.msc_to_numpy(msc,
                                      (subspaces[0].get_dimension(),
                                       subspaces[1].get_dimension()),
                                      subspaces[0].idx_to_state,

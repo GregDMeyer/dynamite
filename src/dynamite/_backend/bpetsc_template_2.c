@@ -55,10 +55,6 @@ PetscErrorCode C(BuildPetsc,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
   PetscInt row_idx, ket, col_idx, bra, sign;
   PetscScalar value;
 
-#if C(RIGHT_SUBSPACE,SP) == SpinConserve_SP
-  PetscInt s2i_sign;
-#endif
-
   PetscCallMPI(MPI_Comm_size(PETSC_COMM_WORLD, &mpi_size));
 
   /* N is dimension of right subspace, M of left */
@@ -102,11 +98,7 @@ PetscErrorCode C(BuildPetsc,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
     for (mask_idx = 0; mask_idx < msc->nmasks; mask_idx++) {
       bra = ket ^ msc->masks[mask_idx];
 
-#if C(RIGHT_SUBSPACE,SP) == SpinConserve_SP
-      col_idx = C(S2I,RIGHT_SUBSPACE)(bra, &s2i_sign, right_subspace_data);
-#else
       col_idx = C(S2I,RIGHT_SUBSPACE)(bra, right_subspace_data);
-#endif
       if (col_idx == -1) {
         continue;
       }
@@ -118,17 +110,13 @@ PetscErrorCode C(BuildPetsc,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
         value += sign * msc->coeffs[term_idx];
       }
 
-#if C(RIGHT_SUBSPACE,SP) == SpinConserve_SP
-      value *= s2i_sign;
-#endif
-
       row_count++;
-      PetscCall(MatSetValue(*A, row_idx, col_idx, value, ADD_VALUES));
+      PetscCall(MatSetValue(*A, row_idx, col_idx, value, INSERT_VALUES));
     }
 
     /* workaround for a bug in PETSc that triggers if there are empty rows */
     if (row_count == 0) {
-      PetscCall(MatSetValue(*A, row_idx, col_start, 0, ADD_VALUES));
+      PetscCall(MatSetValue(*A, row_idx, col_start, 0, INSERT_VALUES));
     }
   }
 
@@ -172,11 +160,7 @@ PetscErrorCode C(ComputeNonzeros,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))
     state = C(I2S,LEFT_SUBSPACE)(row_idx+row_start, left_subspace_data);
     for (mask_idx = 0; mask_idx < msc->nmasks; ++mask_idx) {
 
-#if C(RIGHT_SUBSPACE,SP) == SpinConserve_SP
-      col_idx = C(S2I,RIGHT_SUBSPACE)(state^msc->masks[mask_idx], NULL, right_subspace_data);
-#else
       col_idx = C(S2I,RIGHT_SUBSPACE)(state^msc->masks[mask_idx], right_subspace_data);
-#endif
 
       if (col_idx == -1) {
         /* this term is outside the subspace */
@@ -322,10 +306,6 @@ PetscErrorCode C(MatMult_CPU_General,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, Vec
   PetscInt row_start, row_end, col_start, col_end, col_idx;
   PetscInt ket, bra, sign, row_idx, cache_idx, mask_idx, term_idx;
 
-#if C(LEFT_SUBSPACE,SP) == SpinConserve_SP
-  PetscInt s2i_sign;
-#endif
-
   PetscInt *row_idxs;
   PetscScalar value;
   const PetscScalar *local_x_array;
@@ -381,11 +361,7 @@ PetscErrorCode C(MatMult_CPU_General,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, Vec
       for (mask_idx=0; mask_idx<ctx->nmasks; mask_idx++) {
 	bra = ket ^ ctx->masks[mask_idx];
 
-#if C(LEFT_SUBSPACE,SP) == SpinConserve_SP
-	row_idx = C(S2I,LEFT_SUBSPACE)(bra, &s2i_sign, ctx->left_subspace_data);
-#else
   	row_idx = C(S2I,LEFT_SUBSPACE)(bra, ctx->left_subspace_data);
-#endif
 
 	if (row_idx == -1) continue;
 
@@ -402,10 +378,6 @@ PetscErrorCode C(MatMult_CPU_General,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, Vec
 	if (cache_idx >= VECSET_CACHE_SIZE) {
 	  SETERRQ(MPI_COMM_SELF, PETSC_ERR_MEMC, "cache out of bounds, value %d", cache_idx);
 	}
-
-#if C(LEFT_SUBSPACE,SP) == SpinConserve_SP
-	value *= s2i_sign;
-#endif
 
 	row_idxs[cache_idx] = row_idx;
 	to_send[cache_idx] = value * local_x_array[col_idx-col_start];
@@ -468,9 +440,6 @@ void C(MatMult_CPU_kernel,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
   PetscInt row_idx, ket, col_idx, bra;
   PetscInt mask_idx, term_idx;
   PetscInt sign;
-#if C(RIGHT_SUBSPACE,SP) == SpinConserve_SP
-  PetscInt s2i_sign=0;
-#endif
   PetscScalar value;
 
   for (row_idx = row_start; row_idx < row_end; ++row_idx) {
@@ -479,11 +448,7 @@ void C(MatMult_CPU_kernel,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
     for (mask_idx = 0; mask_idx < ctx->nmasks; mask_idx++) {
       bra = ket ^ ctx->masks[mask_idx];
 
-#if C(RIGHT_SUBSPACE,SP) == SpinConserve_SP
-      col_idx = C(S2I,RIGHT_SUBSPACE)(bra, &s2i_sign, ctx->right_subspace_data);
-#else
       col_idx = C(S2I,RIGHT_SUBSPACE)(bra, ctx->right_subspace_data);
-#endif
 
       /* yikes */
       if (col_idx < col_start || col_idx >= col_end) continue;
@@ -498,9 +463,6 @@ void C(MatMult_CPU_kernel,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
           value += I * sign * ctx->real_coeffs[term_idx];
         }
       }
-#if C(RIGHT_SUBSPACE,SP) == SpinConserve_SP
-      value *= s2i_sign;
-#endif
       b_array[row_idx - row_start] += value * x_array[col_idx - col_start];
     }
   }
@@ -926,11 +888,7 @@ PetscErrorCode C(MatNorm_CPU,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
 
       bra = ket ^ ctx->masks[mask_idx];
 
-#if C(RIGHT_SUBSPACE,SP) == SpinConserve_SP
-      if (C(S2I,RIGHT_SUBSPACE)(bra, NULL, ctx->right_subspace_data) == -1) {
-#else
       if (C(S2I,RIGHT_SUBSPACE)(bra, ctx->right_subspace_data) == -1) {
-#endif
 	continue;
       }
 
@@ -948,10 +906,6 @@ PetscErrorCode C(MatNorm_CPU,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
         }
       }
 
-      // extra s2i sign of csum doesn't matter because we are
-      // immediately taking the absolute value
-      // TODO: handle the extreme edge case in which two different terms collide
-      // onto the same matrix element.
       comp = PetscAbsComplex(csum) - sum_err;
       total = sum + comp;
       sum_err = (total - sum) - comp;
@@ -971,6 +925,11 @@ PetscErrorCode C(MatNorm_CPU,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
   return 0;
 }
 
+/*
+ * This function checks whether an operator (represented as MSC) conserves the given
+ * subspaces. It assumes a product state basis; extra conservation laws (such as the
+ * extra Z2 symmetry in SpinConserve+spinflip) need to be checked externally.
+ */
 #undef  __FUNCT__
 #define __FUNCT__ "CheckConserves"
 PetscErrorCode C(CheckConserves,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
@@ -984,16 +943,6 @@ PetscErrorCode C(CheckConserves,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
   PetscInt mask_idx, term_idx;
   PetscInt row_idx, ket, col_idx, bra, sign;
   PetscScalar value;
-
-#if C(LEFT_SUBSPACE,SP) == SpinConserve_SP && C(RIGHT_SUBSPACE,SP) == SpinConserve_SP
-  PetscInt bra_complement;
-  PetscScalar value_complement;
-  PetscInt switch_spinflip;
-
-  /* whether left and right have different values */
-  switch_spinflip = left_subspace_data->spinflip*right_subspace_data->spinflip;
-#endif
-
   PetscInt local_result;
 
   /* dimension of right subspace */
@@ -1011,30 +960,16 @@ PetscErrorCode C(CheckConserves,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
 
     /* each term looks like value*|ket><bra| */
     bra = C(I2S,RIGHT_SUBSPACE)(col_idx, right_subspace_data);
-#if C(LEFT_SUBSPACE,SP) == SpinConserve_SP && C(RIGHT_SUBSPACE,SP) == SpinConserve_SP
-    bra_complement = bra ^ ((1<<left_subspace_data->L)-1);
-#endif
 
     for (mask_idx=0; mask_idx<msc->nmasks; mask_idx++) {
       ket = bra ^ msc->masks[mask_idx];
 
-#if C(LEFT_SUBSPACE,SP) == SpinConserve_SP
-      row_idx = C(S2I,LEFT_SUBSPACE)(ket, NULL, left_subspace_data);
-#else
       row_idx = C(S2I,LEFT_SUBSPACE)(ket, left_subspace_data);
-#endif
 
       /* in this case, it mapped onto a row that was in the subspace, so we're good */
-      /* (except spinflip, which needs extra sign checks) */
-#if C(LEFT_SUBSPACE,SP) == SpinConserve_SP && C(RIGHT_SUBSPACE,SP) == SpinConserve_SP
-      if (row_idx != -1 && !left_subspace_data->spinflip) {
-        continue;
-      }
-#else
       if (row_idx != -1) {
         continue;
       }
-#endif
 
       /* otherwise, if the sum of all terms for this matrix element is 0, we're OK */
       value = 0;
@@ -1043,42 +978,11 @@ PetscErrorCode C(CheckConserves,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
         value += sign * msc->coeffs[term_idx];
       }
 
-      /* for spinflip, we need to make sure that the value and its complement have the correct sign change */
-#if C(LEFT_SUBSPACE,SP) == SpinConserve_SP && C(RIGHT_SUBSPACE,SP) == SpinConserve_SP
-      value_complement = 0;
-      if (left_subspace_data->spinflip) {
-	for (term_idx=msc->mask_offsets[mask_idx]; term_idx<msc->mask_offsets[mask_idx+1]; ++term_idx) {
-	  sign = 1 - 2*(builtin_parity(bra_complement & msc->signs[term_idx]));
-	  value_complement += sign * msc->coeffs[term_idx];
-	}
-      }
-#endif
-
       /* if value == 0, we can just forget about it and continue */
-#if C(LEFT_SUBSPACE,SP) == SpinConserve_SP && C(RIGHT_SUBSPACE,SP) == SpinConserve_SP
-      if (value != 0 || value_complement != 0) {
-	if (!left_subspace_data->spinflip) {
-	  /* no spinflip, we're just like all the other subspaces */
-	  local_result = 0;
-	  break;
-	}
-	/* this row isn't included but the values were nonzero */
-	else if (row_idx == -1) {
-	  local_result = 0;
-	  break;
-	}
-	/* in this case we have to make sure the signs are right */
-	else if (value*switch_spinflip != value_complement) {
-	  local_result = 0;
-	  break;
-	}
-      }
-#else
       if (value != 0) {
 	local_result = 0;
 	break;
       }
-#endif
     }
     if (!local_result) break;
   }
