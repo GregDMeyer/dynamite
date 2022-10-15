@@ -56,13 +56,6 @@ PetscErrorCode C(ComputeNonzeros,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
 PetscErrorCode C(MatMult_CPU,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, Vec x, Vec b);
 
 /*
- * MatMult kernel for CPU shell matrices.
- */
-void C(MatMult_CPU_kernel,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
-  const PetscScalar* x_array, PetscScalar* b_array, shell_context *ctx,
-  PetscInt row_start, PetscInt row_end, PetscInt col_start, PetscInt col_end);
-
-/*
  * MatNorm for CPU shell matrices.
  */
 PetscErrorCode C(MatNorm_CPU,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
