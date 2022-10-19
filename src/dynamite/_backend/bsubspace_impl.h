@@ -303,29 +303,17 @@ static inline PetscInt S2I_Explicit(PetscInt state, const data_Explicit* data) {
   PetscInt left, right, mid;
   left = 0;
   right = data->dim-1;
-  
-  if (data->rmap_indices == NULL) {
-    while (left <= right) {
-      mid = (left + right)/2;
-      if (data->rmap_states[mid] == state) {
-        return mid;
-      }
-
-      if (data->rmap_states[mid] < state) {
-        left = mid + 1;
-      }
-      else {
-        right = mid - 1;
-      }
-    }
-  }
 
   while (left <= right) {
     mid = (left + right)/2;
     if (data->rmap_states[mid] == state) {
-      return data->rmap_indices[mid];
+      if (data->rmap_indices != NULL) {
+        return data->rmap_indices[mid];
+      }
+      else {
+        return mid;
+      }
     }
-
     if (data->rmap_states[mid] < state) {
       left = mid + 1;
     }
