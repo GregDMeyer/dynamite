@@ -329,12 +329,36 @@ PetscErrorCode C(MatMult_CPU_General,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, Vec
   PetscCall(VecGetOwnershipRange(x, &col_start, &col_end));
   PetscCall(VecGetOwnershipRange(b, &row_start, &row_end));
 
-  /* if there is only one process, just do one call to the kernel */
   if (mpi_size == 1) {
     PetscCall(VecGetArray(b, &(b_array)));
 
-    C(MatMult_CPU_kernel,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
-      local_x_array, b_array, ctx, row_start, row_end, col_start, col_end);
+    for (row_idx = row_start; row_idx < row_end; ++row_idx) {
+      if (row_idx==row_start) {
+        ket = C(I2S,LEFT_SUBSPACE)(row_idx, ctx->left_subspace_data);
+      } else {
+        ket = C(NextState,LEFT_SUBSPACE)(ket, row_idx, ctx->left_subspace_data);
+      }
+
+      for (mask_idx = 0; mask_idx < ctx->nmasks; mask_idx++) {
+        bra = ket ^ ctx->masks[mask_idx];
+
+        col_idx = C(S2I,RIGHT_SUBSPACE)(bra, ctx->right_subspace_data);
+        
+        if (col_idx == -1) continue;
+
+        /* sum all terms for this matrix element */
+        value = 0;
+        for (term_idx = ctx->mask_offsets[mask_idx]; term_idx < ctx->mask_offsets[mask_idx+1]; ++term_idx) {
+          sign = 1 - 2*(builtin_parity(bra & ctx->signs[term_idx]));
+          if (TERM_REAL(ctx->masks[mask_idx], ctx->signs[term_idx])) {
+            value += sign * ctx->real_coeffs[term_idx];
+          } else {
+            value += I * sign * ctx->real_coeffs[term_idx];
+          }
+        }
+        b_array[row_idx - row_start] += value * local_x_array[col_idx - col_start];
+      }
+    }
 
     PetscCall(VecRestoreArray(b, &b_array));
   }
@@ -426,46 +450,6 @@ PetscErrorCode C(MatMult_CPU_General,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, Vec
   PetscCall(VecRestoreArrayRead(x, &local_x_array));
 
   return 0;
-}
-
-#undef  __FUNCT__
-#define __FUNCT__ "MatMult_CPU_kernel"
-/*
- * MatMult kernel for CPU shell matrices.
- */
-void C(MatMult_CPU_kernel,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
-  const PetscScalar* x_array, PetscScalar* b_array, shell_context *ctx,
-  PetscInt row_start, PetscInt row_end, PetscInt col_start, PetscInt col_end)
-{
-  PetscInt row_idx, ket, col_idx, bra;
-  PetscInt mask_idx, term_idx;
-  PetscInt sign;
-  PetscScalar value;
-
-  for (row_idx = row_start; row_idx < row_end; ++row_idx) {
-    ket = C(I2S,LEFT_SUBSPACE)(row_idx, ctx->left_subspace_data);
-
-    for (mask_idx = 0; mask_idx < ctx->nmasks; mask_idx++) {
-      bra = ket ^ ctx->masks[mask_idx];
-
-      col_idx = C(S2I,RIGHT_SUBSPACE)(bra, ctx->right_subspace_data);
-
-      /* yikes */
-      if (col_idx < col_start || col_idx >= col_end) continue;
-
-      /* sum all terms for this matrix element */
-      value = 0;
-      for (term_idx = ctx->mask_offsets[mask_idx]; term_idx < ctx->mask_offsets[mask_idx+1]; ++term_idx) {
-        sign = 1 - 2*(builtin_parity(bra & ctx->signs[term_idx]));
-        if (TERM_REAL(ctx->masks[mask_idx], ctx->signs[term_idx])) {
-          value += sign * ctx->real_coeffs[term_idx];
-        } else {
-          value += I * sign * ctx->real_coeffs[term_idx];
-        }
-      }
-      b_array[row_idx - row_start] += value * x_array[col_idx - col_start];
-    }
-  }
 }
 
 /* use the hand-tuned kernel for parity and full subspaces, if we can */
