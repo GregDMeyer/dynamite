@@ -631,7 +631,7 @@ class Explicit(Subspace):
         map_sorted = np.all(self.state_map[:-1] <= self.state_map[1:])
 
         if map_sorted:
-            self.rmap_indices = np.arange(self.state_map.size, dtype=bsubspace.dnm_int_t)
+            self.rmap_indices = np.array([-1], dtype=bsubspace.dnm_int_t)
             self.rmap_states = self.state_map
         else:
             self.rmap_indices = np.argsort(self.state_map).astype(bsubspace.dnm_int_t, copy=False)

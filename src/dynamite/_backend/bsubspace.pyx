@@ -110,7 +110,10 @@ cdef class CExplicit:
         self.data[0].L = L
         self.data[0].dim = state_map.size
         self.data[0].state_map = &state_map[0]
-        self.data[0].rmap_indices = &rmap_indices[0]
+        if rmap_indices[0] != -1:
+            self.data[0].rmap_indices = &rmap_indices[0]
+        else:
+            self.data[0].rmap_indices = NULL
         self.data[0].rmap_states = &rmap_states[0]
 
 #####
