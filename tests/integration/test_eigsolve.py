@@ -101,18 +101,24 @@ class Analytic(Checker):
         H = index_sum(sigmax())
 
         with self.subTest(which = 'smallest'):
-            evals, evecs = H.eigsolve(nev = 2,
+            nev = 2
+            evals, evecs = H.eigsolve(nev = nev,
                                       getvecs = True,
                                       which = 'smallest')
-            self.is_close(evals[0], -H.get_length())
-            self.is_close(evals[1], -H.get_length() + 2)
+            evals_correct = [-H.get_length() + 2*i for i in range(nev)]
+            for i in range(nev):
+                self.is_close(evals[i], evals_correct[i])
+                self.check_is_evec(H, evecs[i], evals[i], tol=1E-10, evec_tol=1E-9)
 
         with self.subTest(which = 'largest'):
-            evals, evecs = H.eigsolve(nev = 2,
+            nev = 2
+            evals, evecs = H.eigsolve(nev = nev,
                                       getvecs = True,
                                       which = 'largest')
-            self.is_close(evals[0], H.get_length())
-            self.is_close(evals[1], H.get_length() - 2)
+            evals_correct = [H.get_length() - 2*i for i in range(nev)]
+            for i in range(nev):
+                self.is_close(evals[i], evals_correct[i])
+                self.check_is_evec(H, evecs[i], evals[i], tol=1E-10, evec_tol=1E-9)
 
 class Hamiltonians(Checker):
 
