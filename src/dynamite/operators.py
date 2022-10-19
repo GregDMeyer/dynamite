@@ -162,7 +162,7 @@ class Operator:
     def L(self, value):
         L = validate.L(value)
         if L < self.max_spin_idx + 1:
-            raise ValueError('Cannot set L smaller than one plus the largest spin index'
+            raise ValueError('Cannot set L smaller than one plus the largest spin index '
                              'on which the operator has support (max_spin_idx = %d)' %
                              (self.max_spin_idx))
         for left, right in self._subspaces:
