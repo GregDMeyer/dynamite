@@ -273,9 +273,11 @@ static inline PetscErrorCode CopySubspaceData_Explicit(data_Explicit** out_p, co
   PetscCall(PetscMalloc1(in->dim, &((*out_p)->state_map)));
   PetscCall(PetscMemcpy((*out_p)->state_map, in->state_map, in->dim*sizeof(PetscInt)));
 
-  PetscCall(PetscMalloc1(in->dim, &((*out_p)->rmap_indices)));
-  PetscCall(PetscMemcpy((*out_p)->rmap_indices, in->rmap_indices, in->dim*sizeof(PetscInt)));
-
+  if (in->rmap_indices != NULL) {
+    PetscCall(PetscMalloc1(in->dim, &((*out_p)->rmap_indices)));
+    PetscCall(PetscMemcpy((*out_p)->rmap_indices, in->rmap_indices, in->dim*sizeof(PetscInt)));
+  }
+  
   PetscCall(PetscMalloc1(in->dim, &((*out_p)->rmap_states)));
   PetscCall(PetscMemcpy((*out_p)->rmap_states, in->rmap_states, in->dim*sizeof(PetscInt)));
 
@@ -284,7 +286,9 @@ static inline PetscErrorCode CopySubspaceData_Explicit(data_Explicit** out_p, co
 
 static inline PetscErrorCode DestroySubspaceData_Explicit(data_Explicit* data) {
   PetscCall(PetscFree(data->state_map));
-  PetscCall(PetscFree(data->rmap_indices));
+  if (data->rmap_indices != NULL) {
+    PetscCall(PetscFree(data->rmap_indices));
+  }
   PetscCall(PetscFree(data->rmap_states));
   PetscCall(PetscFree(data));
   return 0;
@@ -299,12 +303,17 @@ static inline PetscInt S2I_Explicit(PetscInt state, const data_Explicit* data) {
   PetscInt left, right, mid;
   left = 0;
   right = data->dim-1;
+
   while (left <= right) {
     mid = (left + right)/2;
     if (data->rmap_states[mid] == state) {
-      return data->rmap_indices[mid];
+      if (data->rmap_indices != NULL) {
+        return data->rmap_indices[mid];
+      }
+      else {
+        return mid;
+      }
     }
-
     if (data->rmap_states[mid] < state) {
       left = mid + 1;
     }
