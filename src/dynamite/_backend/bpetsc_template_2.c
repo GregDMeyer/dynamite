@@ -330,14 +330,13 @@ PetscErrorCode C(MatMult_CPU_General,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, Vec
   PetscCall(VecGetOwnershipRange(b, &row_start, &row_end));
 
   if (mpi_size == 1) {
-    
     PetscCall(VecGetArray(b, &(b_array)));
 
     for (row_idx = row_start; row_idx < row_end; ++row_idx) {
       if (row_idx==row_start) {
-	      ket = C(I2S,LEFT_SUBSPACE)(row_idx, ctx->left_subspace_data);
+        ket = C(I2S,LEFT_SUBSPACE)(row_idx, ctx->left_subspace_data);
       } else {
-	      ket = C(NextState,LEFT_SUBSPACE)(ket, row_idx, ctx->left_subspace_data);
+        ket = C(NextState,LEFT_SUBSPACE)(ket, row_idx, ctx->left_subspace_data);
       }
 
       for (mask_idx = 0; mask_idx < ctx->nmasks; mask_idx++) {
@@ -345,7 +344,7 @@ PetscErrorCode C(MatMult_CPU_General,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, Vec
 
         col_idx = C(S2I,RIGHT_SUBSPACE)(bra, ctx->right_subspace_data);
         
-	    if (col_idx == -1) continue;
+        if (col_idx == -1) continue;
 
         /* sum all terms for this matrix element */
         value = 0;
