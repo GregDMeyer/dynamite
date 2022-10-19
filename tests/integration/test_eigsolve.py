@@ -102,9 +102,10 @@ class Analytic(Checker):
 
         with self.subTest(which = 'smallest'):
             nev = 2
-            evals, evecs = H.eigsolve(nev = nev,
-                                      getvecs = True,
-                                      which = 'smallest')
+            evals, evecs = H.eigsolve(nev=nev,
+                                      getvecs=True,
+                                      which='smallest',
+                                      tol=1E-10)
             evals_correct = [-H.get_length() + 2*i for i in range(nev)]
             for i in range(nev):
                 self.is_close(evals[i], evals_correct[i])
@@ -112,9 +113,10 @@ class Analytic(Checker):
 
         with self.subTest(which = 'largest'):
             nev = 2
-            evals, evecs = H.eigsolve(nev = nev,
-                                      getvecs = True,
-                                      which = 'largest')
+            evals, evecs = H.eigsolve(nev=nev,
+                                      getvecs=True,
+                                      which='largest',
+                                      tol=1E-10)
             evals_correct = [H.get_length() - 2*i for i in range(nev)]
             for i in range(nev):
                 self.is_close(evals[i], evals_correct[i])
