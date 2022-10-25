@@ -290,9 +290,9 @@ PetscErrorCode C(MatDestroyCtx_CPU,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A)
 
 #undef VECSET_CACHE_SIZE
 #ifdef PETSC_USE_DEBUG
-  #define VECSET_CACHE_SIZE (1<<7)
+  #define VECSET_CACHE_SIZE (PetscInt)(1<<7)
 #else
-  #define VECSET_CACHE_SIZE (1<<15)
+  #define VECSET_CACHE_SIZE (PetscInt)(1<<15)
 #endif
 
 /*
@@ -343,7 +343,7 @@ PetscErrorCode C(MatMult_CPU_General,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, Vec
         bra = ket ^ ctx->masks[mask_idx];
 
         col_idx = C(S2I,RIGHT_SUBSPACE)(bra, ctx->right_subspace_data);
-        
+
         if (col_idx == -1) continue;
 
         /* sum all terms for this matrix element */
@@ -456,17 +456,17 @@ PetscErrorCode C(MatMult_CPU_General,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, Vec
 /* if subspaces are the same, and are both Full or Parity, use the fancy fast matvec */
 #if C(LEFT_SUBSPACE,SP) == C(RIGHT_SUBSPACE,SP) && (C(LEFT_SUBSPACE,SP) == Full_SP || C(LEFT_SUBSPACE,SP) == Parity_SP)
 
-#define ITER_CUTOFF 8
+#define ITER_CUTOFF (PetscInt)8
 #define LKP_MASK (LKP_SIZE-1)
 
 #undef VECSET_CACHE_SIZE
 
 #ifdef PETSC_USE_DEBUG
-  #define VECSET_CACHE_SIZE (1<<7)
-  #define LKP_SIZE (1<<3)
+  #define VECSET_CACHE_SIZE (PetscInt)(1<<7)
+  #define LKP_SIZE (PetscInt)(1<<3)
 #else
-  #define VECSET_CACHE_SIZE (1<<11)
-  #define LKP_SIZE (1<<6)
+  #define VECSET_CACHE_SIZE (PetscInt)(1<<11)
+  #define LKP_SIZE (PetscInt)(1<<6)
 #endif
 
 PetscErrorCode C(MatMult_CPU_Fast,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, Vec x, Vec b);
@@ -549,10 +549,11 @@ PetscErrorCode do_cache_product(
   PetscScalar* values
 )
 {
-  PetscInt iterate_max, cache_idx, inner_idx, row_idx, stop;
+  PetscInt iterate_max, cache_idx, inner_idx, row_idx, local_start, stop;
 
-  /* TODO: this is not compatible with 64 bit ints */
-  iterate_max = 1 << __builtin_ctz(mask);
+  iterate_max = (PetscInt)1 << builtin_ctz(mask);
+  PetscAssert(iterate_max > (PetscInt)0, PETSC_COMM_SELF, PETSC_ERR_ARG_OUTOFRANGE, "iterate_max %ld <= 0", iterate_max);
+
   if (iterate_max < ITER_CUTOFF) {
     for (cache_idx=0; cache_idx < VECSET_CACHE_SIZE; ++cache_idx) {
       row_idx = (block_start+cache_idx) ^ mask;
@@ -563,14 +564,11 @@ PetscErrorCode do_cache_product(
     for (cache_idx=0; cache_idx < VECSET_CACHE_SIZE;) {
       row_idx = (block_start+cache_idx) ^ mask;
       stop = intmin(iterate_max-(row_idx%iterate_max), VECSET_CACHE_SIZE-cache_idx);
+      local_start = row_idx-x_start;
+      PetscAssert(local_start >= (PetscInt)0, PETSC_COMM_SELF, PETSC_ERR_ARG_OUTOFRANGE, "negative index %ld on x array", local_start);
+      PetscAssert(local_start+stop-(PetscInt)1 < x_end-x_start, PETSC_COMM_SELF, PETSC_ERR_ARG_OUTOFRANGE, "index %ld past end %ld of x array", local_start+stop-(PetscInt)1, x_end-x_start);
       for (inner_idx=0; inner_idx < stop; ++inner_idx) {
-        if (row_idx+inner_idx-x_start < 0) {
-          SETERRQ(PETSC_COMM_SELF, PETSC_ERR_MEMC, "negative index on x array");
-        }
-        if (row_idx+inner_idx-x_start >= x_end-x_start) {
-          SETERRQ(PETSC_COMM_SELF, PETSC_ERR_MEMC, "index past end of x array");
-        }
-        values[cache_idx+inner_idx] += summed_c[cache_idx+inner_idx] * x_array[row_idx+inner_idx-x_start];
+        values[cache_idx+inner_idx] += summed_c[cache_idx+inner_idx] * x_array[local_start+inner_idx];
       }
       cache_idx += inner_idx;
     }
@@ -713,7 +711,7 @@ PetscErrorCode C(MatMult_CPU_Fast,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, Vec x,
 
   /* this relies on MPI size being a power of 2 */
   /* this is log base 2 of the local vector size */
-  n_local_spins = __builtin_ctz(x_end - x_start);
+  n_local_spins = builtin_ctz(x_end - x_start);
 
   PetscCall(PetscMalloc1(mpi_size+1,&(mask_starts)));
   C(compute_mask_starts,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
@@ -724,8 +722,8 @@ PetscErrorCode C(MatMult_CPU_Fast,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, Vec x,
     mask_starts
   );
 
-  proc_mask = (-1) << n_local_spins;
-  proc_me = mpi_rank << n_local_spins;
+  proc_mask = (PetscInt)(-1) << n_local_spins;
+  proc_me = (PetscInt)mpi_rank << n_local_spins;
 
   /* we are not already sending values to another processor */
   assembling = PETSC_FALSE;

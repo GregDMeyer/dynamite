@@ -10,8 +10,10 @@
 #define intmin(a,b) ((a)^(((a)^(b))&(((a)<(b))-1)))
 
 #ifdef PETSC_USE_64BIT_INDICES
+  #define builtin_ctz __builtin_ctzl
   #define builtin_parity __builtin_parityl
 #else
+  #define builtin_ctz __builtin_ctz
   #define builtin_parity __builtin_parity
 #endif
 
