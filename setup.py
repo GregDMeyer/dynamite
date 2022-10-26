@@ -1,6 +1,7 @@
 
 import os
 from subprocess import check_output
+from glob import glob
 
 from setuptools import setup, Extension
 from setuptools.command.build_ext import build_ext
@@ -148,10 +149,15 @@ class MakeBuildExt(build_ext):
 
     def run(self):
 
+        # first remove any old object files which may
+        # correspond to a different PETSC_ARCH
+        for fname in glob('src/dynamite/_backend/*.o'):
+            os.remove(fname)
+
         # build the object files
         make = check_output(['make', 'bpetsc_impl.o'],
                             cwd='src/dynamite/_backend')
-        print(make.decode())
+        print(make.decode(), end='')
 
         if check_cuda():
             make = check_output(['make', 'bcuda_impl.o'],

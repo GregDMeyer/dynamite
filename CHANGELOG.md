@@ -30,6 +30,7 @@
  - Imaginary time evolution is now possible (for entirely real Hamiltonians), when dynamite is built without complex numbers
  - Edge case where matrix norm was incorrect for a few very specific operators, with SpinConserve + spinflip subspace
  - Bug in shell matrix-vector multiply for certain operators when L>31
+ - Ensure backend gets recompiled if `PETSC_ARCH` changes
 
 ## 0.2.3 - 2022-08-17
 
