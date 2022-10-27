@@ -175,12 +175,15 @@ def do_check_conserves(hamiltonian):
     hamiltonian.conserves(hamiltonian.subspace)
 
 # this decorator keeps track of and times function calls
-def log_call(function, stat_dict):
+def log_call(function, stat_dict, alt_name=None):
     config._initialize()
     from petsc4py.PETSc import Sys
     Print = Sys.Print
 
-    fn_name = function.__name__
+    if alt_name is None:
+        fn_name = function.__name__
+    else:
+        fn_name = alt_name
 
     def rtn(*args, **kwargs):
         if __debug__:
@@ -239,7 +242,7 @@ def main():
     # build some states to use in the computations
     in_state = State(L=arg_params.L, subspace=subspace)
     out_state = State(L=arg_params.L, subspace=subspace)
-    in_state.set_random()
+    log_call(in_state.set_random, stats, alt_name="set_random_state")()
 
     # compute the norm
     if arg_params.norm:
@@ -267,7 +270,7 @@ def main():
     out_state.vec.destroy()
 
     if arg_params.track_memory:
-        stats['Gb_memory'] = get_max_memory_usage() / 1E9
+        stats['Gb_memory'] = get_max_memory_usage()
 
     Print('---RESULTS---')
     for k,v in stats.items():

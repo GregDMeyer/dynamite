@@ -33,6 +33,7 @@
  - Bug in shell matrix-vector multiply for certain operators when L>31
  - Ensure backend gets recompiled if `PETSC_ARCH` changes
  - `hash(subspace)` is now much more performant for large Hilbert spaces
+ - Incorrect memory usage reported by `benchmark.py`
 
 ## 0.2.3 - 2022-08-17
 
