@@ -240,9 +240,12 @@ def main():
         log_call(H.build_mat, stats)()
 
     # build some states to use in the computations
-    in_state = State(L=arg_params.L, subspace=subspace)
-    out_state = State(L=arg_params.L, subspace=subspace)
-    log_call(in_state.set_random, stats, alt_name="set_random_state")()
+    if arg_params.evolve or arg_params.mult or arg_params.rdm:
+        in_state = State(L=arg_params.L, subspace=subspace)
+        out_state = State(L=arg_params.L, subspace=subspace)
+        log_call(in_state.set_random, stats, alt_name="set_random_state")()
+    else:
+        in_state = out_state = None
 
     # compute the norm
     if arg_params.norm:
@@ -266,10 +269,13 @@ def main():
     if arg_params.check_conserves:
         log_call(do_check_conserves, stats)(H)
 
-    # trigger memory measurement
-    out_state.vec.destroy()
-
     if arg_params.track_memory:
+        # trigger memory measurement
+        if H is not None:
+            H.destroy_mat()
+        elif in_state is not None:
+            in_state.vec.destroy()
+
         stats['Gb_memory'] = get_max_memory_usage()
 
     Print('---RESULTS---')
