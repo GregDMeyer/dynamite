@@ -336,7 +336,7 @@ class TestSpinConserve(ut.TestCase):
         space_size = len(correct)
         with self.assertRaises(ValueError): 
             states = SpinConserve._idx_to_state(
-                        np.arange(space_size, 2*space_size, dtype=dnm_int_t), L, k, \
+                        np.arange(space_size, 2*space_size, dtype=dnm_int_t), L, k,
                         nchoosek, spinflip=+1
                      )
 
@@ -365,7 +365,7 @@ class TestSpinConserve(ut.TestCase):
         space_size = len(correct)
         with self.assertRaises(ValueError): 
             states = SpinConserve._idx_to_state(
-                        np.arange(space_size, 2*space_size, dtype=dnm_int_t), L, k, \
+                        np.arange(space_size, 2*space_size, dtype=dnm_int_t), L, k,
                         nchoosek, spinflip=-1
                      )
 
