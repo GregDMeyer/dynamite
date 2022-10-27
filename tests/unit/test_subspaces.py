@@ -28,14 +28,14 @@ class TestFull(ut.TestCase):
     def test_mapping_single(self):
         self.assertEqual(Full._idx_to_state(np.array(10, dtype=dnm_int_t), 5), 10)
         self.assertEqual(Full._state_to_idx(np.array(10, dtype=dnm_int_t), 5), 10)
-    
+
     def test_mapping_invalid_i2s(self):
         L = 5
         for idx in [-1, 2**L]:
             with self.subTest(idx=idx):
-                with self.assertRaises(ValueError): 
+                with self.assertRaises(ValueError):
                     state = Full._idx_to_state(np.array([idx], dtype=dnm_int_t), L)
-        
+
     def test_mapping_array(self):
         L = 10
         ins = np.arange(2**L)
@@ -95,26 +95,22 @@ class TestParity(ut.TestCase):
 
         i = Parity._state_to_idx(s, 15, 0)
         self.assertEqual(i, 7)
-   
+
     def test_mapping_invalid_i2s(self):
         L = 5
         for idx in [-1, 2**(L-1)]:
-            with self.subTest(idx=idx):
-                with self.assertRaises(ValueError): 
-                    state = Parity._idx_to_state(np.array([idx], 
-                            dtype=dnm_int_t), L, 0)
-            with self.subTest(idx=idx):
-                with self.assertRaises(ValueError): 
-                    state = Parity._idx_to_state(np.array([idx], 
-                            dtype=dnm_int_t), L, 1)
-        
+            for parity in (0, 1):
+                with self.subTest(idx=idx, parity=parity):
+                    with self.assertRaises(ValueError):
+                        Parity._idx_to_state(np.array([idx], dtype=dnm_int_t), L, parity)
+
     def test_mapping_invalid_s2i(self):
         i = Parity._state_to_idx(np.array([int('01011',2)], dtype=dnm_int_t), 5, 0)
         self.assertEqual(i, -1)
 
         i = Parity._state_to_idx(np.array([int('01010',2)], dtype=dnm_int_t), 5, 1)
         self.assertEqual(i, -1)
-   
+
     def test_mapping_array(self):
         L = 4
 
@@ -297,11 +293,11 @@ class TestSpinConserve(ut.TestCase):
                 states = SpinConserve._idx_to_state(
                     np.arange(len(correct), dtype=dnm_int_t), L, k, nchoosek
                 )
-                
+
                 dim = SpinConserve._get_dimension(L, k, nchoosek)
                 for idx in [-1, dim]:
                     with self.subTest(idx=idx):
-                        with self.assertRaises(ValueError): 
+                        with self.assertRaises(ValueError):
                             states = SpinConserve._idx_to_state(
                                         np.array([idx], dtype=dnm_int_t),
                                         L, k, nchoosek
@@ -334,7 +330,7 @@ class TestSpinConserve(ut.TestCase):
         nchoosek = SpinConserve._compute_nchoosek(L, k)
 
         space_size = len(correct)
-        with self.assertRaises(ValueError): 
+        with self.assertRaises(ValueError):
             states = SpinConserve._idx_to_state(
                         np.arange(space_size, 2*space_size, dtype=dnm_int_t), L, k,
                         nchoosek, spinflip=+1
@@ -363,7 +359,7 @@ class TestSpinConserve(ut.TestCase):
         nchoosek = SpinConserve._compute_nchoosek(L, k)
 
         space_size = len(correct)
-        with self.assertRaises(ValueError): 
+        with self.assertRaises(ValueError):
             states = SpinConserve._idx_to_state(
                         np.arange(space_size, 2*space_size, dtype=dnm_int_t), L, k,
                         nchoosek, spinflip=-1
@@ -644,7 +640,7 @@ class TestExplicit(ut.TestCase):
                 ))
                 for idx in [-1, len(states)]:
                     with self.subTest(idx=idx):
-                        with self.assertRaises(ValueError): 
+                        with self.assertRaises(ValueError):
                             state = s.idx_to_state(idx)
 
     def test_compare_parity(self):

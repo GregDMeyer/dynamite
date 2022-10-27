@@ -222,7 +222,7 @@ class Full(Subspace):
     def _idx_to_state(cls, idx, L):
         idx = cls._numeric_to_array(idx)
         dim = Full._get_dimension(L)
-        if max(idx) >= dim or min(idx) < 0:
+        if np.max(idx) >= dim or np.min(idx) < 0:
             invalid_idx = idx[np.where(np.logical_or(idx >= dim, idx < 0))[0]]
             raise ValueError(f'Indices {invalid_idx} are out of bounds for subspace '
                              f'of dimension {dim}')
@@ -327,7 +327,7 @@ class Parity(Subspace):
     @classmethod
     def _idx_to_state(cls, idx, L, space):
         dim = Parity._get_dimension(L, space)
-        if max(idx) >= dim or min(idx) < 0:
+        if np.max(idx) >= dim or np.min(idx) < 0:
             invalid_idx = idx[np.where(np.logical_or(idx >= dim, idx < 0))[0]]
             raise ValueError(f'Indices {invalid_idx} are out of bounds for subspace '
                              f'of dimension {dim}')
@@ -597,7 +597,7 @@ class SpinConserve(Subspace):
     @classmethod
     def _idx_to_state(cls, idx, L, k, nchoosek, spinflip=0):
         dim = SpinConserve._get_dimension(L, k, nchoosek, spinflip)
-        if max(idx) >= dim or min(idx) < 0:
+        if np.max(idx) >= dim or np.min(idx) < 0:
             invalid_idx = idx[np.where(np.logical_or(idx >= dim, idx < 0))[0]]
             raise ValueError(f'Indices {invalid_idx} are out of bounds for subspace '
                              f'of dimension {dim}')
@@ -677,7 +677,7 @@ class Explicit(Subspace):
         """
         idx = self._numeric_to_array(idx)
         dim = self.get_dimension()
-        if max(idx) >= dim or min(idx) < 0:
+        if np.max(idx) >= dim or np.min(idx) < 0:
             invalid_idx = idx[np.where(np.logical_or(idx >= dim, idx < 0))[0]]
             raise ValueError(f'Indices {invalid_idx} are out of bounds for subspace '
                              f'of dimension {dim}')
