@@ -21,6 +21,7 @@
  - `operators.Operator.scale()` no longer returns the operator it's called on, to avoid confusion about whether a new operator is being created
  - Initial product states can be specified with either the characters `U` and `D` or `0` and `1` (previously only `U` and `D` were allowed)
  - `states.State.normalize()` now has no return value (previously returned the scale factor used for normalization)
+ - `hash(subspace)` now is only the same for two subspaces if `subspace.identical` would return `True`
 
 ### Fixed
  - An exception is now raised if an unknown keyword argument is passed to `computations.evolve()`
@@ -31,6 +32,7 @@
  - Edge case where matrix norm was incorrect for a few very specific operators, with SpinConserve + spinflip subspace
  - Bug in shell matrix-vector multiply for certain operators when L>31
  - Ensure backend gets recompiled if `PETSC_ARCH` changes
+ - `hash(subspace)` is now much more performant for large Hilbert spaces
 
 ## 0.2.3 - 2022-08-17
 

@@ -52,7 +52,7 @@ class Subspace:
         Returns whether two subspaces are exactly the same---both the same
         type and with the same values.
         '''
-        raise NotImplementedError()
+        return hash(self) == hash(s)
 
     @property
     def L(self):
@@ -155,9 +155,6 @@ class Subspace:
 
         return self._chksum
 
-    def __hash__(self):
-        return self.get_checksum()
-
     def get_cdata(self):
         '''
         Returns an object containing the subspace data accessible by the backend C.
@@ -171,6 +168,7 @@ class Subspace:
         '''
         raise NotImplementedError()
 
+
 class Full(Subspace):
 
     def __init__(self):
@@ -183,11 +181,8 @@ class Full(Subspace):
 
         return Subspace.__eq__(self, s)
 
-    # overriding __eq__ causes this to get unset. :(
-    __hash__ = Subspace.__hash__
-
-    def identical(self, s):
-        return type(self) == type(s) and self.L == s.L
+    def __hash__(self):
+        return hash((self.to_enum(), self.L))
 
     def get_dimension(self):
         """
@@ -276,17 +271,8 @@ class Parity(Subspace):
             raise ValueError('Invalid parity space "'+str(value)+'" '
                              '(valid choices are 0, 1, "even", or "odd")')
 
-    def identical(self, s):
-        if type(self) != type(s):
-            return False
-
-        if self.L != s.L:
-            return False
-
-        if self.space != s.space:
-            return False
-
-        return True
+    def __hash__(self):
+        return hash((self.to_enum(), self.L, self.space))
 
     def get_dimension(self):
         """
@@ -388,17 +374,8 @@ class SpinConserve(Subspace):
 
         self._nchoosek = self._compute_nchoosek(L, k)
 
-    def identical(self, s):
-        if type(self) != type(s):
-            return False
-
-        if self.L != s.L or self.k != s.k:
-            return False
-
-        if self.spinflip != s.spinflip:
-            return False
-
-        return True
+    def __hash__(self):
+        return hash((self.to_enum(), self.L, self.k, self.spinflip))
 
     def reduce_msc(self, msc, check_conserves=False):
         if self.spinflip == 0:
@@ -643,11 +620,8 @@ class Explicit(Subspace):
             raise ValueError('State in subspace has more spins than provided')
         return value
 
-    def identical(self, s):
-        if type(self) != type(s):
-            return False
-
-        return self == s
+    def __hash__(self):
+        return hash((self.to_enum(), self.get_checksum()))
 
     def get_dimension(self):
         """
