@@ -222,8 +222,8 @@ class Full(Subspace):
     def _idx_to_state(cls, idx, L):
         idx = cls._numeric_to_array(idx)
         dim = Full._get_dimension(L)
-        invalid_idx = idx[np.where(np.logical_or(idx >= dim, idx < 0))[0]]
-        if len(invalid_idx) > 0:
+        if max(idx) >= dim or min(idx) < 0:
+            invalid_idx = idx[np.where(np.logical_or(idx >= dim, idx < 0))[0]]
             raise ValueError(f'Indices {invalid_idx} are out of bounds for subspace '
                              f'of dimension {dim}')
         return bsubspace.idx_to_state_Full(idx, cls._get_cdata(L))
@@ -327,8 +327,8 @@ class Parity(Subspace):
     @classmethod
     def _idx_to_state(cls, idx, L, space):
         dim = Parity._get_dimension(L, space)
-        invalid_idx = idx[np.where(np.logical_or(idx >= dim, idx < 0))[0]]
-        if len(invalid_idx) > 0:
+        if max(idx) >= dim or min(idx) < 0:
+            invalid_idx = idx[np.where(np.logical_or(idx >= dim, idx < 0))[0]]
             raise ValueError(f'Indices {invalid_idx} are out of bounds for subspace '
                              f'of dimension {dim}')
         return bsubspace.idx_to_state_Parity(idx, cls._get_cdata(L, space))
@@ -597,8 +597,8 @@ class SpinConserve(Subspace):
     @classmethod
     def _idx_to_state(cls, idx, L, k, nchoosek, spinflip=0):
         dim = SpinConserve._get_dimension(L, k, nchoosek, spinflip)
-        invalid_idx = idx[np.where(np.logical_or(idx >= dim, idx < 0))[0]]
-        if len(invalid_idx) > 0:
+        if max(idx) >= dim or min(idx) < 0:
+            invalid_idx = idx[np.where(np.logical_or(idx >= dim, idx < 0))[0]]
             raise ValueError(f'Indices {invalid_idx} are out of bounds for subspace '
                              f'of dimension {dim}')
         return bsubspace.idx_to_state_SpinConserve(idx, cls._get_cdata(L, k, nchoosek, spinflip))
@@ -677,8 +677,8 @@ class Explicit(Subspace):
         """
         idx = self._numeric_to_array(idx)
         dim = self.get_dimension()
-        invalid_idx = idx[np.where(np.logical_or(idx >= dim, idx < 0))[0]]
-        if len(invalid_idx) > 0:
+        if max(idx) >= dim or min(idx) < 0:
+            invalid_idx = idx[np.where(np.logical_or(idx >= dim, idx < 0))[0]]
             raise ValueError(f'Indices {invalid_idx} are out of bounds for subspace '
                              f'of dimension {dim}')
         return bsubspace.idx_to_state_Explicit(idx, self.get_cdata())
