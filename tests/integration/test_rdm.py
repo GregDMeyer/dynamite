@@ -135,6 +135,8 @@ class Explicit(dtr.DynamiteTestCase):
         state.vec.assemblyEnd()
         state.set_initialized()
 
+        # structure of this array:
+        # (keep_spins, density_matrix, ent. entropy)
         correct_dms = [
             (
                 [0],
