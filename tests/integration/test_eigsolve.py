@@ -9,7 +9,7 @@ import dynamite_test_runner as dtr
 from dynamite import config
 from dynamite.operators import index_sum, sigmax, identity, op_sum
 from dynamite.states import State
-from dynamite.subspaces import Parity
+from dynamite.subspaces import Parity, SpinConserve, Auto
 from dynamite.tools import complex_enabled
 from dynamite.computations import MaxIterationsError
 
@@ -174,9 +174,32 @@ class ZeroDiagonal(Checker):
                 evals, evecs = H.eigsolve(nev=5, getvecs=True, tol=1E-12, target=target)
                 self.check_all(H, evals, evecs, tol=1E-11, evec_tol=1E-9)
 
-class ParityTests(Checker):
+class Subspaces(Checker):
 
-    def test_exceptions(self):
+    def test_all_subspaces(self):
+        for H_name in hamiltonians.get_names(complex_enabled()):
+            if H_name == 'syk' and 'small_only' in self.skip_flags:
+                continue
+
+            with self.subTest(H=H_name):
+                H = getattr(hamiltonians, H_name)()
+
+                subspaces = [Parity('even'), Parity('odd'), 
+                            SpinConserve(config.L, config.L//2, spinflip='+'),
+                            SpinConserve(config.L, config.L//2, spinflip='-'),
+                            SpinConserve(config.L, config.L//2, spinflip=None),
+                            Auto(H, (1 << (H.L//2)), sort=True),
+                            Auto(H, (1 << (H.L//2)), sort=False),
+                            ]
+
+                for subspace in subspaces:
+                    with self.subTest(subspace=subspace):
+                        H.add_subspace(subspace)
+                        H.allow_projection = True
+                        evals, evecs = H.eigsolve(nev=5, getvecs=True, tol=1E-12, subspace=subspace)
+                        self.check_all(H, evals, evecs, tol=1E-12, evec_tol=1E-11)
+        
+    def test_parity_exceptions(self):
         H = identity()
         s = Parity('even')
 
