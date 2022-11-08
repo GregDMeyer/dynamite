@@ -11,8 +11,8 @@ def commutator(o1, o2):
         The commutator
     """
     rtn = o1*o2 - o2*o1
-    rtn._string_rep.string = '[%s, %s]' % (o1.string, o2.string)
-    rtn._string_rep.tex = r'\left[ %s, %s \right]' % (o1.tex, o2.tex)
+    rtn._string_rep.string = '[%s, %s]' % (o1._string_rep.string, o2._string_rep.string)
+    rtn._string_rep.tex = r'\left[ %s, %s \right]' % (o1._string_rep.tex, o2._string_rep.tex)
     rtn._string_rep.brackets = ''
     return rtn
 
