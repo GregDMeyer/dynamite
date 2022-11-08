@@ -515,6 +515,9 @@ class SpinConserve(Subspace):
         '''
         Returns an object containing the subspace data accessible by the C backend.
         '''
+        if self.L is None:
+            raise ValueError('L has not been set for this subspace')
+
         return bsubspace.CSpinConserve(
             self.L, self.k,
             np.ascontiguousarray(self._nchoosek),
@@ -549,6 +552,10 @@ class Explicit(Subspace):
         else:
             self.rmap_indices = np.argsort(self.state_map).astype(bsubspace.dnm_int_t, copy=False)
             self.rmap_states = self.state_map[self.rmap_indices]
+
+        # ensure all states are unique
+        if np.any(self.rmap_states[1:] == self.rmap_states[:-1]):
+            raise ValueError('values in state_list must be unique')
 
         if L is not None:
             self.check_L(L)
@@ -589,6 +596,9 @@ class Explicit(Subspace):
         '''
         Returns an object containing the subspace data accessible by the C backend.
         '''
+        if self.L is None:
+            raise ValueError('L has not been set for this subspace')
+
         return bsubspace.CExplicit(
             self.L,
             np.ascontiguousarray(self.state_map),

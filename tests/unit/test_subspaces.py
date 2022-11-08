@@ -614,6 +614,10 @@ class TestExplicit(ut.TestCase):
                 with self.assertRaises(ValueError):
                     s.L = 4
 
+    def test_nonunique_error(self):
+        with self.assertRaises(ValueError):
+            Explicit([0, 1, 2, 2])
+
     def test_dimension(self):
         for name, states in self.test_states.items():
             with self.subTest(which=name):
