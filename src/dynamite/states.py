@@ -559,7 +559,7 @@ class State:
         return coeffs
 
     def _idx_to_str(self, idx):
-        int_rep = self.subspace.idx_to_state(idx)[0]
+        int_rep = self.subspace.idx_to_state(idx)
 
         if self.repr_binary:
             alphabet = '01'

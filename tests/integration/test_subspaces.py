@@ -82,7 +82,7 @@ class SpinFlipConversion(dtr.DynamiteTestCase):
         subspace = SpinConserve(L=4, k=2, spinflip='+')
         for start_state in [0, 1, 2]:
             with self.subTest(start_state=start_state):
-                spinflip_state = State(state=subspace.idx_to_state(start_state)[0], subspace=subspace)
+                spinflip_state = State(state=subspace.idx_to_state(start_state), subspace=subspace)
                 prod_basis_state = SpinConserve.convert_spinflip(spinflip_state)
                 coeffs = [0]*3
                 coeffs[start_state] = 1/np.sqrt(2)
@@ -102,7 +102,7 @@ class SpinFlipConversion(dtr.DynamiteTestCase):
         subspace = SpinConserve(L=4, k=2, spinflip='-')
         for start_state in [0, 1, 2]:
             with self.subTest(start_state=start_state):
-                spinflip_state = State(state=subspace.idx_to_state(start_state)[0], subspace=subspace)
+                spinflip_state = State(state=subspace.idx_to_state(start_state), subspace=subspace)
                 prod_basis_state = SpinConserve.convert_spinflip(spinflip_state)
                 coeffs = [0]*3
                 coeffs[start_state] = 1/np.sqrt(2)

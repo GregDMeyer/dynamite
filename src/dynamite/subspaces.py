@@ -9,6 +9,7 @@ import numpy as np
 from copy import deepcopy
 from zlib import crc32
 import math
+from functools import wraps
 
 from . import validate, states, config
 from ._backend import bsubspace
@@ -163,20 +164,39 @@ class Subspace:
         """
         return self._c_get_dimension(self._get_cdata())
 
+    def _single_or_array(fn):
+        '''
+        Takes a functions that takes and returns arrays, and allows it to take and
+        return just a single value as well.
+        '''
+        @wraps(fn)
+        def rtn_fn(self, val, *args, **kwargs):
+            single_value = not hasattr(val, "__len__")
+            val = self._numeric_to_array(val)
+
+            rtn = fn(self, val, *args, **kwargs)
+
+            if single_value:
+                return rtn[0]
+            else:
+                return rtn
+
+        return rtn_fn
+
+    @_single_or_array
     def idx_to_state(self, idx):
         """
         Maps an index to an integer that in binary corresponds to the spin configuration.
         Vectorized implementation allows passing a numpy array of indices as idx.
         """
-        idx = self._numeric_to_array(idx)
         self._check_idx_bounds(idx)
         return self._c_idx_to_state(idx, self._get_cdata())
 
+    @_single_or_array
     def state_to_idx(self, state):
         """
         The inverse mapping of :meth:`idx_to_state`.
         """
-        state = self._numeric_to_array(state)
         return self._c_state_to_idx(state, self._get_cdata())
 
     def _to_c(self):

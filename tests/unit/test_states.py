@@ -226,7 +226,7 @@ class PrettyPrint(ut.TestCase):
         state._subspace.state_to_idx = lambda x: x-1
         state._subspace.L = 4
         state._subspace.get_dimension = lambda: 8
-        state._subspace.idx_to_state = lambda x: [x+1]
+        state._subspace.idx_to_state = lambda x: x+1
 
         state._vec = np.zeros(8, dtype=np.complex128)
         state._vec[1] = 1

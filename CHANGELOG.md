@@ -22,6 +22,7 @@
  - Initial product states can be specified with either the characters `U` and `D` or `0` and `1` (previously only `U` and `D` were allowed)
  - `states.State.normalize()` now has no return value (previously returned the scale factor used for normalization)
  - `hash(subspace)` now is only the same for two subspaces if `subspace.identical` would return `True`
+ - Subspace methods `idx_to_state` and `state_to_idx` now return a scalar when passed a scalar, instead of returning a length-1 array
 
 ### Fixed
  - An exception is now raised if an unknown keyword argument is passed to `computations.evolve()`
