@@ -13,6 +13,7 @@
  - `State.set_uniform()` to set the state to a uniform superposition
  - `Operator.infinity_norm()`
  - The `run_all_tests.py` script (in `tests/integration`) now has an optional flag `--test-set <filename>`, which accepts a file listing tests to be run (instead of simply running all available tests)
+ - `L` can now be passed to most subspaces as an argument
 
 ### Changed
  - Moved `operators.load_from_file` into the Operator class, as `operators.Operator.load`

@@ -34,8 +34,12 @@ class Subspace:
     _c_idx_to_state = None
     _c_state_to_idx = None
 
-    def __init__(self):
-        self._L = config.L
+    def __init__(self, L=None):
+        if L is None:
+            self._L = config.L
+        else:
+            self._L = validate.L(L)
+
         self._chksum = None
 
     def __eq__(self, s):
@@ -219,8 +223,8 @@ class Full(Subspace):
     _c_idx_to_state = bsubspace.idx_to_state_Full
     _c_state_to_idx = bsubspace.state_to_idx_Full
 
-    def __init__(self):
-        Subspace.__init__(self)
+    def __init__(self, L=None):
+        Subspace.__init__(self, L)
 
     def __eq__(self, s):
         if isinstance(s, Full):
@@ -230,6 +234,14 @@ class Full(Subspace):
 
     def __hash__(self):
         return hash((self._enum, self.L))
+
+    def __repr__(self):
+        if self.L is None:
+            arg_str = ''
+        else:
+            arg_str = f'L={self.L}'
+
+        return f'Full({arg_str})'
 
     def _get_cdata(self):
         '''
@@ -255,8 +267,8 @@ class Parity(Subspace):
     _c_idx_to_state = bsubspace.idx_to_state_Parity
     _c_state_to_idx = bsubspace.state_to_idx_Parity
 
-    def __init__(self, space):
-        Subspace.__init__(self)
+    def __init__(self, space, L=None):
+        Subspace.__init__(self, L)
         self._space = self._check_space(space)
 
     @property
@@ -275,6 +287,13 @@ class Parity(Subspace):
 
     def __hash__(self):
         return hash((self._enum, self.L, self.space))
+
+    def __repr__(self):
+        arg_str = {0: "'even'", 1: "'odd'"}[self.space]
+        if self.L is not None:
+            arg_str += f', L={self.L}'
+
+        return f'Parity({arg_str})'
 
     def _get_cdata(self):
         '''
@@ -309,8 +328,7 @@ class SpinConserve(Subspace):
     _c_state_to_idx = bsubspace.state_to_idx_SpinConserve
 
     def __init__(self, L, k, spinflip=None):
-        Subspace.__init__(self)
-        self._L = validate.L(L)
+        Subspace.__init__(self, L=L)
 
         if spinflip is None or spinflip == 0:
             self._spinflip = 0
@@ -332,6 +350,12 @@ class SpinConserve(Subspace):
 
     def __hash__(self):
         return hash((self._enum, self.L, self.k, self.spinflip))
+
+    def __repr__(self):
+        arg_str = f'L={self.L}, k={self.k}'
+        if self.spinflip != 0:
+            arg_str += f', spinflip={self.spinflip:+d}'
+        return f'SpinConserve({arg_str})'
 
     def reduce_msc(self, msc, check_conserves=False):
         if self.spinflip == 0:
@@ -513,8 +537,8 @@ class Explicit(Subspace):
     _c_idx_to_state = bsubspace.idx_to_state_Explicit
     _c_state_to_idx = bsubspace.state_to_idx_Explicit
 
-    def __init__(self, state_list):
-        Subspace.__init__(self)
+    def __init__(self, state_list, L=None):
+        Subspace.__init__(self, L=L)
         self.state_map = np.asarray(state_list, dtype=bsubspace.dnm_int_t)
 
         map_sorted = np.all(self.state_map[:-1] <= self.state_map[1:])
@@ -526,6 +550,9 @@ class Explicit(Subspace):
             self.rmap_indices = np.argsort(self.state_map).astype(bsubspace.dnm_int_t, copy=False)
             self.rmap_states = self.state_map[self.rmap_indices]
 
+        if L is not None:
+            self.check_L(L)
+
     def check_L(self, value):
         # last value of rmap_states is the lexicographically largest one
         if self.rmap_states[-1] >> value != 0:
@@ -534,6 +561,12 @@ class Explicit(Subspace):
 
     def __hash__(self):
         return hash((self._enum, self.get_checksum()))
+
+    def __repr__(self):
+        arg_str = f'{self.state_map}'
+        if self.L is not None:
+            arg_str += f', L={self.L}'
+        return f'Explicit({arg_str})'
 
     def _get_cdata(self):
         '''
@@ -580,6 +613,13 @@ class Auto(Explicit):
 
         H.establish_L()
 
+        # construct repr args it now so we don't have to save a ton of stuff
+        self._repr_args = f'H={repr(H)}, state={repr(state)}'
+        if size_guess is not None:
+            self._repr_args += f', size_guess={size_guess}'
+        if not sort:
+            self._repr_args += ', sort=False'
+
         self.state = states.State.str_to_state(state, H.L)
 
         if size_guess is None:
@@ -597,6 +637,7 @@ class Auto(Explicit):
         if sort:
             state_map.sort()
 
-        Explicit.__init__(self, state_map)
+        Explicit.__init__(self, state_map, L=H.L)
 
-        self._L = H.L
+    def __repr__(self):
+        return f'Auto({self._repr_args})'

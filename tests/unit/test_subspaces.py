@@ -76,6 +76,14 @@ class TestFull(ut.TestCase):
         with self.assertRaises(AttributeError):
             sp.L = 6
 
+    def test_repr(self):
+        cases = [
+            'Full()',
+            'Full(L=4)'
+        ]
+        for case in cases:
+            self.assertEqual(repr(eval(case)), case)
+
 
 class TestParity(ut.TestCase):
 
@@ -201,6 +209,16 @@ class TestParity(ut.TestCase):
                 s.L = 5
                 with self.assertRaises(AttributeError):
                     s.L = 6
+
+    def test_repr(self):
+        cases = [
+            "Parity('even')",
+            "Parity('odd')",
+            "Parity('even', L=4)",
+            "Parity('odd', L=4)",
+        ]
+        for case in cases:
+            self.assertEqual(repr(eval(case)), case)
 
 
 class TestSpinConserve(ut.TestCase):
@@ -510,6 +528,15 @@ class TestSpinConserve(ut.TestCase):
                     initial, correct, spinflip, 4, True
                 )
 
+    def test_repr(self):
+        cases = [
+            "SpinConserve(L=4, k=2)",
+            "SpinConserve(L=4, k=2, spinflip=+1)",
+            "SpinConserve(L=4, k=2, spinflip=-1)",
+        ]
+        for case in cases:
+            self.assertEqual(repr(eval(case)), case)
+
 
 class TestRCM(ut.TestCase):
 
@@ -650,6 +677,14 @@ class TestExplicit(ut.TestCase):
         s.L = 6
 
         self.assertEqual(p, s)
+
+    def test_repr(self):
+        cases = [
+            (Explicit([1, 2, 3]), "Explicit([1 2 3])"),
+            (Explicit([1, 2, 3], L=4), "Explicit([1 2 3], L=4)")
+        ]
+        for case, result in cases:
+            self.assertEqual(repr(case), result)
 
 
 class TestAuto(ut.TestCase):
