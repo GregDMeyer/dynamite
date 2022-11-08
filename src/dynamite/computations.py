@@ -257,7 +257,7 @@ def eigsolve(H, getvecs=False, nev=1, which='smallest', target=None, tol=None, s
     for i in range(nconv):
         evals[i] = eps.getEigenpair(i, None).real
         if getvecs:
-            v = State(H.L, H.subspace)
+            v = State(L=H.L, subspace=H.subspace)
             eps.getEigenpair(i, v.vec)
             v.set_initialized()
             evecs.append(v)

@@ -4,14 +4,16 @@ from unittest.mock import Mock, MagicMock, ANY
 import numpy as np
 
 from dynamite import config
+from dynamite.states import State
+
 config.initialize()
 
 from petsc4py import PETSc
 
 # mock a vector
 PETSc.Vec = MagicMock()
+PETSc.Vec().create().getOwnershipRange.return_value = 0, 0
 
-from dynamite.states import State
 
 class StrToIdx(ut.TestCase):
 
@@ -48,6 +50,11 @@ class SetL(ut.TestCase):
         s = State(L=5)
         self.assertEqual(s.L, 5)
 
+    def test_L_direct_property(self):
+        s = State()
+        s.L = 5
+        self.assertEqual(s.L, 5)
+
     def test_L_subspace(self):
         from dynamite.subspaces import Subspace
         subspace = Mock(spec=Subspace)
@@ -55,6 +62,23 @@ class SetL(ut.TestCase):
 
         s = State(subspace=subspace)
         self.assertEqual(s.L, 5)
+
+        with self.assertRaises(ValueError):
+            s.L = 6
+
+    def test_L_str(self):
+        s = State(state='UUUDDD')
+        self.assertEqual(s.L, 6)
+
+    def test_L_str_later(self):
+        s = State()
+        s.set_product('UUUDDD')
+        self.assertEqual(s.L, 6)
+
+    def test_L_fail(self):
+        s = State()
+        with self.assertRaises(ValueError):
+            s.vec
 
 
 class SetValues(ut.TestCase):

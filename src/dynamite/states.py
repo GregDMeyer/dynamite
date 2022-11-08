@@ -16,26 +16,26 @@ class State:
     Parameters
     ----------
 
-    L : int, optional
-        Spin chain length. Can be ommitted if config.L is set or a subspace
-        is provided.
-
-    subspace : dynamite.subspace.Subspace, optional
-        The subspace on which the state should be defined.
-        If not specified, defaults to config.subspace.
-
     state : int or str, optional
         An initial product state to set the state to. Also accepts ``'random'``
         and ``'uniform'``. The state can also be initialized later with the
         :meth:`set_product`, :meth:`set_uniform` and :meth:`set_random`
         methods.
 
+    subspace : dynamite.subspace.Subspace, optional
+        The subspace on which the state should be defined.
+        If not specified, defaults to config.subspace.
+
+    L : int, optional
+        Spin chain length. Can be ommitted if config.L is set, a subspace
+        is provided, or a string is passed to the state argument.
+
     seed : int, optional
         If the ``state`` argument is set to ``'random'``, the seed for the random number
         generator. This argument is ignored otherwise.
     """
 
-    def __init__(self, L = None, subspace = None, state = None, seed = None):
+    def __init__(self, state=None, subspace=None, L=None, seed=None):
 
         if subspace is None:
             if config.subspace is not None:
@@ -43,20 +43,11 @@ class State:
             else:
                 subspace = subspaces.Full()
 
-        if L is None and subspace.L is None:
-            L = config.L
-
-        if subspace.L is None:
-            if L is None:
-                raise ValueError('Must specify L either as a parameter, '
-                                 'by providing a subspace, or via config.L')
-            else:
-                subspace.L = validate.L(L)
-        elif L is not None and L != subspace.L:
-            raise ValueError('The value of L provided as a parameter '
-                             'does not match that of the subspace')
-
         self._subspace = validate.subspace(subspace)
+
+        if L is not None:
+            self.L = L
+
         self._vec = None  # create when first used
         self._initialized = False
 
@@ -76,9 +67,16 @@ class State:
     def L(self):
         return self.subspace.L
 
+    @L.setter
+    def L(self, value):
+        if self.L is not None and self.L != value:
+            raise ValueError('L is already set to a different value (possibly by subspace)')
+
+        self.subspace.L = value
+
     def copy(self, result=None):
         if result is None:
-            result = State(self.L, self.subspace.copy())
+            result = State(L=self.L, subspace=self.subspace.copy())
 
         if self.subspace != result.subspace:
             raise ValueError('subspace of state and result must match')
@@ -111,6 +109,9 @@ class State:
         but are fairly transparent from looking at the petsc4py source code.
         """
         if self._vec is None:
+            if self.L is None:
+                raise ValueError('must set L first')
+
             config._initialize()
             from petsc4py import PETSc
 
@@ -212,6 +213,10 @@ class State:
         s : int or str
             A representation of the state.
         """
+
+        # automatically set L to the length of the string
+        if self.L is None and isinstance(s, str):
+            self.L = len(s)
 
         idx = self.subspace.state_to_idx(self.str_to_state(s, self.L))
 
@@ -378,7 +383,7 @@ class State:
         '''
         self.assert_initialized()
 
-        if index < 0 or index >= self.subspace.L:
+        if index < 0 or index >= self.L:
             raise ValueError("spin index out of range")
 
         if value not in (0, 1):

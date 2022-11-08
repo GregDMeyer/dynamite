@@ -14,8 +14,11 @@
  - `Operator.infinity_norm()`
  - The `run_all_tests.py` script (in `tests/integration`) now has an optional flag `--test-set <filename>`, which accepts a file listing tests to be run (instead of simply running all available tests)
  - `L` can now be passed to most subspaces as an argument
+ - `L` for the `State` class can be inferred from the length of string passed to the `state` argument of the constructor
+ - `L` for state class can now be set directly via the `State.L` parameter
 
 ### Changed
+ - Order of arguments to `State` class changed
  - Moved `operators.load_from_file` into the Operator class, as `operators.Operator.load`
  - Moved `operators.from_bytes` into the Operator class, as `operators.Operator.from_bytes`
  - Switched to using `pyproject.toml` for package metadata and build configuration
