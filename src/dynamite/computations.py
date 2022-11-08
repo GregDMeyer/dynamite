@@ -318,8 +318,7 @@ def reduced_density_matrix(state, keep):
                          % str(keep))
 
     dm = bpetsc.reduced_density_matrix(
-        state.vec, state.subspace.to_enum(),
-        state.subspace.get_cdata(), keep
+        state.vec, state.subspace._to_c(), keep
     )
 
     return dm

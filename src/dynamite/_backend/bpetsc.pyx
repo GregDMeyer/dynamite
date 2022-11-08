@@ -14,14 +14,14 @@ cimport numpy as np
 import cython
 
 cdef extern from "bsubspace_impl.h":
-    ctypedef struct subspaces_t:
-        int left_type
-        int right_type
-        void *left_data
-        void *right_data
-
     ctypedef enum subspace_type:
         pass
+
+    ctypedef struct subspaces_t:
+        subspace_type left_type
+        subspace_type right_type
+        void *left_data
+        void *right_data
 
 cdef extern from "bpetsc_impl.h":
 
@@ -73,10 +73,8 @@ def build_mat(PetscInt [:] masks,
               PetscInt [:] mask_offsets,
               PetscInt [:] signs,
               np.complex128_t [:] coeffs,
-              subspace_type left_type,
-              left_data,
-              subspace_type right_type,
-              right_data,
+              left_subspace,
+              right_subspace,
               bint shell,
               bint gpu):
 
@@ -107,10 +105,10 @@ def build_mat(PetscInt [:] masks,
 
     M = Mat()
 
-    subspaces.left_type = left_type
-    bsubspace.set_data_pointer(left_type, left_data, &(subspaces.left_data))
-    subspaces.right_type = right_type
-    bsubspace.set_data_pointer(right_type, right_data, &(subspaces.right_data))
+    subspaces.left_type = left_subspace['type']
+    bsubspace.set_data_pointer(subspaces.left_type, left_subspace['data'], &(subspaces.left_data))
+    subspaces.right_type = right_subspace['type']
+    bsubspace.set_data_pointer(subspaces.right_type, right_subspace['data'], &(subspaces.right_data))
 
     if gpu:
         IF not USE_CUDA:
@@ -137,10 +135,8 @@ def check_conserves(PetscInt [:] masks,
                     PetscInt [:] mask_offsets,
                     PetscInt [:] signs,
                     np.complex128_t [:] coeffs,
-                    subspace_type left_type,
-                    left_data,
-                    subspace_type right_type,
-                    right_data):
+                    left_subspace,
+                    right_subspace):
 
     cdef int ierr, nterms, nmasks
     cdef subspaces_t subspaces
@@ -167,10 +163,10 @@ def check_conserves(PetscInt [:] masks,
 
         msc.coeffs = <void*>&real_coeffs[0]
 
-    subspaces.left_type = left_type
-    bsubspace.set_data_pointer(left_type, left_data, &(subspaces.left_data))
-    subspaces.right_type = right_type
-    bsubspace.set_data_pointer(right_type, right_data, &(subspaces.right_data))
+    subspaces.left_type = left_subspace['type']
+    bsubspace.set_data_pointer(subspaces.left_type, left_subspace['data'], &(subspaces.left_data))
+    subspaces.right_type = right_subspace['type']
+    bsubspace.set_data_pointer(subspaces.right_type, right_subspace['data'], &(subspaces.right_data))
 
     ierr = CheckConserves(&msc, &subspaces, &result)
 
@@ -253,7 +249,7 @@ def get_cur_memory_usage(which='all'):
         raise Error(ierr)
     return mem
 
-def reduced_density_matrix(Vec v, subspace_type sub_type, sub_data, PetscInt [:] keep, bint triang=True):
+def reduced_density_matrix(Vec v, subspace, PetscInt [:] keep, bint triang=True):
 
     if DNM_PETSC_COMPLEX:
         matrix_dtype = np.complex128
@@ -269,17 +265,17 @@ def reduced_density_matrix(Vec v, subspace_type sub_type, sub_data, PetscInt [:]
     cdef int ierr
     cdef void* sub_data_p
 
-    bsubspace.set_data_pointer(sub_type, sub_data, &sub_data_p)
+    bsubspace.set_data_pointer(subspace['type'], subspace['data'], &sub_data_p)
 
     cdef np.complex128_t [:,:] rtn_c
     cdef np.float64_t [:,:] rtn_f
 
     if DNM_PETSC_COMPLEX:
         rtn_c = rtn_np
-        ierr = ReducedDensityMatrix(v.vec, sub_type, sub_data_p, keep.size, &keep[0], triang, rtn_c.shape[0], <void*>&rtn_c[0,0])
+        ierr = ReducedDensityMatrix(v.vec, subspace['type'], sub_data_p, keep.size, &keep[0], triang, rtn_c.shape[0], <void*>&rtn_c[0,0])
     else:
         rtn_f = rtn_np
-        ierr = ReducedDensityMatrix(v.vec, sub_type, sub_data_p, keep.size, &keep[0], triang, rtn_f.shape[0], <void*>&rtn_f[0,0])
+        ierr = ReducedDensityMatrix(v.vec, subspace['type'], sub_data_p, keep.size, &keep[0], triang, rtn_f.shape[0], <void*>&rtn_f[0,0])
 
     if ierr != 0:
         raise Error(ierr)

@@ -15,6 +15,7 @@ from ._backend import bsubspace
 from .msc_tools import dnm_int_t, combine_and_sort
 from .bitwise import parity
 
+
 class Subspace:
     '''
     Base subspace class.
@@ -23,6 +24,14 @@ class Subspace:
     # subclasses should set to False if they need
     _product_state_basis = True
     _checksum_start = 0
+
+    # enum value used in the backend to identify subspace
+    _enum = None
+
+    # functions each subclass should supply
+    _c_get_dimension = None
+    _c_idx_to_state = None
+    _c_state_to_idx = None
 
     def __init__(self):
         self._L = config.L
@@ -75,12 +84,6 @@ class Subspace:
         value = self.check_L(value)
         self._L = value
 
-    def get_dimension(self):
-        """
-        Get the dimension of the subspace.
-        """
-        raise NotImplementedError()
-
     @property
     def product_state_basis(self):
         """
@@ -123,18 +126,17 @@ class Subspace:
         x = np.array(x, copy = False, dtype = bsubspace.dnm_int_t).reshape((-1,))
         return np.ascontiguousarray(x)
 
-    def idx_to_state(self, idx):
-        """
-        Maps an index to an integer that in binary corresponds to the spin configuration.
-        Vectorized implementation allows passing a numpy array of indices as idx.
-        """
-        raise NotImplementedError()
-
-    def state_to_idx(self, state):
-        """
-        The inverse mapping of :meth:`idx_to_state`.
-        """
-        raise NotImplementedError()
+    def _check_idx_bounds(self, idx):
+        dim = self.get_dimension()
+        if np.min(idx) < 0 or np.max(idx) >= dim:
+            # do this inside the if statement for performance
+            invalid_idx = idx[np.logical_or(idx >= dim, idx < 0)]
+            if len(invalid_idx) == 1:
+                msg = f'Index {invalid_idx[0]}'
+            else:
+                msg = f'Indices {invalid_idx}'
+            msg += f' out of bounds for subspace of dimension {dim}'
+            raise ValueError(msg)
 
     def copy(self):
         return deepcopy(self)
@@ -155,26 +157,51 @@ class Subspace:
 
         return self._chksum
 
-    def get_cdata(self):
+    def get_dimension(self):
+        """
+        Get the dimension of the subspace.
+        """
+        return self._c_get_dimension(self._get_cdata())
+
+    def idx_to_state(self, idx):
+        """
+        Maps an index to an integer that in binary corresponds to the spin configuration.
+        Vectorized implementation allows passing a numpy array of indices as idx.
+        """
+        idx = self._numeric_to_array(idx)
+        self._check_idx_bounds(idx)
+        return self._c_idx_to_state(idx, self._get_cdata())
+
+    def state_to_idx(self, state):
+        """
+        The inverse mapping of :meth:`idx_to_state`.
+        """
+        state = self._numeric_to_array(state)
+        return self._c_state_to_idx(state, self._get_cdata())
+
+    def _to_c(self):
+        '''
+        Returns the subspace type and data, in C-accessible format.
+        '''
+        return {'type': self._enum, 'data': self._get_cdata()}
+
+    def _get_cdata(self):
         '''
         Returns an object containing the subspace data accessible by the backend C.
-        '''
-        raise NotImplementedError()
-
-    def to_enum(self):
-        '''
-        Convert the class types used in the Python frontend to the enum values
-        used in the C backend.
         '''
         raise NotImplementedError()
 
 
 class Full(Subspace):
 
+    _enum = bsubspace.SubspaceType.FULL
+    _c_get_dimension = bsubspace.get_dimension_Full
+    _c_idx_to_state = bsubspace.idx_to_state_Full
+    _c_state_to_idx = bsubspace.state_to_idx_Full
+
     def __init__(self):
         Subspace.__init__(self)
 
-    # Full is a special case
     def __eq__(self, s):
         if isinstance(s, Full):
             return s.L == self.L
@@ -182,70 +209,15 @@ class Full(Subspace):
         return Subspace.__eq__(self, s)
 
     def __hash__(self):
-        return hash((self.to_enum(), self.L))
+        return hash((self._enum, self.L))
 
-    def get_dimension(self):
-        """
-        Get the dimension of the subspace.
-        """
-        if self.L is None:
-            raise ValueError('L has not been set for this subspace')
-        return self._get_dimension(self.L)
-
-    @classmethod
-    def _get_dimension(cls, L):
-        return bsubspace.get_dimension_Full(cls._get_cdata(L))
-
-    def idx_to_state(self, idx):
-        """
-        Maps an index to an integer that in binary corresponds to the spin configuration.
-        Vectorized implementation allows passing a numpy array of indices as idx.
-        """
-        if self.L is None:
-            raise ValueError('L has not been set for this subspace')
-        return self._idx_to_state(idx, self.L)
-
-    def state_to_idx(self, state):
-        """
-        The inverse mapping of :meth:`idx_to_state`.
-        """
-        if self.L is None:
-            raise ValueError('L has not been set for this subspace')
-        return self._state_to_idx(state, self.L)
-
-    @classmethod
-    def _idx_to_state(cls, idx, L):
-        idx = cls._numeric_to_array(idx)
-        dim = Full._get_dimension(L)
-        if np.max(idx) >= dim or np.min(idx) < 0:
-            invalid_idx = idx[np.where(np.logical_or(idx >= dim, idx < 0))[0]]
-            raise ValueError(f'Indices {invalid_idx} are out of bounds for subspace '
-                             f'of dimension {dim}')
-        return bsubspace.idx_to_state_Full(idx, cls._get_cdata(L))
-
-    @classmethod
-    def _state_to_idx(cls, state, L):
-        state = cls._numeric_to_array(state)
-        return bsubspace.state_to_idx_Full(state, cls._get_cdata(L))
-
-    def get_cdata(self):
+    def _get_cdata(self):
         '''
         Returns an object containing the subspace data accessible by the C backend.
         '''
         if self.L is None:
             raise ValueError('L has not been set for this subspace')
-        return self._get_cdata(self.L)
-
-    @classmethod
-    def _get_cdata(cls, L):
-        return bsubspace.CFull(L)
-
-    def to_enum(self):
-        '''
-        Convert the class types used in the Python frontend to the enum values
-        used in the C backend.
-        '''
-        return bsubspace.SubspaceType.FULL
+        return bsubspace.CFull(self.L)
 
 
 class Parity(Subspace):
@@ -257,6 +229,11 @@ class Parity(Subspace):
     space : int
         Either 0 or 'even' for the even subspace, or 1 or 'odd' for the other.
     '''
+
+    _enum = bsubspace.SubspaceType.PARITY
+    _c_get_dimension = bsubspace.get_dimension_Parity
+    _c_idx_to_state = bsubspace.idx_to_state_Parity
+    _c_state_to_idx = bsubspace.state_to_idx_Parity
 
     def __init__(self, space):
         Subspace.__init__(self)
@@ -277,70 +254,15 @@ class Parity(Subspace):
                              '(valid choices are 0, 1, "even", or "odd")')
 
     def __hash__(self):
-        return hash((self.to_enum(), self.L, self.space))
+        return hash((self._enum, self.L, self.space))
 
-    def get_dimension(self):
-        """
-        Get the dimension of the subspace.
-        """
-        if self.L is None:
-            raise ValueError('L has not been set for this subspace')
-        return self._get_dimension(self.L, self.space)
-
-    @classmethod
-    def _get_dimension(cls, L, space):
-        return bsubspace.get_dimension_Parity(cls._get_cdata(L, space))
-
-    def idx_to_state(self, idx):
-        """
-        Maps an index to an integer that in binary corresponds to the spin configuration.
-        Vectorized implementation allows passing a numpy array of indices as idx.
-        """
-        if self.L is None:
-            raise ValueError('L has not been set for this subspace')
-        idx = self._numeric_to_array(idx)
-        return self._idx_to_state(idx, self.L, self.space)
-
-    def state_to_idx(self, state):
-        """
-        The inverse mapping of :meth:`idx_to_state`.
-        """
-        if self.L is None:
-            raise ValueError('L has not been set for this subspace')
-        state = self._numeric_to_array(state)
-        return self._state_to_idx(state, self.L, self.space)
-
-    @classmethod
-    def _idx_to_state(cls, idx, L, space):
-        dim = Parity._get_dimension(L, space)
-        if np.max(idx) >= dim or np.min(idx) < 0:
-            invalid_idx = idx[np.where(np.logical_or(idx >= dim, idx < 0))[0]]
-            raise ValueError(f'Indices {invalid_idx} are out of bounds for subspace '
-                             f'of dimension {dim}')
-        return bsubspace.idx_to_state_Parity(idx, cls._get_cdata(L, space))
-
-    @classmethod
-    def _state_to_idx(cls, state, L, space):
-        return bsubspace.state_to_idx_Parity(state, cls._get_cdata(L, space))
-
-    def get_cdata(self):
+    def _get_cdata(self):
         '''
         Returns an object containing the subspace data accessible by the C backend.
         '''
         if self.L is None:
             raise ValueError('L has not been set for this subspace')
-        return self._get_cdata(self.L, self.space)
-
-    @classmethod
-    def _get_cdata(cls, L, space):
-        return bsubspace.CParity(L, space)
-
-    def to_enum(self):
-        '''
-        Convert the class types used in the Python frontend to the enum values
-        used in the C backend.
-        '''
-        return bsubspace.SubspaceType.PARITY
+        return bsubspace.CParity(self.L, self.space)
 
 
 class SpinConserve(Subspace):
@@ -351,7 +273,7 @@ class SpinConserve(Subspace):
     Parameters
     ----------
     L : int
-        Length of spin chain (constant for this class)
+        Length of spin chain
 
     k : int
         Number of down spins (1's in integer representation of state)
@@ -361,6 +283,10 @@ class SpinConserve(Subspace):
     '''
 
     _product_state_basis = False
+    _enum = bsubspace.SubspaceType.SPIN_CONSERVE
+    _c_get_dimension = bsubspace.get_dimension_SpinConserve
+    _c_idx_to_state = bsubspace.idx_to_state_SpinConserve
+    _c_state_to_idx = bsubspace.state_to_idx_SpinConserve
 
     def __init__(self, L, k, spinflip=None):
         Subspace.__init__(self)
@@ -385,7 +311,7 @@ class SpinConserve(Subspace):
         self._nchoosek = self._compute_nchoosek(L, k)
 
     def __hash__(self):
-        return hash((self.to_enum(), self.L, self.k, self.spinflip))
+        return hash((self._enum, self.L, self.k, self.spinflip))
 
     def reduce_msc(self, msc, check_conserves=False):
         if self.spinflip == 0:
@@ -534,11 +460,6 @@ class SpinConserve(Subspace):
 
         return k
 
-    @Subspace.L.setter
-    def L(self, value):
-        if value != self.L:
-            raise AttributeError('cannot change L for SpinConserve class')
-
     @property
     def k(self):
         """
@@ -546,64 +467,15 @@ class SpinConserve(Subspace):
         """
         return self._k
 
-    def get_dimension(self):
-        """
-        Get the dimension of the subspace.
-        """
-        return self._get_dimension(self.L, self.k, self._nchoosek, self._spinflip)
-
-    @classmethod
-    def _get_dimension(cls, L, k, nchoosek, spinflip=0):
-        return bsubspace.get_dimension_SpinConserve(cls._get_cdata(L, k, nchoosek, spinflip))
-
-    def idx_to_state(self, idx):
-        """
-        Maps an index to an integer that in binary corresponds to the spin configuration.
-        Vectorized implementation allows passing a numpy array of indices as idx.
-        """
-        idx = self._numeric_to_array(idx)
-        return self._idx_to_state(idx, self.L, self.k, self._nchoosek, self._spinflip)
-
-    def state_to_idx(self, state):
-        """
-        The inverse mapping of :meth:`idx_to_state`.
-        """
-        state = self._numeric_to_array(state)
-        return self._state_to_idx(state, self.L, self.k, self._nchoosek, self._spinflip)
-
-    @classmethod
-    def _idx_to_state(cls, idx, L, k, nchoosek, spinflip=0):
-        dim = SpinConserve._get_dimension(L, k, nchoosek, spinflip)
-        if np.max(idx) >= dim or np.min(idx) < 0:
-            invalid_idx = idx[np.where(np.logical_or(idx >= dim, idx < 0))[0]]
-            raise ValueError(f'Indices {invalid_idx} are out of bounds for subspace '
-                             f'of dimension {dim}')
-        return bsubspace.idx_to_state_SpinConserve(idx, cls._get_cdata(L, k, nchoosek, spinflip))
-
-    @classmethod
-    def _state_to_idx(cls, state, L, k, nchoosek, spinflip=0):
-        return bsubspace.state_to_idx_SpinConserve(state, cls._get_cdata(L, k, nchoosek, spinflip))
-
-    def get_cdata(self):
+    def _get_cdata(self):
         '''
         Returns an object containing the subspace data accessible by the C backend.
         '''
-        return self._get_cdata(self.L, self.k, self._nchoosek, self._spinflip)
-
-    @classmethod
-    def _get_cdata(cls, L, k, nchoosek, spinflip=0):
         return bsubspace.CSpinConserve(
-            L, k,
-            np.ascontiguousarray(nchoosek),
-            spinflip
+            self.L, self.k,
+            np.ascontiguousarray(self._nchoosek),
+            self.spinflip
         )
-
-    def to_enum(self):
-        '''
-        Convert the class types used in the Python frontend to the enum values
-        used in the C backend.
-        '''
-        return bsubspace.SubspaceType.SPIN_CONSERVE
 
 
 class Explicit(Subspace):
@@ -615,6 +487,11 @@ class Explicit(Subspace):
     state_list : array-like
         An array of integers representing the states (in binary).
     '''
+
+    _enum = bsubspace.SubspaceType.EXPLICIT
+    _c_get_dimension = bsubspace.get_dimension_Explicit
+    _c_idx_to_state = bsubspace.idx_to_state_Explicit
+    _c_state_to_idx = bsubspace.state_to_idx_Explicit
 
     def __init__(self, state_list):
         Subspace.__init__(self)
@@ -636,35 +513,9 @@ class Explicit(Subspace):
         return value
 
     def __hash__(self):
-        return hash((self.to_enum(), self.get_checksum()))
+        return hash((self._enum, self.get_checksum()))
 
-    def get_dimension(self):
-        """
-        Get the dimension of the subspace.
-        """
-        return bsubspace.get_dimension_Explicit(self.get_cdata())
-
-    def idx_to_state(self, idx):
-        """
-        Maps an index to an integer that in binary corresponds to the spin configuration.
-        Vectorized implementation allows passing a numpy array of indices as idx.
-        """
-        idx = self._numeric_to_array(idx)
-        dim = self.get_dimension()
-        if np.max(idx) >= dim or np.min(idx) < 0:
-            invalid_idx = idx[np.where(np.logical_or(idx >= dim, idx < 0))[0]]
-            raise ValueError(f'Indices {invalid_idx} are out of bounds for subspace '
-                             f'of dimension {dim}')
-        return bsubspace.idx_to_state_Explicit(idx, self.get_cdata())
-
-    def state_to_idx(self, state):
-        """
-        The inverse mapping of :meth:`idx_to_state`.
-        """
-        state = self._numeric_to_array(state)
-        return bsubspace.state_to_idx_Explicit(state, self.get_cdata())
-
-    def get_cdata(self):
+    def _get_cdata(self):
         '''
         Returns an object containing the subspace data accessible by the C backend.
         '''
@@ -674,13 +525,6 @@ class Explicit(Subspace):
             np.ascontiguousarray(self.rmap_indices),
             np.ascontiguousarray(self.rmap_states)
         )
-
-    def to_enum(self):
-        '''
-        Convert the class types used in the Python frontend to the enum values
-        used in the C backend.
-        '''
-        return bsubspace.SubspaceType.EXPLICIT
 
 
 class Auto(Explicit):

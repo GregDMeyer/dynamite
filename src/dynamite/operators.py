@@ -410,10 +410,8 @@ class Operator:
             mask_offsets=mask_offsets,
             signs=np.ascontiguousarray(msc['signs']),
             coeffs=np.ascontiguousarray(msc['coeffs']),
-            left_type=left.to_enum(),
-            left_data=left.get_cdata(),
-            right_type=right.to_enum(),
-            right_data=right.get_cdata(),
+            left_subspace=left._to_c(),
+            right_subspace=right._to_c()
         )
 
     @property
@@ -607,10 +605,8 @@ class Operator:
             mask_offsets=np.ascontiguousarray(mask_offsets),
             signs=np.ascontiguousarray(msc['signs']),
             coeffs=np.ascontiguousarray(msc['coeffs']),
-            left_type=subspaces[0].to_enum(),
-            left_data=subspaces[0].get_cdata(),
-            right_type=subspaces[1].to_enum(),
-            right_data=subspaces[1].get_cdata(),
+            left_subspace=subspaces[0]._to_c(),
+            right_subspace=subspaces[1]._to_c(),
             shell=self.shell,
             gpu=config.gpu
         )
