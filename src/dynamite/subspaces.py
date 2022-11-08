@@ -563,7 +563,24 @@ class Explicit(Subspace):
         return hash((self._enum, self.get_checksum()))
 
     def __repr__(self):
-        arg_str = f'{self.state_map}'
+        # following numpy's lead about when to put ellipsis
+        if len(self.state_map) < 1000:
+            to_show = self.state_map
+        else:
+            to_show = list(self.state_map[:3]) + ['...'] + list(self.state_map[-3:])
+
+        if self.L is None:
+            # number of bits in max value of state map
+            L = int(self.rmap_states[-1]).bit_length()
+        else:
+            L = self.L
+
+        # python 0b... integers, but with zeros filled to length L
+        arg_str = '[' + ', '.join(
+            x if isinstance(x, str) else '0b' + bin(x)[2:].zfill(L)
+            for x in to_show
+        ) + ']'
+
         if self.L is not None:
             arg_str += f', L={self.L}'
         return f'Explicit({arg_str})'

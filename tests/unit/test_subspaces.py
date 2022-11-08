@@ -680,11 +680,26 @@ class TestExplicit(ut.TestCase):
 
     def test_repr(self):
         cases = [
-            (Explicit([1, 2, 3]), "Explicit([1 2 3])"),
-            (Explicit([1, 2, 3], L=4), "Explicit([1 2 3], L=4)")
+            'Explicit([0b00, 0b10, 0b11])',
+            'Explicit([0b11, 0b10, 0b00])',
+            'Explicit([0b0000, 0b0100, 0b0010], L=4)'
         ]
-        for case, result in cases:
-            self.assertEqual(repr(case), result)
+        for case in cases:
+            self.assertEqual(repr(eval(case)), case)
+
+    def test_repr_large(self):
+        self.assertEqual(
+            repr(Explicit(np.arange(1000))),
+            'Explicit([0b0000000000, 0b0000000001, 0b0000000010, ..., 0b1111100101, 0b1111100110, '
+            '0b1111100111])'
+        )
+
+    def test_repr_large_L(self):
+        self.assertEqual(
+            repr(Explicit(np.arange(1000), L=11)),
+            'Explicit([0b00000000000, 0b00000000001, 0b00000000010, ..., 0b01111100101, '
+            '0b01111100110, 0b01111100111], L=11)'
+        )
 
 
 class TestAuto(ut.TestCase):
