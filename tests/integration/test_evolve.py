@@ -9,7 +9,7 @@ import unittest as ut
 from dynamite import config
 from dynamite.operators import sigmax, index_product, identity
 from dynamite.states import State
-from dynamite.subspaces import Parity
+from dynamite.subspaces import Parity, SpinConserve, Auto
 from dynamite.tools import complex_enabled
 from dynamite.computations import MaxIterationsError
 
@@ -116,9 +116,42 @@ class Hamiltonians(EvolveChecker):
         self.evolve_all(50.0, skip=skip, max_its=500)
 
 @ut.skipIf(not complex_enabled(), 'complex numbers not enabled')
-class ParityTests(EvolveChecker):
+class Subspaces(EvolveChecker):
 
-    def test_exceptions(self):
+    def test_all_subspaces(self):
+        skip = set()
+        if self.skip_flags['small_only']:
+            skip.add('syk')
+        if self.skip_flags['medium_only']:
+            skip.add('long_range')
+            skip.add('localized')
+
+        for H_name in hamiltonians.get_names(include_complex=complex_enabled()):
+            if H_name in skip:
+                continue
+
+            H = getattr(hamiltonians, H_name)()
+
+            subspaces = [
+                Parity('even'), Parity('odd'),
+                SpinConserve(config.L, config.L//2, spinflip=None),
+                Auto(H, (1 << (H.L//2)), sort=True),
+                Auto(H, (1 << (H.L//2)), sort=False),
+            ]
+
+            if config.L % 2 == 0:
+                subspaces += [
+                    SpinConserve(config.L, config.L//2, spinflip='+'),
+                    SpinConserve(config.L, config.L//2, spinflip='-'),
+                ]
+
+            for subspace in subspaces:
+                with self.subTest(subspace=subspace):
+                    H.add_subspace(subspace)
+                    H.allow_projection = True
+                    self.evolve_check(H, 0.1)
+
+    def test_parity_exceptions(self):
         H = identity()
         full_state = State(state=0)
         sub_state = State(state=0, subspace=Parity('even'))
