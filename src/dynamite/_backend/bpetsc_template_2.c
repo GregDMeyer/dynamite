@@ -753,6 +753,13 @@ PetscErrorCode C(MatMult_CPU_Fast,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, Vec x,
 
       for (mask_idx = mask_starts[proc_idx]; mask_idx < mask_starts[proc_idx+1]; ++mask_idx) {
 
+        #if (C(LEFT_SUBSPACE,SP) == Parity_SP)
+        /* skip terms that don't preserve parity */
+        if (builtin_parity(ctx->masks[mask_idx])) {
+          continue;
+        }
+        #endif
+
         m = C(S2I_nocheck,LEFT_SUBSPACE)(
           ctx->masks[mask_idx],
           NULL
