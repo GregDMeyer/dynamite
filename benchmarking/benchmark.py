@@ -225,8 +225,6 @@ def main():
     # build our Hamiltonian, if we need it
     if arg_params.H is not None:
         H = log_call(build_hamiltonian, stats)(arg_params)
-        if __debug__:
-            Print('nnz:', H.nnz, '\ndensity:', H.density, '\nMSC size:', H.msc_size)
     else:
         if (arg_params.subspace == 'auto' or
                 any(getattr(arg_params, x) for x in ['norm', 'eigsolve', 'evolve', 'mult'])):
@@ -237,6 +235,11 @@ def main():
     subspace = log_call(build_subspace, stats)(arg_params, H)
     if H is not None:
         H.subspace = subspace
+        Print('H statistics:')
+        Print(' dim:', H.dim[0])
+        Print(' nnz:', H.nnz)
+        Print(' density:', H.density)
+        Print(' MSC size:', H.msc_size)
         log_call(H.build_mat, stats)()
 
     # build some states to use in the computations
