@@ -9,7 +9,7 @@ import unittest as ut
 from dynamite import config
 from dynamite.operators import sigmax, index_product, identity
 from dynamite.states import State
-from dynamite.subspaces import Parity, SpinConserve, Auto
+from dynamite.subspaces import Parity, SpinConserve, Auto, XParity
 from dynamite.tools import complex_enabled
 from dynamite.computations import MaxIterationsError
 
@@ -133,17 +133,23 @@ class Subspaces(EvolveChecker):
             H = getattr(hamiltonians, H_name)()
 
             subspaces = [
-                Parity('even'), Parity('odd'),
-                SpinConserve(config.L, config.L//2, spinflip=None),
+                Parity('even'),
+                Parity('odd'),
+                SpinConserve(config.L, config.L//2),
+            ]
+            all_subspaces = subspaces.copy()
+
+            if config.L % 2 == 0:
+                for subspace in subspaces:
+                    all_subspaces.append(XParity(subspace, '+'))
+                    all_subspaces.append(XParity(subspace, '-'))
+
+            all_subspaces += [
+                XParity(sector='+'),
+                XParity(sector='-'),
                 Auto(H, (1 << (H.L//2)), sort=True),
                 Auto(H, (1 << (H.L//2)), sort=False),
             ]
-
-            if config.L % 2 == 0:
-                subspaces += [
-                    SpinConserve(config.L, config.L//2, spinflip='+'),
-                    SpinConserve(config.L, config.L//2, spinflip='-'),
-                ]
 
             for subspace in subspaces:
                 with self.subTest(subspace=subspace):

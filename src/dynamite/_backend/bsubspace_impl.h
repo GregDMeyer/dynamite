@@ -30,6 +30,12 @@ typedef struct _subspaces_t
   void *right_data;
 } subspaces_t;
 
+/*
+ * NOTE: none of the functions in this file handle XParity---that is handled elsewhere.
+ * when called on XParity all of these functions give correct values for the *parent*
+ * subspace
+ */
+
 /***** FULL *****/
 
 typedef struct _data_Full
@@ -158,7 +164,6 @@ typedef struct _data_SpinConserve
 {
   PetscInt L;
   PetscInt k;
-  PetscInt spinflip;
   PetscInt ld_nchoosek;
   PetscInt* nchoosek;
 } data_SpinConserve;
@@ -182,9 +187,6 @@ static inline PetscErrorCode DestroySubspaceData_SpinConserve(data_SpinConserve*
 }
 
 static inline PetscInt Dim_SpinConserve(const data_SpinConserve* data) {
-  if (data->spinflip) {
-    return data->nchoosek[data->k*data->ld_nchoosek + data->L]/2;
-  }
   return data->nchoosek[data->k*data->ld_nchoosek + data->L];
 }
 
@@ -202,13 +204,6 @@ static inline PetscInt S2I_nocheck_SpinConserve(PetscInt state, const data_SpinC
 }
 
 static inline PetscInt S2I_SpinConserve(PetscInt state, const data_SpinConserve* data) {
-  if (data->spinflip) {
-    if (state >> (data->L-1)) return (PetscInt)(-1);
-  }
-  else {
-    if (state >> data->L) return (PetscInt)(-1);
-  }
-
   if (builtin_popcount(state) != data->k) return (PetscInt)(-1);
 
   return S2I_nocheck_SpinConserve(state, data);

@@ -39,9 +39,9 @@ typedef enum _shell_impl {
   GPU_SHELL
 } shell_impl;
 
-PetscErrorCode BuildMat(const msc_t *msc, subspaces_t *subspaces, shell_impl shell, Mat *A);
+PetscErrorCode BuildMat(const msc_t *msc, subspaces_t *subspaces, shell_impl shell, int xparity, Mat *A);
 
-PetscErrorCode CheckConserves(const msc_t *msc, subspaces_t *subspaces, PetscInt *result);
+PetscErrorCode CheckConserves(const msc_t *msc, subspaces_t *subspaces, int xparity, PetscInt *result);
 
 PetscErrorCode BuildContext(const msc_t *msc,
                             const void* left_subspace_data,

@@ -13,7 +13,7 @@ from dynamite.states import State
 from dynamite.tools import complex_enabled, get_cur_memory_usage
 from dynamite.operators import identity, sigmax, sigmay, index_sum
 from dynamite.msc_tools import msc_dtype, dnm_int_t
-from dynamite.subspaces import Auto, SpinConserve
+from dynamite.subspaces import Auto, SpinConserve, XParity
 import hamiltonians
 
 
@@ -164,9 +164,12 @@ class Compare(dtr.DynamiteTestCase):
 
         op = index_sum(sigmax(0)*sigmax(1) + sigmay(0)*sigmay(1))
 
-        for spinflip in ['+', '-', None]:
-            with self.subTest(spinflip=spinflip):
-                op.subspace = SpinConserve(config.L, config.L//2, spinflip=spinflip)
+        for xparity in ['+', '-', None]:
+            with self.subTest(xparity=xparity):
+                if xparity is None:
+                    op.subspace = SpinConserve(config.L, config.L//2)
+                else:
+                    op.subspace = XParity(SpinConserve(config.L, config.L//2), xparity)
                 self.compare_matrices(op)
 
 

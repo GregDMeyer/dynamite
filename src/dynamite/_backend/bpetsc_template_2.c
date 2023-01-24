@@ -16,21 +16,22 @@ PetscErrorCode C(BuildMat,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
   const void* left_subspace_data,
   const void* right_subspace_data,
   shell_impl shell,
+  int xparity,
   Mat *A)
 {
   PetscErrorCode ierr;
   if (shell == NO_SHELL) {
     ierr = C(BuildPetsc,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
-      msc, left_subspace_data, right_subspace_data, A);
+      msc, left_subspace_data, right_subspace_data, xparity, A);
   }
   else if (shell == CPU_SHELL) {
     ierr = C(BuildCPUShell,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
-      msc, left_subspace_data, right_subspace_data, A);
+      msc, left_subspace_data, right_subspace_data, xparity, A);
   }
 #if PETSC_HAVE_CUDA
   else if (shell == GPU_SHELL) {
     ierr = C(BuildGPUShell,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
-      msc, left_subspace_data, right_subspace_data, A);
+      msc, left_subspace_data, right_subspace_data, xparity, A);
   }
 #endif
   else {
@@ -45,6 +46,7 @@ PetscErrorCode C(BuildPetsc,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
   const msc_t *msc,
   const void* left_subspace_data,
   const void* right_subspace_data,
+  int xparity,
   Mat *A)
 {
   PetscInt M, N, row_start, row_end, col_start;
@@ -60,6 +62,15 @@ PetscErrorCode C(BuildPetsc,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
   /* N is dimension of right subspace, M of left */
   M = C(Dim,LEFT_SUBSPACE)(left_subspace_data);
   N = C(Dim,RIGHT_SUBSPACE)(right_subspace_data);
+
+  /*
+   * because we adjust the msc with subspace.reduce_msc, this is
+   * the only thing we have to do in the backend to handle xparity!
+   */
+  if (xparity) {
+    M /= 2;
+    N /= 2;
+  }
 
   /* create matrix */
   PetscCall(MatCreate(PETSC_COMM_WORLD, A));
@@ -187,6 +198,7 @@ PetscErrorCode C(BuildCPUShell,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
   const msc_t *msc,
   const C(data,LEFT_SUBSPACE)* left_subspace_data,
   const C(data,RIGHT_SUBSPACE)* right_subspace_data,
+  int xparity,
   Mat *A)
 {
   PetscInt M, N, m, n;
@@ -195,6 +207,15 @@ PetscErrorCode C(BuildCPUShell,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
   /* N is dimension of right subspace, M of left */
   M = C(Dim,LEFT_SUBSPACE)(left_subspace_data);
   N = C(Dim,RIGHT_SUBSPACE)(right_subspace_data);
+
+  /*
+   * because we adjust the msc with subspace.reduce_msc, this is
+   * the only thing we have to do in the backend to handle xparity!
+   */
+  if (xparity) {
+    M /= 2;
+    N /= 2;
+  }
 
   m = PETSC_DECIDE;
   n = PETSC_DECIDE;
@@ -916,8 +937,8 @@ PetscErrorCode C(MatNorm_CPU,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
 
 /*
  * This function checks whether an operator (represented as MSC) conserves the given
- * subspaces. It assumes a product state basis; extra conservation laws (such as the
- * extra Z2 symmetry in SpinConserve+spinflip) need to be checked externally.
+ * subspaces. It assumes a product state basis; extra conservation laws (such as
+ * XParity) need to be checked externally.
  */
 #undef  __FUNCT__
 #define __FUNCT__ "CheckConserves"
@@ -925,6 +946,7 @@ PetscErrorCode C(CheckConserves,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
   const msc_t *msc,
   const C(data,LEFT_SUBSPACE)* left_subspace_data,
   const C(data,RIGHT_SUBSPACE)* right_subspace_data,
+  int xparity,
   PetscInt* result)
 {
   PetscLayout layout;
@@ -936,6 +958,10 @@ PetscErrorCode C(CheckConserves,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
 
   /* dimension of right subspace */
   N = C(Dim,RIGHT_SUBSPACE)(right_subspace_data);
+  if (xparity) {
+    N /= 2;
+  }
+
 
   /* split the work across processes */
   PetscCall(PetscLayoutCreate(PETSC_COMM_WORLD, &layout));

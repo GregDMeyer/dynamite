@@ -11,7 +11,7 @@ from zlib import crc32
 import math
 from functools import wraps
 
-from . import validate, states, config
+from . import validate, config, states
 from ._backend import bsubspace
 from .msc_tools import dnm_int_t, combine_and_sort
 from .bitwise import parity
@@ -22,25 +22,7 @@ class Subspace:
     Base subspace class.
     '''
 
-    # subclasses should set to False if they need
-    _product_state_basis = True
-    _checksum_start = 0
-
-    # enum value used in the backend to identify subspace
-    _enum = None
-
-    # functions each subclass should supply
-    _c_get_dimension = None
-    _c_idx_to_state = None
-    _c_state_to_idx = None
-
-    def __init__(self, L=None):
-        if L is None:
-            self._L = config.L
-        else:
-            self._L = validate.L(L)
-
-        self._chksum = None
+    _chksum = None
 
     def __eq__(self, s):
         '''
@@ -53,7 +35,7 @@ class Subspace:
         if not isinstance(s, Subspace):
             raise ValueError('Cannot compare Subspace to non-Subspace type')
 
-        if self._L is None:
+        if self.L is None:
             raise ValueError('Cannot evaluate equality of subspaces before setting L')
 
         if self.get_dimension() != s.get_dimension():
@@ -97,52 +79,6 @@ class Subspace:
         """
         return self._product_state_basis
 
-    def reduce_msc(self, msc, check_conserves=False):
-        """
-        Return an equivalent (in the subspace) but simpler MSC representation
-        for the operator, by taking advantage of the subspace's symmetries.
-
-        Parameters
-        ----------
-
-        msc : dynamite.msc_tools.msc_dtype
-            The input MSC representation
-
-        check_conserves : bool
-            Whether to return whether the operator was conserved
-
-        Returns
-        -------
-
-        dynamite.msc_tools.msc_dtype
-            The reduced version
-
-        bool
-            Whether the operator was conserved during the operation
-        """
-        raise NotImplementedError
-
-    @classmethod
-    def _numeric_to_array(cls, x):
-        '''
-        Convert numeric values of any type to the type expected by the backend
-        functions.
-        '''
-        x = np.array(x, copy = False, dtype = bsubspace.dnm_int_t).reshape((-1,))
-        return np.ascontiguousarray(x)
-
-    def _check_idx_bounds(self, idx):
-        dim = self.get_dimension()
-        if np.min(idx) < 0 or np.max(idx) >= dim:
-            # do this inside the if statement for performance
-            invalid_idx = idx[np.logical_or(idx >= dim, idx < 0)]
-            if len(invalid_idx) == 1:
-                msg = f'Index {invalid_idx[0]}'
-            else:
-                msg = f'Indices {invalid_idx}'
-            msg += f' out of bounds for subspace of dimension {dim}'
-            raise ValueError(msg)
-
     def copy(self):
         return deepcopy(self)
 
@@ -153,7 +89,7 @@ class Subspace:
         '''
         if self._chksum is None:
             BLOCK = 2**14
-            chksum = self._checksum_start
+            chksum = 0
             for start in range(0, self.get_dimension(), BLOCK):
                 stop = min(start+BLOCK, self.get_dimension())
                 smap = self.idx_to_state(np.arange(start, stop))
@@ -166,7 +102,10 @@ class Subspace:
         """
         Get the dimension of the subspace.
         """
-        return self._c_get_dimension(self._get_cdata())
+        return self._get_dimension()
+
+    def _get_dimension(self):
+        raise NotImplementedError
 
     def _single_or_array(fn):
         '''
@@ -176,7 +115,9 @@ class Subspace:
         @wraps(fn)
         def rtn_fn(self, val, *args, **kwargs):
             single_value = not hasattr(val, "__len__")
-            val = self._numeric_to_array(val)
+            val = np.ascontiguousarray(
+                np.array(val, copy=False, dtype=bsubspace.dnm_int_t).reshape((-1,))
+            )
 
             rtn = fn(self, val, *args, **kwargs)
 
@@ -193,21 +134,74 @@ class Subspace:
         Maps an index to an integer that in binary corresponds to the spin configuration.
         Vectorized implementation allows passing a numpy array of indices as idx.
         """
-        self._check_idx_bounds(idx)
-        return self._c_idx_to_state(idx, self._get_cdata())
+
+        # check that all indices are in bounds
+        dim = self.get_dimension()
+        if np.min(idx) < 0 or np.max(idx) >= dim:
+            # do this inside the if statement for performance
+            invalid_idx = idx[np.logical_or(idx >= dim, idx < 0)]
+            if len(invalid_idx) == 1:
+                msg = f'Index {invalid_idx[0]}'
+            else:
+                msg = f'Indices {invalid_idx}'
+            msg += f' out of bounds for subspace of dimension {dim}'
+            raise ValueError(msg)
+
+        return self._idx_to_state(idx)
+
+    def _idx_to_state(idx):
+        raise NotImplementedError
 
     @_single_or_array
     def state_to_idx(self, state):
         """
         The inverse mapping of :meth:`idx_to_state`.
         """
-        return self._c_state_to_idx(state, self._get_cdata())
+        return self._state_to_idx(state)
+
+    def _state_to_idx(self, state):
+        raise NotImplementedError
 
     def _to_c(self):
         '''
-        Returns the subspace type and data, in C-accessible format.
+        Returns a dict with the fields 'type' and 'data' containing information about the underlying
+        product state subspace. Any subspace on top of that (currently only XParity) needs to be
+        handled separately.
         '''
-        return {'type': self._enum, 'data': self._get_cdata()}
+        raise NotImplementedError
+
+
+class _ProductStateSubspace(Subspace):
+    """
+    A subspace whose basis states are product states in the Z basis. Subspaces of this
+    class underlie the non-product-state subspaces (currently only XParity).
+    """
+    _product_state_basis = True
+
+    # enum value used in the backend to identify subspace
+    _enum = None
+
+    # functions each subclass should supply
+    _c_get_dimension = None
+    _c_idx_to_state = None
+    _c_state_to_idx = None
+
+    def __init__(self, L=None):
+        self._L = None
+        if L is None:
+            L = config.L
+
+        if L is not None:
+            self.L = L
+
+    def _get_dimension(self):
+        return self._c_get_dimension(self._get_cdata())
+
+    def _idx_to_state(self, idx):
+        return self._c_idx_to_state(idx, self._get_cdata())
+
+    def _state_to_idx(self, state):
+        return self._c_state_to_idx(state, self._get_cdata())
 
     def _get_cdata(self):
         '''
@@ -215,8 +209,11 @@ class Subspace:
         '''
         raise NotImplementedError()
 
+    def _to_c(self):
+        return {'type': self._enum, 'data': self._get_cdata()}
 
-class Full(Subspace):
+
+class Full(_ProductStateSubspace):
 
     _enum = bsubspace.SubspaceType.FULL
     _c_get_dimension = bsubspace.get_dimension_Full
@@ -224,13 +221,13 @@ class Full(Subspace):
     _c_state_to_idx = bsubspace.state_to_idx_Full
 
     def __init__(self, L=None):
-        Subspace.__init__(self, L)
+        super().__init__(L)
 
     def __eq__(self, s):
         if isinstance(s, Full):
             return s.L == self.L
 
-        return Subspace.__eq__(self, s)
+        return super().__eq__(s)
 
     def __hash__(self):
         return hash((self._enum, self.L))
@@ -252,7 +249,7 @@ class Full(Subspace):
         return bsubspace.CFull(self.L)
 
 
-class Parity(Subspace):
+class Parity(_ProductStateSubspace):
     '''
     The subspaces of states in which the number of up spins is even or odd.
 
@@ -268,7 +265,7 @@ class Parity(Subspace):
     _c_state_to_idx = bsubspace.state_to_idx_Parity
 
     def __init__(self, space, L=None):
-        Subspace.__init__(self, L)
+        super().__init__(L)
         self._space = self._check_space(space)
 
     @property
@@ -304,7 +301,7 @@ class Parity(Subspace):
         return bsubspace.CParity(self.L, self.space)
 
 
-class SpinConserve(Subspace):
+class SpinConserve(_ProductStateSubspace):
     '''
     The subspaces of states which conserve total magnetization (total
     number of up/down spins).
@@ -317,169 +314,28 @@ class SpinConserve(Subspace):
     k : int
         Number of down spins (1's in integer representation of state)
 
-    spinflip : str, optional
-        Sign of spinflip basis ('+' or '-'). Omit to not use Z2 symmetry.
+    spinflip : None
+        (deprecated, use ``XParity`` subspace)
     '''
 
-    _product_state_basis = False
     _enum = bsubspace.SubspaceType.SPIN_CONSERVE
     _c_get_dimension = bsubspace.get_dimension_SpinConserve
     _c_idx_to_state = bsubspace.idx_to_state_SpinConserve
     _c_state_to_idx = bsubspace.state_to_idx_SpinConserve
 
     def __init__(self, L, k, spinflip=None):
-        Subspace.__init__(self, L=L)
-
-        if spinflip is None or spinflip == 0:
-            self._spinflip = 0
-        elif spinflip in ['+', +1]:
-            self._spinflip = +1
-        elif spinflip in ['-', -1]:
-            self._spinflip = -1
-        else:
-            raise ValueError('invalid value for spinflip')
-
-        self._product_state_basis = self.spinflip == 0
-
-        # unique checksum for each value of spinflip
-        self._checksum_start = self._spinflip
-
+        super().__init__(L=L)
         self._k = self._check_k(k)
-
         self._nchoosek = self._compute_nchoosek(L, k)
+        if spinflip is not None:
+            raise DeprecationWarning('spinflip argument has been deprecated; use the XParity '
+                                     'class instead.')
 
     def __hash__(self):
-        return hash((self._enum, self.L, self.k, self.spinflip))
+        return hash((self._enum, self.L, self.k))
 
     def __repr__(self):
-        arg_str = f'L={self.L}, k={self.k}'
-        if self.spinflip != 0:
-            arg_str += f', spinflip={self.spinflip:+d}'
-        return f'SpinConserve({arg_str})'
-
-    def reduce_msc(self, msc, check_conserves=False):
-        if self.spinflip == 0:
-            raise NotImplementedError("reduce_msc should not be called when "
-                                      "not using the additional spinflip "
-                                      "subspace")
-
-        msc = msc.copy()
-
-        # delete elements which do not commute with symmetry operator
-        keep = parity(msc['signs']) == 0
-        conserved = np.all(keep)
-        msc = msc[keep]
-
-        terms_to_mod = np.nonzero(msc['masks'] >> (self.L-1))
-        msc['masks'][terms_to_mod] ^= (1 << self.L) - 1
-
-        if self.spinflip == -1:
-            msc['coeffs'][terms_to_mod] *= -1
-
-        msc = combine_and_sort(msc)
-
-        if check_conserves:
-            return msc, conserved
-        else:
-            return msc
-
-    @property
-    def spinflip(self):
-        """
-        Whether the subspace uses the additional spinflip symmetry.
-        Returns integer +1, -1, or 0 (no spinflip symmetry).
-        """
-        return self._spinflip
-
-    @classmethod
-    def convert_spinflip(cls, state, sign=None):
-        """
-        Convert a state on a subspace where spinflip is set
-        to a state on a product state SpinConserve subspace,
-        and vice versa
-
-        Parameters
-        ----------
-
-        state : State
-            The input state
-
-        sign : str, optional
-            The sign of the spinflip subspace. Required when converting from
-            non-spinflip subspace.
-
-        Returns
-        -------
-
-        State
-            The converted state
-        """
-        state.assert_initialized()
-
-        if state.subspace.spinflip == 0 and sign is None:
-            raise ValueError('must provide sign when converting to spinflip')
-
-        if state.subspace.spinflip != 0 and sign is not None:
-            raise ValueError("do not provide sign when converting from "
-                             "spinflip subspace")
-
-        if sign in ['+', +1]:
-            sign = +1
-        elif sign in ['-', -1]:
-            sign = -1
-        elif sign is not None:
-            raise ValueError('invalid value of sign')
-
-        new_space = SpinConserve(state.subspace.L,
-                                 state.subspace.k,
-                                 spinflip=sign)
-
-        rtn_state = states.State(subspace=new_space)
-        istart, iend = state.vec.getOwnershipRange()
-
-        n_in = len(state)
-        n_rtn = len(rtn_state)
-        if state.subspace.spinflip:  # to product state basis
-            start = n_rtn-istart-1
-            end = n_rtn-iend-1
-            rtn_state.vec[start:end:-1] = state.vec[istart:iend]
-
-            if state.subspace.spinflip == -1:
-                # flip sign of second half of vector for - subspace
-                rtn_state.vec.assemble()
-                rtn_state.vec.scale(-1)
-
-            rtn_state.vec[istart:iend] = state.vec[istart:iend]
-
-        else:  # from product state basis
-
-            # second half of vector
-            start = max(n_in//2, istart)
-            end = iend
-            if start < end:
-                # an unfortunate side effect of python slice notation
-                if n_in == end:
-                    rtn_state.vec[n_in-start-1::-1] = state.vec[start:end]
-                else:
-                    rtn_state.vec[n_in-start-1:n_in-end-1:-1] = state.vec[start:end]
-
-            rtn_state.vec.assemble()
-            if sign == -1:
-                rtn_state.vec.scale(-1)
-
-            if istart < n_in//2:
-                start = istart
-                end = min(n_in//2, iend)
-                rtn_state.vec.setValues(np.arange(start, end, dtype=dnm_int_t),
-                                        state.vec[start:end],
-                                        addv=True)
-
-        rtn_state.vec.assemble()
-        rtn_state.vec.scale(1/np.sqrt(2))
-
-        rtn_state.set_initialized()
-
-        return rtn_state
+        return f'SpinConserve(L={self.L}, k={self.k})'
 
     @classmethod
     def _compute_nchoosek(cls, L, k):
@@ -499,9 +355,6 @@ class SpinConserve(Subspace):
         if not (0 <= k <= self.L):
             raise ValueError('k must be between 0 and L')
 
-        if self._spinflip and not 2*k == self.L:
-            raise ValueError('L must equal 2k for spinflip symmetry')
-
         return k
 
     @property
@@ -520,12 +373,11 @@ class SpinConserve(Subspace):
 
         return bsubspace.CSpinConserve(
             self.L, self.k,
-            np.ascontiguousarray(self._nchoosek),
-            self.spinflip
+            np.ascontiguousarray(self._nchoosek)
         )
 
 
-class Explicit(Subspace):
+class Explicit(_ProductStateSubspace):
     '''
     A subspace generated by explicitly passing a list of product states.
 
@@ -541,7 +393,6 @@ class Explicit(Subspace):
     _c_state_to_idx = bsubspace.state_to_idx_Explicit
 
     def __init__(self, state_list, L=None):
-        Subspace.__init__(self, L=L)
         self.state_map = np.asarray(state_list, dtype=bsubspace.dnm_int_t)
 
         map_sorted = np.all(self.state_map[:-1] <= self.state_map[1:])
@@ -557,8 +408,7 @@ class Explicit(Subspace):
         if np.any(self.rmap_states[1:] == self.rmap_states[:-1]):
             raise ValueError('values in state_list must be unique')
 
-        if L is not None:
-            self.check_L(L)
+        super().__init__(L=L)
 
     def check_L(self, value):
         # last value of rmap_states is the lexicographically largest one
@@ -668,3 +518,269 @@ class Auto(Explicit):
 
     def __repr__(self):
         return f'Auto({self._repr_args})'
+
+
+class XParity(Subspace):
+    r'''
+    This class implements the Parity subspace, but in the X basis instead
+    of the Z basis. Unlike the other subspaces, it can be applied on top of
+    another subspace by passing that subspace as the ``parent`` argument.
+
+    In the Z basis, the basis states of this subspace are not product states,
+    but rather states of the form :math:`\left|c\right> + \left|\bar c \right>`,
+    where :math:`\left|c\right>` is a product state and :math:`\left|\bar c\right>`
+    is its complement (all spins flipped). In dynamite's interface, these basis states
+    are represented by the bitstring :math:`c` or :math:`\bar c` that is lexicographically
+    first (that is, the one having spin L-1 in the :math:`\left|0\right>` state).
+    '''
+
+    _product_state_basis = False
+
+    def __init__(self, parent=None, sector='+', L=None):
+        if parent is None:
+            parent = Full()
+
+        self._parent = parent
+        if L is not None:
+            self.parent.L = L
+
+        self._validate_parent(self.parent)
+
+        if sector in ['+', +1]:
+            self._sector = +1
+        elif sector in ['-', -1]:
+            self._sector = -1
+        else:
+            raise ValueError('invalid value for sector')
+
+    @classmethod
+    def _validate_parent(cls, parent):
+        if parent.L is None:
+            raise ValueError('L must be set for the parent subspace')
+
+        if not parent.product_state_basis:
+            raise ValueError('parent must be a product state subspace')
+
+        # Full is always fine
+        if isinstance(parent, Full):
+            return
+
+        # Parity is fine if L is even
+        if isinstance(parent, Parity):
+            if parent.L % 2 == 0:
+                return
+
+            raise ValueError('Parity is only compatible with XParity when L is even')
+
+        # SpinConserve is only OK at half filling
+        if isinstance(parent, SpinConserve):
+            if parent.L == 2*parent.k:
+                return
+
+            raise ValueError('SpinConserve is only compatible with XParity when k=L/2')
+
+        # otherwise (currently only could be Explicit) we have to check... explicitly!
+
+        dim = parent.get_dimension()
+        if dim % 2 != 0:
+            raise ValueError('parent subspace must have even dimension')
+
+        block_size = 1024  # for efficiency
+        for start in range(0, dim//2, block_size):
+            end = min(start+block_size, dim//2)
+
+            # states in first half, they are representatives
+            state_block = parent.idx_to_state(np.arange(start, end))
+
+            # make sure they all start with 0
+            if np.count_nonzero(state_block >> (parent.L-1)):
+                raise ValueError('first dim/2 basis states must have spin L-1 up '
+                                 '(0 in integer notation)')
+
+            # make sure their complements are also in subspace
+            if np.any(parent.state_to_idx(state_block) == -1):
+                raise ValueError('the complement of every state in subspace (all spins flipped) '
+                                 'must also be in subspace')
+
+            # we don't need to check the ones starting with 1, because all basis states are unique,
+            # so if half of states start with 0 and each one has a complement there is no room for
+            # extra states starting with 1 that don't have a matching 0 state
+
+    @property
+    def parent(self):
+        """
+        The parent subspace upon which XParity has been applied.
+        """
+        return self._parent
+
+    @property
+    def sector(self):
+        """
+        The sector of the xparity symmetry.
+        Returns +1 or -1 as an integer.
+        """
+        return self._sector
+
+    def reduce_msc(self, msc, check_conserves=False):
+        """
+        Return an equivalent (in the subspace) but simpler MSC representation
+        for the operator, by taking advantage of the subspace's symmetries.
+
+        Parameters
+        ----------
+
+        msc : dynamite.msc_tools.msc_dtype
+            The input MSC representation
+
+        check_conserves : bool
+            Whether to return whether the operator was conserved
+
+        Returns
+        -------
+
+        dynamite.msc_tools.msc_dtype
+            The reduced version
+
+        bool
+            Whether the operator was conserved during the operation
+        """
+        msc = msc.copy()
+
+        # delete elements which do not commute with symmetry operator
+        keep = parity(msc['signs']) == 0
+        conserved = np.all(keep)
+        msc = msc[keep]
+
+        terms_to_mod = np.nonzero(msc['masks'] >> (self.L-1))
+        msc['masks'][terms_to_mod] ^= (1 << self.L) - 1
+
+        if self.sector == -1:
+            msc['coeffs'][terms_to_mod] *= -1
+
+        msc = combine_and_sort(msc)
+
+        if check_conserves:
+            return msc, conserved
+        else:
+            return msc
+
+    def convert_state(self, state):
+        """
+        Convert a state on the XParity subspace to one on its parent, or
+        vice versa.
+
+        Parameters
+        ----------
+
+        state : State
+            The input state
+
+        Returns
+        -------
+
+        State
+            The converted state
+        """
+        state.assert_initialized()
+
+        istart, iend = state.vec.getOwnershipRange()
+        n_in = len(state)
+
+        block_size = 1024
+
+        # convert to parent
+        if state.subspace is self:
+            rtn_state = states.State(subspace=self.parent)
+
+            flip_mask = (1 << self.L) - 1
+            for block_start in range(istart, iend, block_size):
+                block_end = min(iend, block_start + block_size)
+
+                # get the indices where values should be set
+                from_idxs = np.arange(block_start, block_end, dtype=dnm_int_t)
+                from_states = self.idx_to_state(from_idxs)
+                to_idxs = self.parent.state_to_idx(flip_mask ^ from_states)
+                rtn_state.vec[to_idxs] = state.vec[from_idxs]
+
+            rtn_state.vec.assemble()
+
+            if self.sector == -1:
+                # flip sector of second half of vector for - subspace
+                rtn_state.vec.scale(-1)
+
+            # first half is easier---indices are the same!
+            rtn_state.vec[istart:iend] = state.vec[istart:iend]
+
+        # convert from parent
+        elif state.subspace is self.parent:
+            rtn_state = states.State(subspace=self)
+
+            # second half of vector
+            start = max(n_in//2, istart)
+            end = iend
+            if start < end:
+                flip_mask = (1 << self.L) - 1
+                for block_start in range(start, end, block_size):
+                    block_end = min(end, block_start + block_size)
+
+                    # get the indices where values should be set
+                    from_idxs = np.arange(block_start, block_end, dtype=dnm_int_t)
+                    from_states = self.parent.idx_to_state(from_idxs)
+                    to_idxs = self.state_to_idx(flip_mask ^ from_states)
+                    rtn_state.vec[to_idxs] = state.vec[from_idxs]
+
+            rtn_state.vec.assemble()
+            if self.sector == -1:
+                # flip sector of second half of vector for - subspace
+                rtn_state.vec.scale(-1)
+
+            if istart < n_in//2:
+                start = istart
+                end = min(n_in//2, iend)
+                rtn_state.vec.setValues(np.arange(start, end, dtype=dnm_int_t),
+                                        state.vec[start:end],
+                                        addv=True)
+
+        else:
+            raise ValueError('subspace of input state must be this XParity subspace '
+                             'or its parent')
+
+        rtn_state.vec.assemble()
+        rtn_state.vec.scale(1/np.sqrt(2))  # normalize
+
+        rtn_state.set_initialized()
+
+        return rtn_state
+
+    def __hash__(self):
+        return hash(('XParity', self.sector, self.parent))
+
+    def __repr__(self):
+        return f'XParity({repr(self.parent)}, sector={self.sector:+d})'
+
+    @property
+    def _L(self):
+        return self.parent.L
+
+    @_L.setter
+    def _L(self, value):
+        self.parent.L = value
+
+    def _get_dimension(self):
+        return self.parent.get_dimension()//2
+
+    def _idx_to_state(self, idx):
+        # representative states are the first N/2
+        # so we can just call parent function directly
+        return self.parent.idx_to_state(idx)
+
+    def _state_to_idx(self, state):
+        # this function takes a representation of a "representative"
+        # state---so it must start with 0 (have spin L-1 in state 0)
+        if np.count_nonzero(state >> (self.L-1)):
+            raise ValueError('invalid state')
+
+        return self.parent.state_to_idx(state)
+
+    def _to_c(self):
+        return self.parent._to_c()

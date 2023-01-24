@@ -16,6 +16,7 @@
  - `L` can now be passed to most subspaces as an argument
  - `L` for the `State` class can be inferred from the length of string passed to the `state` argument of the constructor
  - `L` for state class can now be set directly via the `State.L` parameter
+ - `XParity` subspace, which implements Parity but in the X basis and can be applied on top of other subspaces
 
 ### Changed
  - Order of arguments to `State` class changed
@@ -27,6 +28,7 @@
  - `states.State.normalize()` now has no return value (previously returned the scale factor used for normalization)
  - `hash(subspace)` now is only the same for two subspaces if `subspace.identical` would return `True`
  - Subspace methods `idx_to_state` and `state_to_idx` now return a scalar when passed a scalar, instead of returning a length-1 array
+ - Removed `spinflip` argument from `SpinConserve` (replaced by `XParity` subspace)
 
 ### Fixed
  - An exception is now raised if an unknown keyword argument is passed to `computations.evolve()`

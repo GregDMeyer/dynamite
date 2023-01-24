@@ -10,13 +10,13 @@ import dynamite_test_runner as dtr
 
 from dynamite import config
 from dynamite.tools import complex_enabled
-from dynamite.subspaces import SpinConserve, Parity
+from dynamite.subspaces import SpinConserve, Parity, XParity
 from dynamite.operators import index_product, sigma_plus, sigma_minus
 
 
 def collision_operator():
     '''
-    An extremely contrived operator where terms collide for spinflip.
+    An extremely contrived operator where terms collide for XParity.
     '''
     half = 2*(config.L//4)
     left_half = 0.75*index_product(sigma_plus(), size=half//2)
@@ -41,7 +41,7 @@ class Hamiltonians(dtr.DynamiteTestCase):
         for H_name in all_H:
             if H_name == 'syk' and self.skip_flags['small_only']:
                 continue
-            test_subspaces = ('full', 'spinconserve', 'mix', 'spinflip+', 'spinflip-')
+            test_subspaces = ('full', 'spinconserve', 'mix', 'xparity+', 'xparity-')
             for subspace_name in test_subspaces:
                 with self.subTest(H=H_name, subspace=subspace_name):
                     if H_name == 'collision':
@@ -52,11 +52,12 @@ class Hamiltonians(dtr.DynamiteTestCase):
                     if subspace_name == 'spinconserve':
                         H.subspace = SpinConserve(config.L, config.L//3)
                         H.allow_projection = True
-                    elif subspace_name.startswith('spinflip'):
+                    elif subspace_name.startswith('xparity'):
                         if config.L % 2 == 1:
                             continue
-                        H.subspace = SpinConserve(
-                            config.L, config.L//2, spinflip=subspace_name[-1]
+                        H.subspace = XParity(
+                            SpinConserve(config.L, config.L//2),
+                            sector=subspace_name[-1]
                         )
                         H.allow_projection = True
                     elif subspace_name == 'mix':

@@ -9,7 +9,7 @@ import dynamite_test_runner as dtr
 from dynamite import config
 from dynamite.tools import complex_enabled
 from dynamite.msc_tools import msc_dtype
-from dynamite.subspaces import Full, Parity, SpinConserve, Auto
+from dynamite.subspaces import Full, Parity, SpinConserve, Auto, XParity
 from dynamite.operators import index_sum, sigmax, sigmay, sigmaz
 from dynamite.operators import Operator
 
@@ -62,24 +62,27 @@ class SubspaceConservation(dtr.DynamiteTestCase):
                         answers[H_name]
                     )
 
-    def test_spinconserve_spinflip_false(self):
+    def test_spinconserve_xparity_false(self):
         L = config.L
 
         if L % 2 != 0:
             self.skipTest("only for even spin chain lengths")
 
         k = config.L//2
-        for spinflip in ('+', '-'):
+        for xparity in ('+', '-'):
             for H_name in hamiltonians.get_names(complex_enabled()):
                 H = getattr(hamiltonians, H_name)()
-                with self.subTest(H=H_name, spinflip=spinflip):
+                with self.subTest(H=H_name, xparity=xparity):
                     self.assertFalse(
-                        H.conserves(SpinConserve(
-                            config.L, k, spinflip=spinflip
-                        ))
+                        H.conserves(
+                            XParity(
+                                SpinConserve(config.L, k),
+                                sector=xparity
+                            )
+                        )
                     )
 
-    def test_spinconserve_spinflip_heisenberg(self):
+    def test_spinconserve_xparity_heisenberg(self):
         H = index_sum(
             sigmax(0)*sigmax(1) + sigmay(0)*sigmay(1) + sigmaz(0)*sigmaz(1)
         )
@@ -89,19 +92,22 @@ class SubspaceConservation(dtr.DynamiteTestCase):
             self.skipTest("only for even spin chain lengths")
 
         k = config.L//2
-        for spinflip in ('+', '-'):
-            with self.subTest(spinflip=spinflip):
+        for xparity in ('+', '-'):
+            with self.subTest(xparity=xparity):
                 self.assertTrue(
-                    H.conserves(SpinConserve(
-                        config.L, k, spinflip=spinflip
-                    ))
+                    H.conserves(
+                        XParity(
+                            SpinConserve(config.L, k),
+                            sector=xparity
+                        )
+                    )
                 )
 
-    def test_spinconserve_spinflip_error(self):
+    def test_spinconserve_xparity_error(self):
         op = sigmax()
         with self.assertRaises(ValueError):
             op.conserves(
-                SpinConserve(config.L, config.L//2, spinflip='+'),
+                XParity(SpinConserve(config.L, config.L//2), sector='+'),
                 Full()
             )
 
@@ -133,11 +139,11 @@ class SubspaceConservation(dtr.DynamiteTestCase):
                 op.conserves(Parity('odd'), Parity('even'))
             )
 
-    # Switching the value of spinflip is currently not supported, but could be
+    # Switching the value of xparity is currently not supported, but could be
     # in the future
-    # def test_change_spinflip(self):
+    # def test_change_xparity(self):
     #     """
-    #     Test operators that take us from one spinflip value to the other
+    #     Test operators that take us from one xparity value to the other
     #     """
     #     L = config.L
     #     if L % 2 != 0:
@@ -148,15 +154,15 @@ class SubspaceConservation(dtr.DynamiteTestCase):
 
     #     self.assertTrue(
     #         op.conserves(
-    #             SpinConserve(config.L, k, spinflip='+'),
-    #             SpinConserve(config.L, k, spinflip='-')
+    #             XParity(SpinConserve(config.L, k), sector='+'),
+    #             XParity(SpinConserve(config.L, k), sector='-')
     #         )
     #     )
 
     #     self.assertTrue(
     #         op.conserves(
-    #             SpinConserve(config.L, k, spinflip='-'),
-    #             SpinConserve(config.L, k, spinflip='+')
+    #             XParity(SpinConserve(config.L, k), sector='-'),
+    #             XParity(SpinConserve(config.L, k), sector='+')
     #         )
     #     )
 

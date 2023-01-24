@@ -9,7 +9,7 @@ import dynamite_test_runner as dtr
 import unittest as ut
 
 from dynamite import config
-from dynamite.subspaces import Parity, Auto, SpinConserve
+from dynamite.subspaces import Parity, Auto, SpinConserve, XParity
 from dynamite.states import State
 from dynamite.computations import reduced_density_matrix, entanglement_entropy, renyi_entropy
 from dynamite.tools import complex_enabled
@@ -289,8 +289,8 @@ class SpinConserveSpace(FullSpace):
     def setUp(self):
         self.state = State(subspace=SpinConserve(config.L, config.L//2))
 
-class SpinConserveSpinFlipSpace(FullSpace):
-    def test_spinflip_fail(self):
+class SpinConserveXParitySpace(FullSpace):
+    def test_xparity_fail(self):
         if config.L % 2:
             self.skipTest("only for even L")
 
@@ -298,8 +298,9 @@ class SpinConserveSpinFlipSpace(FullSpace):
             with self.subTest(sign=sign):
                 state = State(
                     state='random',
-                    subspace=SpinConserve(
-                        config.L, config.L//2, spinflip=sign
+                    subspace=XParity(
+                        SpinConserve(config.L, config.L//2),
+                        sector=sign
                     )
                 )
                 with self.assertRaises(ValueError):

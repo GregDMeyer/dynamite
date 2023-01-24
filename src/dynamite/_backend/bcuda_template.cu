@@ -5,6 +5,7 @@ PetscErrorCode C(BuildGPUShell,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
   const msc_t *msc,
   const C(data,LEFT_SUBSPACE)* left_subspace_data,
   const C(data,RIGHT_SUBSPACE)* right_subspace_data,
+  int xparity,
   Mat *A)
 {
   PetscInt M, N, mpi_size;
@@ -19,6 +20,10 @@ PetscErrorCode C(BuildGPUShell,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
   /* N is dimension of right subspace, M of left */
   M = C(Dim,LEFT_SUBSPACE)(left_subspace_data);
   N = C(Dim,RIGHT_SUBSPACE)(right_subspace_data);
+  if (xparity) {
+    M /= 2;
+    N /= 2;
+  }
 
   PetscCall(C(BuildContext_CUDA,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
     msc, left_subspace_data, right_subspace_data, &ctx));

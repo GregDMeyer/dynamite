@@ -9,7 +9,7 @@ import hamiltonians
 from dynamite import config
 from dynamite.msc_tools import msc_dtype
 from dynamite.operators import identity, sigmax, sigmay, index_sum, index_product
-from dynamite.subspaces import Full, Parity, Auto, SpinConserve
+from dynamite.subspaces import Full, Parity, Auto, SpinConserve, XParity
 from dynamite.states import State
 from dynamite.tools import complex_enabled
 
@@ -51,7 +51,7 @@ class FullSpace(dtr.DynamiteTestCase):
         correct = {3 : 1}
         self.check_nonzeros(r, correct)
 
-    def test_spinflip(self):
+    def test_spin_flip(self):
         H = index_product(sigmax())
         s = State(state='D'*H.get_length())
         r = H * s
@@ -117,8 +117,7 @@ class Subspaces(dtr.DynamiteTestCase):
         check_subspace : dynamite.subspace.Subspace
             The subspace to multiply under.
         '''
-        extra_conversion = isinstance(check_subspace, SpinConserve)
-        extra_conversion = extra_conversion and check_subspace.spinflip
+        extra_conversion = isinstance(check_subspace, XParity)
 
         # compare all possible combinations of going to and from the full space
         self.assertTrue(isinstance(x_full.subspace, Full))
@@ -127,7 +126,7 @@ class Subspaces(dtr.DynamiteTestCase):
         to_space = identity()
         to_space.allow_projection = True
         if extra_conversion:
-            to_space.add_subspace(SpinConserve(check_subspace.L, check_subspace.k), Full())
+            to_space.add_subspace(check_subspace.parent, Full())
         else:
             to_space.add_subspace(check_subspace, Full())
 
@@ -137,7 +136,7 @@ class Subspaces(dtr.DynamiteTestCase):
         if extra_conversion:
             tmp = State(subspace=to_space.left_subspace)
             to_space.dot(correct_full, tmp)
-            correct_sub = SpinConserve.convert_spinflip(tmp, sign=check_subspace.spinflip)
+            correct_sub = check_subspace.convert_state(tmp)
         else:
             correct_sub = State(subspace=check_subspace)
             to_space.dot(correct_full, correct_sub)
@@ -157,8 +156,8 @@ class Subspaces(dtr.DynamiteTestCase):
     def generate_random_in_subspace(cls, space):
         x_sub = State(subspace=space, state='random', seed=0)
 
-        if isinstance(space, SpinConserve) and space.spinflip:
-            tmp = SpinConserve.convert_spinflip(x_sub)
+        if isinstance(space, XParity):
+            tmp = space.convert_state(x_sub)
         else:
             tmp = x_sub
 
@@ -234,12 +233,14 @@ class Subspaces(dtr.DynamiteTestCase):
     def test_spin_conserve_half_filling(self):
         H = index_sum(sigmax(0)*sigmax(1) + sigmay(0)*sigmay(1))
 
-        for spinflip in ['+', '-', None]:
-            if spinflip is not None and config.L%2 != 0:
+        for xparity in ['+', '-', None]:
+            if xparity is not None and config.L % 2 != 0:
                 continue
 
-            with self.subTest(spinflip=spinflip):
-                sp = SpinConserve(config.L, config.L//2, spinflip=spinflip)
+            with self.subTest(xparity=xparity):
+                sp = SpinConserve(config.L, config.L//2)
+                if xparity is not None:
+                    sp = XParity(sp, sector=xparity)
                 xs = self.generate_random_in_subspace(sp)
                 self.compare_to_full(H, *xs, sp)
 

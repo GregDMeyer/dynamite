@@ -45,10 +45,12 @@ cdef extern from "bpetsc_impl.h":
     int BuildMat(msc_t *msc,
                  subspaces_t *subspaces,
                  shell_impl shell,
+                 bint xparity,
                  PetscMat *A)
 
     int CheckConserves(msc_t *msc,
                        subspaces_t *subspaces,
+                       bint xparity,
                        bint *result)
 
     int ReducedDensityMatrix(
@@ -75,6 +77,7 @@ def build_mat(PetscInt [:] masks,
               np.complex128_t [:] coeffs,
               left_subspace,
               right_subspace,
+              bint xparity,
               bint shell,
               bint gpu):
 
@@ -123,7 +126,7 @@ def build_mat(PetscInt [:] masks,
         else:
             which_shell = CPU_SHELL
 
-    ierr = BuildMat(&msc, &subspaces, which_shell, &M.mat)
+    ierr = BuildMat(&msc, &subspaces, which_shell, xparity, &M.mat)
 
     if ierr != 0:
         raise Error(ierr)
@@ -136,7 +139,8 @@ def check_conserves(PetscInt [:] masks,
                     PetscInt [:] signs,
                     np.complex128_t [:] coeffs,
                     left_subspace,
-                    right_subspace):
+                    right_subspace,
+                    xparity):
 
     cdef int ierr, nterms, nmasks
     cdef subspaces_t subspaces
@@ -168,7 +172,7 @@ def check_conserves(PetscInt [:] masks,
     subspaces.right_type = right_subspace['type']
     bsubspace.set_data_pointer(subspaces.right_type, right_subspace['data'], &(subspaces.right_data))
 
-    ierr = CheckConserves(&msc, &subspaces, &result)
+    ierr = CheckConserves(&msc, &subspaces, xparity, &result)
 
     if ierr != 0:
         raise Error(ierr)

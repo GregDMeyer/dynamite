@@ -9,7 +9,7 @@ import dynamite_test_runner as dtr
 
 from dynamite import config
 from dynamite.states import State, UninitializedError
-from dynamite.subspaces import Parity, SpinConserve, Auto
+from dynamite.subspaces import Parity, SpinConserve, Auto, XParity
 from dynamite.operators import sigmaz, sigmax, sigmay, index_sum
 from dynamite.computations import reduced_density_matrix
 from dynamite.tools import complex_enabled
@@ -483,12 +483,17 @@ class Saving(dtr.DynamiteTestCase):
         loaded = State.from_file(self.fname)
         self.check_states_equal(state, loaded)
 
-    def test_save_spinconserve_spinflip(self):
-        subspace = SpinConserve(config.L, config.L//2, spinflip=True)
-        state = State(state='random', subspace=subspace)
-        state.save(self.fname)
-        loaded = State.from_file(self.fname)
-        self.check_states_equal(state, loaded)
+    def test_save_spinconserve_xparity(self):
+        if config.L % 2 != 0:
+            self.skipTest("only for even L")
+
+        for xparity in '+-':
+            with self.subTest(xparity=xparity):
+                subspace = XParity(SpinConserve(config.L, config.L//2), sector=xparity)
+                state = State(state='random', subspace=subspace)
+                state.save(self.fname)
+                loaded = State.from_file(self.fname)
+                self.check_states_equal(state, loaded)
 
     def test_save_auto(self):
         H = index_sum(sigmax(0)*sigmax(1) + sigmay(0)*sigmay(1))

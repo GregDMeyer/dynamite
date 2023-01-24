@@ -11,6 +11,7 @@ PetscErrorCode C(BuildMat,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
   const void* left_subspace_data,
   const void* right_subspace_data,
   shell_impl shell,
+  int xparity,
   Mat *A);
 
 /*
@@ -20,6 +21,7 @@ PetscErrorCode C(BuildPetsc,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
   const msc_t *msc,
   const void* left_subspace_data,
   const void* right_subspace_data,
+  int xparity,
   Mat *A);
 
 /*
@@ -29,6 +31,7 @@ PetscErrorCode C(BuildCPUShell,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
   const msc_t *msc,
   const C(data,LEFT_SUBSPACE)* left_subspace_data,
   const C(data,RIGHT_SUBSPACE)* right_subspace_data,
+  int xparity,
   Mat *A);
 
 /*

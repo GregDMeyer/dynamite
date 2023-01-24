@@ -9,7 +9,7 @@ from dynamite.states import State
 from dynamite.operators import sigmax, sigmay, sigmaz
 from dynamite.operators import op_sum, op_product, index_sum
 from dynamite.extras import majorana
-from dynamite.subspaces import Full, Parity, SpinConserve, Auto
+from dynamite.subspaces import Full, Parity, SpinConserve, Auto, XParity
 from dynamite.tools import track_memory, get_max_memory_usage
 from dynamite.computations import reduced_density_matrix
 
@@ -36,7 +36,6 @@ def parse_args(argv=None):
 
     parser.add_argument('--subspace', choices=['full', 'parity',
                                                'spinconserve',
-                                               'spinconservespinflip',
                                                'auto', 'nosortauto'],
                         default='full',
                         help='Which subspace to use.')
@@ -44,6 +43,11 @@ def parse_args(argv=None):
                         help='The particular subspace to use. For parity, options are "even" '
                         'and "odd", for spinconserve an integer number of up spins, for auto '
                         'supply a starting state like UUUUDDDD.')
+    parser.add_argument('--xparity', choices=['plus', 'minus'], nargs='?', const='plus',
+                        help='If provided, applies the XParity subspace of the specified sector '
+                        '(+ if sector not specified) on top of the subspace specified with the '
+                        '--subspace argument (or XParity alone if no other subspace was '
+                        'specified).')
 
     parser.add_argument('--evolve', action='store_true',
                         help='Request that the Hamiltonian evolves a state.')
@@ -87,14 +91,13 @@ def build_subspace(params, hamiltonian=None):
             space = 'even'
         rtn = Parity(space)
 
-    elif params.subspace in ['spinconserve', 'spinconservespinflip']:
+    elif params.subspace == 'spinconserve':
         if space is None:
             space = params.L//2
         else:
             space = int(space)
 
-        spinflip = '+' if 'spinflip' in params.subspace else None
-        rtn = SpinConserve(params.L, space, spinflip=spinflip)
+        rtn = SpinConserve(params.L, space)
 
     elif params.subspace in ['auto', 'nosortauto']:
         if space is None:
@@ -104,6 +107,10 @@ def build_subspace(params, hamiltonian=None):
 
     else:
         raise ValueError("invalid subspace")
+
+    if params.xparity is not None:
+        sector = {'plus': '+', 'minus': '-'}[params.xparity]
+        rtn = XParity(rtn, sector=sector)
 
     return rtn
 

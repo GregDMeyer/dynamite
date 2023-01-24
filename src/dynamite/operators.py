@@ -6,12 +6,12 @@ defines their built-in behavior and operations.
 from itertools import chain
 from zlib import crc32
 import re
-from string import digits, ascii_lowercase
+from string import ascii_lowercase
 import numpy as np
 
 from . import config, validate, msc_tools
 from .computations import evolve, eigsolve
-from .subspaces import Full, Explicit
+from .subspaces import Full, Explicit, XParity
 from .states import State
 from .tools import complex_enabled
 
@@ -387,7 +387,7 @@ class Operator:
         if not left.product_state_basis or not right.product_state_basis:
             if left is not right:
                 raise ValueError('if left or right subspace is not a product '
-                                 'state basis, they must be identical')
+                                 'state basis, they must be the same object')
 
         left.L = self.L
         right.L = self.L
@@ -411,7 +411,8 @@ class Operator:
             signs=np.ascontiguousarray(msc['signs']),
             coeffs=np.ascontiguousarray(msc['coeffs']),
             left_subspace=left._to_c(),
-            right_subspace=right._to_c()
+            right_subspace=right._to_c(),
+            xparity=isinstance(left, XParity)
         )
 
     @property
@@ -600,6 +601,9 @@ class Operator:
 
         masks, mask_offsets = self._get_mask_offsets(msc)
 
+        # note: currently XParity is the only non-product-state basis, so we just handle
+        # it explicitly here. obviously this will have to be generalized if other non-
+        # product-state bases are implemented
         mat = bpetsc.build_mat(
             masks=np.ascontiguousarray(masks),
             mask_offsets=np.ascontiguousarray(mask_offsets),
@@ -607,8 +611,9 @@ class Operator:
             coeffs=np.ascontiguousarray(msc['coeffs']),
             left_subspace=subspaces[0]._to_c(),
             right_subspace=subspaces[1]._to_c(),
+            xparity=isinstance(subspaces[0], XParity),
             shell=self.shell,
-            gpu=config.gpu
+            gpu=config.gpu,
         )
 
         self._mats[subspaces] = mat
