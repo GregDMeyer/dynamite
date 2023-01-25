@@ -251,7 +251,7 @@ def eigsolve(H, getvecs=False, nev=1, which='smallest', target=None, tol=None, s
     elif reason <= 0 or nconv < nev:
         raise ConvergenceError('eigsolver failed to converge')
 
-    evals = np.ndarray((nconv,), dtype=np.float)
+    evals = np.ndarray((nconv,), dtype=float)
     evecs = []
 
     for i in range(nconv):

@@ -895,7 +895,7 @@ class Operator:
 
         from matplotlib import pyplot as plt
         plt.figure()
-        normalized = np.array((self.to_numpy(subspaces=subspaces) != 0).toarray(), dtype = np.float)
+        normalized = np.array((self.to_numpy(subspaces=subspaces) != 0).toarray(), dtype=float)
         transformed = np.log(normalized + 1E-9)
         plt.imshow(transformed, cmap='Greys')
         plt.show()
