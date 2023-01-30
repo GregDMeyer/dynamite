@@ -360,7 +360,7 @@ class SpinConserve(_ProductStateSubspace):
     @property
     def k(self):
         """
-        The number of up ("0") spins.
+        The number of down ("1" in binary representation) spins.
         """
         return self._k
 
