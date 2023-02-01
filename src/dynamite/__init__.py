@@ -217,9 +217,7 @@ def check_version():
 
     # finally do the check
 
-    url = 'https://api.github.com/repos/GregDMeyer/dynamite/git/refs/heads/'
-    url += bbuild.get_build_branch()
-
+    url = 'https://api.github.com/repos/GregDMeyer/dynamite/releases/latest'
     try:
         with request.urlopen(url, timeout=1) as url_req:
             data = json.load(url_req)
@@ -229,11 +227,9 @@ def check_version():
     except:
         return
 
-    commit = data['object']['sha']
-
-    if not commit.startswith(bbuild.get_build_commit()):
-        print('Changes have been pushed to GitHub since dynamite was '
-              'installed.\n', file=stderr)
+    release_version = data["tag_name"][1:]  # tag_name starts with 'v'
+    if release_version != bbuild.get_build_version():
+        print('A new version of dynamite has been released!', file=stderr)
 
         if 'DNM_DOCKER' in environ:
             update_msg = 'Please pull the latest image from DockerHub.'
