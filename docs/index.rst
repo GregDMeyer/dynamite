@@ -30,15 +30,22 @@ Start the tutorial by launching the notebook ``0-Welcome.ipynb`` in the left pan
     page! Additionally, you may want to check you are getting correct answers by
     comparing a small system to output from a different method.
 
-Features
---------
- - Easy building of spin chain Hamiltonians through Python
- - Performance-critical code written in C, giving speed comparable
-   to pure C implementation
- - Underlying PETSc/SLEPc libraries supply fast algorithms for matrix
-   exponentiation and eigensolving
- - Options such as shell matrices provide customizability and access to
-   extremely large Hilbert spaces
+How to cite
+-----------
+
+Currently, the best way to cite dynamite is by citing the
+`Zenodo repository <https://doi.org/10.5281/zenodo.3606825>`_.
+A manuscript is coming soon!
+
+Publications using dynamite
+---------------------------
+
+The following list is likely incomplete, please
+`let us know <https://github.com/GregDMeyer/dynamite/issues>`_
+of any publications that should be added!
+
+.. include:: pubs.md
+   :parser: myst_parser.sphinx_
 
 .. toctree::
    :maxdepth: 2

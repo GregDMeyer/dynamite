@@ -1,0 +1,11 @@
+
+ - Machado *et al.*, “Exponentially slow heating in short and long-range interacting Floquet systems,” [*Phys. Rev. Res.*, vol. 1, no. 3, p. 033202, Dec. 2019.](https://doi.org/10.1103/PhysRevResearch.1.033202)
+ - Machado *et al.*, “Long-Range Prethermal Phases of Nonequilibrium Matter,” [*Phys. Rev. X*, vol. 10, no. 1, p. 011043, Feb. 2020.](https://doi.org/10.1103/PhysRevX.10.011043)
+ - Ye *et al.*, “Emergent Hydrodynamics in Nonequilibrium Quantum Systems,” [*Phys. Rev. Lett.*, vol. 125, no. 3, p. 030601, Jul. 2020.](https://doi.org/10.1103/PhysRevLett.125.030601)
+ - Kobrin *et al.*, “Many-Body Chaos in the Sachdev-Ye-Kitaev Model,” [*Phys. Rev. Lett.*, vol. 126, no. 3, p. 030602, Jan. 2021.](https://doi.org/10.1103/PhysRevLett.126.030602)
+ - Sahay *et al.*, “Emergent Ergodicity at the Transition between Many-Body Localized Phases,” [*Phys. Rev. Lett.*, vol. 126, no. 10, p. 100604, Mar. 2021.](https://doi.org/10.1103/PhysRevLett.126.100604)
+ - Kyprianidis *et al.*, “Observation of a prethermal discrete time crystal,” [*Science*, vol. 372, no. 6547, pp. 1192–1196, Jun. 2021.](https://doi.org/10.1126/science.abg8102)
+ - Cáceres *et al.*, “Sparse SYK and traversable wormholes,” [*J. High Energ. Phys.*, vol. 2021, no. 11, p. 15, Nov. 2021.](https://doi.org/10.1007/JHEP11(2021)015)
+ - Schuster *et al.*, “Many-Body Quantum Teleportation via Operator Spreading in the Traversable Wormhole Protocol,” [*Phys. Rev. X*, vol. 12, no. 3, p. 031013, Jul. 2022.](https://doi.org/10.1103/PhysRevX.12.031013)
+ - Schuster *et al.*, “Learning quantum systems via out-of-time-order correlators.” [arXiv, Aug. 03, 2022.](http://arxiv.org/abs/2208.02254)
+ - Schuster *et al.*, “Operator Growth in Open Quantum Systems.” [arXiv, Aug. 25, 2022.](https://doi.org/10.48550/arXiv.2208.12272)

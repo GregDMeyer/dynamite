@@ -1,4 +1,6 @@
-sphinx>=1.4
-ipykernel
-nbsphinx
-sphinx_rtd_theme
+Sphinx==5.3.0
+ipykernel==6.21.0
+nbsphinx==0.8.12
+sphinx_rtd_theme==1.2.0rc2
+myst-parser==0.18.1
+docutils==0.18.1
