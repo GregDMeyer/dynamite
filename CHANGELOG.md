@@ -42,6 +42,7 @@
  - `hash(subspace)` is now much more performant for large Hilbert spaces
  - Incorrect memory usage reported by `benchmark.py`
  - Matrix-vector multiplication was incorrect for `Parity` subspace when operator did not conserve the subspace
+ - Deprecated `np.float` type
 
 ## 0.2.3 - 2022-08-17
 
