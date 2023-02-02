@@ -579,12 +579,12 @@ class State:
 
     def __str__(self):
         if not self.initialized:
-            return '<State with uninitialized contents>'
+            return repr(self)
 
         nonzeros = self._get_nonzero_elements()
 
         if not nonzeros:
-            return '<zero vector>'
+            return repr(self)
 
         coeff_strs = self._get_coeff_strs(nonzeros)
         state_strs = []
@@ -598,12 +598,12 @@ class State:
 
     def _repr_latex_(self):
         if not self.initialized:
-            return '<State with uninitialized contents>'
+            return repr(self)
 
         nonzeros = self._get_nonzero_elements()
 
         if not nonzeros:
-            return '<zero vector>'
+            return repr(self)
 
         coeff_strs = self._get_coeff_strs(nonzeros)
         state_strs = []
@@ -617,6 +617,16 @@ class State:
                 state_strs.append(r'\left|'+state_str+r'\right>')
 
         return '$'+' + '.join(c+s for c, s in zip(coeff_strs, state_strs))+'$'
+
+    def __repr__(self):
+        if not self.initialized:
+            state_str = 'with uninitialized contents'
+        elif not self._get_nonzero_elements():
+            state_str = 'of norm zero'
+        else:
+            state_str = str(self)
+
+        return f'<State {state_str} on subspace {str(self.subspace)}>'
 
     def save(self, fname):
         '''

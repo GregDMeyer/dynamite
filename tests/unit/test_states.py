@@ -185,6 +185,9 @@ class PrettyPrint(ut.TestCase):
                     r'$\left|' + s + r'\right>$'
                 )
 
+                # just test that repr doesn't error
+                repr(state)
+
     def test_product_state_mixed(self):
         subtests = [
             'UU00',
@@ -211,6 +214,9 @@ class PrettyPrint(ut.TestCase):
                     r'$\left|' + s + r'\right>$'
                 )
 
+                # just test that repr doesn't error
+                repr(state)
+
     def test_superposition_real(self):
         state = State(L=4)
         state._vec = np.zeros(16, dtype=np.complex128)
@@ -226,6 +232,9 @@ class PrettyPrint(ut.TestCase):
             state._repr_latex_(),
             r'$1.000\left|1000\right> + 0.500\left|0100\right>$'
         )
+
+        # just test that repr doesn't error
+        repr(state)
 
     def test_superposition_complex(self):
         state = State(L=4)
@@ -243,6 +252,9 @@ class PrettyPrint(ut.TestCase):
             r'$(0.000+1.000j)\left|1000\right> + '
             r'(0.500+0.000j)\left|0100\right>$'
         )
+
+        # just test that repr doesn't error
+        repr(state)
 
     def test_subspace(self):
         state = State(L=4)
@@ -265,6 +277,9 @@ class PrettyPrint(ut.TestCase):
             r'$\left|0100\right>$'
         )
 
+        # just test that repr doesn't error
+        repr(state)
+
     def test_large(self):
         state = State(L=7)
         state._vec = np.zeros(128, dtype=np.complex128)
@@ -282,30 +297,44 @@ class PrettyPrint(ut.TestCase):
             r'0.003\left|0100000\right> + \cdots + 0.128\left|1111111\right>$'
         )
 
+        # just test that repr doesn't error
+        repr(state)
+
     def test_uninitialized(self):
         state = State(L=4)
+
+        correct_str = '<State with uninitialized contents on subspace Full(L=4)>'
+
         self.assertEqual(
             str(state),
-            '<State with uninitialized contents>'
+            correct_str
         )
         self.assertEqual(
             state._repr_latex_(),
-            '<State with uninitialized contents>'
+            correct_str
         )
+
+        # just test that repr doesn't error
+        repr(state)
 
     def test_zero(self):
         state = State(L=4)
         state.vec[:] = 0
         state.set_initialized()
 
+        correct_str = '<State of norm zero on subspace Full(L=4)>'
+
         self.assertEqual(
             str(state),
-            '<zero vector>'
+            correct_str
         )
         self.assertEqual(
             state._repr_latex_(),
-            '<zero vector>'
+            correct_str
         )
+
+        # just test that repr doesn't error
+        repr(state)
 
 
 if __name__ == '__main__':
