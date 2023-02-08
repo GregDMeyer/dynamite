@@ -555,15 +555,15 @@ class XParity(Subspace):
 
     @classmethod
     def _validate_parent(cls, parent):
-        if parent.L is None:
-            raise ValueError('L must be set for the parent subspace')
-
         if not parent.product_state_basis:
             raise ValueError('parent must be a product state subspace')
 
         # Full is always fine
         if isinstance(parent, Full):
             return
+
+        if parent.L is None:
+            raise ValueError('L must be set for the parent subspace')
 
         # Parity is fine if L is even
         if isinstance(parent, Parity):

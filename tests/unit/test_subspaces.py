@@ -6,9 +6,9 @@ These tests should NOT require MPI.
 '''
 
 import unittest as ut
-from unittest.mock import Mock
 import numpy as np
 from dynamite.subspaces import Full, Parity, Explicit, Auto, SpinConserve
+from dynamite.subspaces import XParity, _ProductStateSubspace
 from dynamite.msc_tools import msc_dtype
 from dynamite._backend.bsubspace import compute_rcm
 from dynamite._backend.bbuild import dnm_int_t
@@ -236,21 +236,9 @@ class TestSpinConserve(ut.TestCase):
                 sp._L = L
                 sp._k = k
                 sp._nchoosek = SpinConserve._compute_nchoosek(L, k)
-                sp._spinflip = 0
                 self.assertEqual(sp.get_dimension(), dim)
 
-                if L == 2*k:
-                    for spinflip in (-1, 1):
-                        with self.subTest(spinflip=spinflip):
-                            sp._spinflip = spinflip
-                            self.assertEqual(sp.get_dimension(), dim//2)
-
-    def test_product_state_basis_spinflip(self):
-        for sign in '+-':
-            with self.subTest(sign=sign):
-                self.assertFalse(SpinConserve(4, 2, spinflip=sign).product_state_basis)
-
-    def test_product_state_basis_no_spinflip(self):
+    def test_product_state_basis(self):
         self.assertTrue(SpinConserve(4, 2).product_state_basis)
 
     def test_parameter_exceptions(self):
@@ -277,7 +265,6 @@ class TestSpinConserve(ut.TestCase):
         sp._L = 6
         sp._k = 3
         sp._nchoosek = SpinConserve._compute_nchoosek(sp.L, sp.k)
-        sp._spinflip = 0
 
         s = sp.idx_to_state(5)
         self.assertEqual(s, int('010101', 2))
@@ -289,7 +276,6 @@ class TestSpinConserve(ut.TestCase):
         sp = object.__new__(SpinConserve)
         sp._L = 5
         sp._k = 1
-        sp._spinflip = 0
         sp._nchoosek = SpinConserve._compute_nchoosek(sp.L, sp.k)
 
         i = sp.state_to_idx(int('01011', 2))
@@ -307,7 +293,6 @@ class TestSpinConserve(ut.TestCase):
 
     def test_mapping_array(self):
         sp = object.__new__(SpinConserve)
-        sp._spinflip = 0
 
         sp._L = 4
         ks = [1, 2]
@@ -356,42 +341,6 @@ class TestSpinConserve(ut.TestCase):
                 idxs = sp.state_to_idx(correct)
                 self.assertEqual(idxs[2], -1)
 
-    def test_mapping_array_spinflip(self):
-        sp = object.__new__(SpinConserve)
-
-        sp._L = 4
-        sp._k = sp.L//2
-        sp._nchoosek = SpinConserve._compute_nchoosek(sp.L, sp.k)
-        sp._spinflip = 1
-
-        bad_state = 0b1001
-
-        for spinflip in (-1, 1):
-            with self.subTest(spinflip=spinflip):
-                correct = np.array([
-                    0b0011,
-                    0b0101,
-                    0b0110,
-                ], dtype=dnm_int_t)
-                space_size = len(correct)
-
-                with self.assertRaises(ValueError):
-                    sp.idx_to_state(np.arange(space_size, 2*space_size, dtype=dnm_int_t))
-
-                idxs = sp.state_to_idx(correct)
-                for i, idx in enumerate(idxs):
-                    self.assertEqual(i, idx)
-
-                correct[2] = bad_state
-                idxs = sp.state_to_idx(correct)
-                self.assertEqual(idxs[2], -1)
-
-    def test_spinflip_exception(self):
-        for sign in '+-':
-            with self.subTest(sign=sign):
-                with self.assertRaises(ValueError):
-                    SpinConserve(5, 2, spinflip=sign)
-
     def test_compare_to_auto(self):
         test_cases = [
             'DDUUUUUU',
@@ -407,14 +356,74 @@ class TestSpinConserve(ut.TestCase):
                 sp2 = SpinConserve(len(state), state.count('D'))
                 self.assertEqual(sp1, sp2)
 
+    def test_repr(self):
+        cases = [
+            "SpinConserve(L=4, k=2)",
+        ]
+        for case in cases:
+            self.assertEqual(repr(eval(case)), case)
+
+
+class TestXParity(ut.TestCase):
+
+    def test_dimension(self):
+        L = 10
+        spaces = [
+            (Full(L), 512),
+            (Parity('even', L=L), 256),
+            (SpinConserve(L, L//2), 126)
+        ]
+        for sector in (-1, 1):
+            for space, correct in spaces:
+                with self.subTest(sector=sector, space=space):
+                    sp = XParity(space)
+                    self.assertEqual(sp.get_dimension(), correct)
+
+    def test_product_state_basis(self):
+        self.assertFalse(XParity().product_state_basis)
+
+    def test_mapping_array(self):
+        sp = XParity(SpinConserve(4, 2))
+
+        bad_state = 0b1001
+
+        for sector in (-1, 1):
+            with self.subTest(sector=sector):
+                correct = np.array([
+                    0b0011,
+                    0b0101,
+                    0b0110,
+                ], dtype=dnm_int_t)
+                space_size = len(correct)
+
+                sp._sector = sector
+
+                with self.assertRaises(ValueError):
+                    sp.idx_to_state(np.arange(space_size, 2*space_size, dtype=dnm_int_t))
+
+                idxs = sp.state_to_idx(correct)
+                for i, idx in enumerate(idxs):
+                    self.assertEqual(i, idx)
+
+                correct[2] = bad_state
+                with self.assertRaises(ValueError):
+                    sp.state_to_idx(correct)
+
+    def test_parent_exception(self):
+        for sign in '+-':
+            with self.subTest(sign=sign):
+                with self.assertRaises(ValueError):
+                    XParity(SpinConserve(5, 2), sector=sign)
+
     @classmethod
     def msc_from_array(cls, ary):
         msc = [(int(m, 2), int(s, 2), c) for m, s, c in ary]
         return np.array(msc, copy=False, dtype=msc_dtype)
 
-    def check_reduce_msc_equal(self, initial, correct, spinflip, L, conserves):
-        sp = object.__new__(SpinConserve)
-        sp._spinflip = spinflip
+    def check_reduce_msc_equal(self, initial, correct, sector, L, conserves):
+        sp = object.__new__(XParity)
+        sp._parent = _ProductStateSubspace()
+        sp._sector = sector
         sp._L = L
 
         check_msc, conserved = sp.reduce_msc(self.msc_from_array(initial), check_conserves=True)
@@ -432,14 +441,14 @@ class TestSpinConserve(ut.TestCase):
             ('1100', '0000', 0.25),
         ]
 
-        for spinflip in (1, -1):
-            with self.subTest(spinflip=spinflip):
+        for sector in (1, -1):
+            with self.subTest(sector=sector):
                 correct = [
-                    ('0011', '0000', 0.75+spinflip*0.25),
+                    ('0011', '0000', 0.75+sector*0.25),
                 ]
 
                 self.check_reduce_msc_equal(
-                    initial, correct, spinflip, 4, True
+                    initial, correct, sector, 4, True
                 )
 
     def test_reduce_msc_flip_sign_cancel(self):
@@ -448,9 +457,9 @@ class TestSpinConserve(ut.TestCase):
             ('1100', '0000', 1),
         ]
 
-        for spinflip in (1, -1):
-            with self.subTest(spinflip=spinflip):
-                if spinflip == 1:
+        for sector in (1, -1):
+            with self.subTest(sector=sector):
+                if sector == 1:
                     correct = [
                         ('0011', '0000', 2),
                     ]
@@ -459,7 +468,7 @@ class TestSpinConserve(ut.TestCase):
                     ]
 
                 self.check_reduce_msc_equal(
-                    initial, correct, spinflip, 4, True
+                    initial, correct, sector, 4, True
                 )
 
     def test_reduce_msc_flip_odd_Z(self):
@@ -469,13 +478,13 @@ class TestSpinConserve(ut.TestCase):
             ('0000', '1110', 1),
         ]
 
-        for spinflip in (1, -1):
-            with self.subTest(spinflip=spinflip):
+        for sector in (1, -1):
+            with self.subTest(sector=sector):
                 correct = [
                 ]
 
                 self.check_reduce_msc_equal(
-                    initial, correct, spinflip, 4, False
+                    initial, correct, sector, 4, False
                 )
 
     def test_reduce_msc_flip_even_Z(self):
@@ -485,8 +494,8 @@ class TestSpinConserve(ut.TestCase):
             ('0000', '1111', 1),
         ]
 
-        for spinflip in (1, -1):
-            with self.subTest(spinflip=spinflip):
+        for sector in (1, -1):
+            with self.subTest(sector=sector):
                 correct = [
                     ('0000', '0011', 1),
                     ('0000', '1001', 1),
@@ -494,7 +503,7 @@ class TestSpinConserve(ut.TestCase):
                 ]
 
                 self.check_reduce_msc_equal(
-                    initial, correct, spinflip, 4, True
+                    initial, correct, sector, 4, True
                 )
 
     def test_reduce_msc_flip_XZ(self):
@@ -502,14 +511,14 @@ class TestSpinConserve(ut.TestCase):
             ('1100', '0011', 1),
         ]
 
-        for spinflip in (1, -1):
-            with self.subTest(spinflip=spinflip):
+        for sector in (1, -1):
+            with self.subTest(sector=sector):
                 correct = [
-                    ('0011', '0011', spinflip),
+                    ('0011', '0011', sector),
                 ]
 
                 self.check_reduce_msc_equal(
-                    initial, correct, spinflip, 4, True
+                    initial, correct, sector, 4, True
                 )
 
     def test_reduce_msc_flip_XYZ(self):
@@ -518,21 +527,23 @@ class TestSpinConserve(ut.TestCase):
             ('1100', '0011', 0.25),
         ]
 
-        for spinflip in (1, -1):
-            with self.subTest(spinflip=spinflip):
+        for sector in (1, -1):
+            with self.subTest(sector=sector):
                 correct = [
-                    ('0011', '0011', 0.75+spinflip*0.25),
+                    ('0011', '0011', 0.75+sector*0.25),
                 ]
 
                 self.check_reduce_msc_equal(
-                    initial, correct, spinflip, 4, True
+                    initial, correct, sector, 4, True
                 )
 
     def test_repr(self):
         cases = [
-            "SpinConserve(L=4, k=2)",
-            "SpinConserve(L=4, k=2, spinflip=+1)",
-            "SpinConserve(L=4, k=2, spinflip=-1)",
+            "XParity(Full(L=4), sector=+1)",
+            "XParity(SpinConserve(L=4, k=2), sector=+1)",
+            "XParity(SpinConserve(L=4, k=2), sector=-1)",
+            "XParity(Parity('even', L=4), sector=+1)",
+            "XParity(Parity('even', L=4), sector=-1)",
         ]
         for case in cases:
             self.assertEqual(repr(eval(case)), case)
