@@ -50,7 +50,6 @@ PetscErrorCode C(BuildContext_CUDA,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
 {
   PetscReal *cpu_real_coeffs, real_part;
   PetscInt nterms, i;
-  cudaError_t err;
   shell_context *ctx;
 
   PetscCall(PetscMalloc(sizeof(shell_context), ctx_p));
@@ -60,21 +59,21 @@ PetscErrorCode C(BuildContext_CUDA,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
   ctx->nrm = -1;
   nterms = msc->mask_offsets[msc->nmasks];
 
-  err = cudaMalloc((void **) &(ctx->masks),
-    sizeof(PetscInt)*msc->nmasks);CHKERRCUDA(err);
-  err = cudaMemcpy(ctx->masks, msc->masks, sizeof(PetscInt)*msc->nmasks,
-    cudaMemcpyHostToDevice);CHKERRCUDA(err);
+  PetscCallCUDA(cudaMalloc((void **) &(ctx->masks),
+    sizeof(PetscInt)*msc->nmasks));
+  PetscCallCUDA(cudaMemcpy(ctx->masks, msc->masks, sizeof(PetscInt)*msc->nmasks,
+    cudaMemcpyHostToDevice));
 
-  err = cudaMalloc((void **) &(ctx->mask_offsets),
-    sizeof(PetscInt)*(msc->nmasks+1));CHKERRCUDA(err);
-  err = cudaMemcpy(ctx->mask_offsets, msc->mask_offsets, sizeof(PetscInt)*(msc->nmasks+1),
-    cudaMemcpyHostToDevice);CHKERRCUDA(err);
+  PetscCallCUDA(cudaMalloc((void **) &(ctx->mask_offsets),
+    sizeof(PetscInt)*(msc->nmasks+1)));
+  PetscCallCUDA(cudaMemcpy(ctx->mask_offsets, msc->mask_offsets, sizeof(PetscInt)*(msc->nmasks+1),
+    cudaMemcpyHostToDevice));
 
-  err = cudaMalloc((void **) &(ctx->signs), sizeof(PetscInt)*nterms);CHKERRCUDA(err);
-  err = cudaMemcpy(ctx->signs, msc->signs, sizeof(PetscInt)*nterms,
-    cudaMemcpyHostToDevice);CHKERRCUDA(err);
+  PetscCallCUDA(cudaMalloc((void **) &(ctx->signs), sizeof(PetscInt)*nterms));
+  PetscCallCUDA(cudaMemcpy(ctx->signs, msc->signs, sizeof(PetscInt)*nterms,
+    cudaMemcpyHostToDevice));
 
-  err = cudaMalloc((void **) &(ctx->real_coeffs), sizeof(PetscReal)*nterms);CHKERRCUDA(err);
+  PetscCallCUDA(cudaMalloc((void **) &(ctx->real_coeffs), sizeof(PetscReal)*nterms));
   /*
    * we need a CPU vector in which we will store the real coefficients, then we'll copy
    * from that over to the CPU.
@@ -84,8 +83,8 @@ PetscErrorCode C(BuildContext_CUDA,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
     real_part = PetscRealPart(msc->coeffs[i]);
     cpu_real_coeffs[i] = (real_part != 0) ? real_part : PetscImaginaryPart(msc->coeffs[i]);
   }
-  err = cudaMemcpy(ctx->real_coeffs, cpu_real_coeffs, sizeof(PetscReal)*nterms,
-    cudaMemcpyHostToDevice);CHKERRCUDA(err);
+  PetscCallCUDA(cudaMemcpy(ctx->real_coeffs, cpu_real_coeffs, sizeof(PetscReal)*nterms,
+    cudaMemcpyHostToDevice));
   PetscCall(PetscFree(cpu_real_coeffs));
 
   PetscCall(C(CopySubspaceData_CUDA,LEFT_SUBSPACE)(
@@ -100,15 +99,14 @@ PetscErrorCode C(BuildContext_CUDA,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
 
 PetscErrorCode C(MatDestroyCtx_GPU,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A)
 {
-  cudaError_t err;
   shell_context *ctx;
 
   PetscCall(MatShellGetContext(A, &ctx));
 
-  err = cudaFree(ctx->masks);CHKERRCUDA(err);
-  err = cudaFree(ctx->mask_offsets);CHKERRCUDA(err);
-  err = cudaFree(ctx->signs);CHKERRCUDA(err);
-  err = cudaFree(ctx->real_coeffs);CHKERRCUDA(err);
+  PetscCallCUDA(cudaFree(ctx->masks));
+  PetscCallCUDA(cudaFree(ctx->mask_offsets));
+  PetscCallCUDA(cudaFree(ctx->signs));
+  PetscCallCUDA(cudaFree(ctx->real_coeffs));
 
   PetscCall(C(DestroySubspaceData_CUDA,LEFT_SUBSPACE)(
     (C(data,LEFT_SUBSPACE)*) ctx->left_subspace_data));
@@ -122,7 +120,6 @@ PetscErrorCode C(MatDestroyCtx_GPU,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A)
 
 PetscErrorCode C(MatMult_GPU,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, Vec x, Vec b)
 {
-  cudaError_t err;
   shell_context *ctx;
 
   const PetscScalar* xarray;
@@ -138,7 +135,7 @@ PetscErrorCode C(MatMult_GPU,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, Vec x, Vec 
 
   PetscCall(VecGetSize(b, &size));
 
-  err = cudaDeviceSynchronize();CHKERRCUDA(err);
+  PetscCallCUDA(cudaDeviceSynchronize());
 
   C(device_MatMult,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))<<<GPU_BLOCK_NUM,GPU_BLOCK_SIZE>>>(
     size,
@@ -152,7 +149,7 @@ PetscErrorCode C(MatMult_GPU,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, Vec x, Vec 
     xarray,
     barray);
 
-  err = cudaDeviceSynchronize();CHKERRCUDA(err);
+  PetscCallCUDA(cudaDeviceSynchronize());
 
   PetscCall(VecCUDARestoreArrayRead(x, &xarray));
   PetscCall(VecCUDARestoreArray(b, &barray));
@@ -221,7 +218,6 @@ __global__ void C(device_MatMult,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
 
 PetscErrorCode C(MatNorm_GPU,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, NormType type, PetscReal *nrm)
 {
-  cudaError_t err;
   shell_context *ctx;
 
   PetscReal *d_maxs,*h_maxs;
@@ -242,7 +238,7 @@ PetscErrorCode C(MatNorm_GPU,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, NormType ty
     return 0;
   }
 
-  err = cudaMalloc((void **) &d_maxs, sizeof(PetscReal)*GPU_BLOCK_NUM);CHKERRCUDA(err);
+  PetscCallCUDA(cudaMalloc((void **) &d_maxs, sizeof(PetscReal)*GPU_BLOCK_NUM));
   PetscCall(PetscMalloc1(GPU_BLOCK_NUM, &h_maxs));
 
   PetscCall(MatGetSize(A, &M, NULL));
@@ -258,9 +254,9 @@ PetscErrorCode C(MatNorm_GPU,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, NormType ty
     (C(data,RIGHT_SUBSPACE)*) ctx->right_subspace_data,
     d_maxs);
 
-  err = cudaDeviceSynchronize();CHKERRCUDA(err);
+  PetscCallCUDA(cudaDeviceSynchronize());
 
-  err = cudaMemcpy(h_maxs, d_maxs, sizeof(PetscReal)*GPU_BLOCK_NUM, cudaMemcpyDeviceToHost);CHKERRCUDA(err);
+  PetscCallCUDA(cudaMemcpy(h_maxs, d_maxs, sizeof(PetscReal)*GPU_BLOCK_NUM, cudaMemcpyDeviceToHost));
 
   /* now do max of h_maxs */
   (*nrm) = 0;
@@ -270,7 +266,7 @@ PetscErrorCode C(MatNorm_GPU,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, NormType ty
 
   ctx->nrm = (*nrm);
 
-  err = cudaFree(d_maxs);CHKERRCUDA(err);
+  PetscCallCUDA(cudaFree(d_maxs));
   PetscCall(PetscFree(h_maxs));
 
   return 0;

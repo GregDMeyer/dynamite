@@ -16,15 +16,13 @@
 /* subspace functions for the GPU */
 
 PetscErrorCode CopySubspaceData_CUDA_Full(data_Full** out_p, const data_Full* in) {
-  cudaError_t err;
-  err = cudaMalloc((void **) out_p, sizeof(data_Full));CHKERRCUDA(err);
-  err = cudaMemcpy(*out_p, in, sizeof(data_Full), cudaMemcpyHostToDevice);CHKERRCUDA(err);
+  PetscCallCUDA(cudaMalloc((void **) out_p, sizeof(data_Full)));
+  PetscCallCUDA(cudaMemcpy(*out_p, in, sizeof(data_Full), cudaMemcpyHostToDevice));
   return 0;
 }
 
 PetscErrorCode DestroySubspaceData_CUDA_Full(data_Full* data) {
-  cudaError_t err;
-  err = cudaFree(data);CHKERRCUDA(err);
+  PetscCallCUDA(cudaFree(data));
   return 0;
 }
 
@@ -37,15 +35,13 @@ __device__ PetscInt I2S_CUDA_Full(PetscInt idx, const data_Full* data) {
 }
 
 PetscErrorCode CopySubspaceData_CUDA_Parity(data_Parity** out_p, const data_Parity* in) {
-  cudaError_t err;
-  err = cudaMalloc((void **) out_p, sizeof(data_Parity));CHKERRCUDA(err);
-  err = cudaMemcpy(*out_p, in, sizeof(data_Parity), cudaMemcpyHostToDevice);CHKERRCUDA(err);
+  PetscCallCUDA(cudaMalloc((void **) out_p, sizeof(data_Parity)));
+  PetscCallCUDA(cudaMemcpy(*out_p, in, sizeof(data_Parity), cudaMemcpyHostToDevice));
   return 0;
 }
 
 PetscErrorCode DestroySubspaceData_CUDA_Parity(data_Parity* data) {
-  cudaError_t err;
-  err = cudaFree(data);CHKERRCUDA(err);
+  PetscCallCUDA(cudaFree(data));
   return 0;
 }
 
@@ -58,32 +54,29 @@ __device__ PetscInt I2S_CUDA_Parity(PetscInt idx, const data_Parity* data) {
 }
 
 PetscErrorCode CopySubspaceData_CUDA_SpinConserve(data_SpinConserve** out_p, const data_SpinConserve* in) {
-  cudaError_t err;
   PetscInt len_nchoosek = (in->k+1)*in->ld_nchoosek;
 
   data_SpinConserve cpu_data;
 
   PetscCall(PetscMemcpy(&cpu_data, in, sizeof(data_SpinConserve)));
 
-  err = cudaMalloc(&(cpu_data.nchoosek), sizeof(PetscInt)*len_nchoosek);CHKERRCUDA(err);
-  err = cudaMemcpy(cpu_data.nchoosek, in->nchoosek,
-		   sizeof(PetscInt)*len_nchoosek, cudaMemcpyHostToDevice);CHKERRCUDA(err);
+  PetscCallCUDA(cudaMalloc(&(cpu_data.nchoosek), sizeof(PetscInt)*len_nchoosek));
+  PetscCallCUDA(cudaMemcpy(cpu_data.nchoosek, in->nchoosek,
+                           sizeof(PetscInt)*len_nchoosek, cudaMemcpyHostToDevice));
 
-  err = cudaMalloc((void **) out_p, sizeof(data_SpinConserve));CHKERRCUDA(err);
-  err = cudaMemcpy(*out_p, &cpu_data, sizeof(data_SpinConserve), cudaMemcpyHostToDevice);CHKERRCUDA(err);
+  PetscCallCUDA(cudaMalloc((void **) out_p, sizeof(data_SpinConserve)));
+  PetscCallCUDA(cudaMemcpy(*out_p, &cpu_data, sizeof(data_SpinConserve), cudaMemcpyHostToDevice));
 
   return 0;
 }
 
 PetscErrorCode DestroySubspaceData_CUDA_SpinConserve(data_SpinConserve* data) {
-  cudaError_t err;
-
   data_SpinConserve cpu_data;
 
-  err = cudaMemcpy(&cpu_data, data, sizeof(data_SpinConserve), cudaMemcpyDeviceToHost);CHKERRCUDA(err);
+  PetscCallCUDA(cudaMemcpy(&cpu_data, data, sizeof(data_SpinConserve), cudaMemcpyDeviceToHost));
 
-  err = cudaFree(cpu_data.nchoosek);CHKERRCUDA(err);
-  err = cudaFree(data);CHKERRCUDA(err);
+  PetscCallCUDA(cudaFree(cpu_data.nchoosek));
+  PetscCallCUDA(cudaFree(data));
   return 0;
 }
 
@@ -120,41 +113,37 @@ __device__ PetscInt I2S_CUDA_SpinConserve(PetscInt idx, const data_SpinConserve*
 }
 
 PetscErrorCode CopySubspaceData_CUDA_Explicit(data_Explicit** out_p, const data_Explicit* in) {
-  cudaError_t err;
-
   data_Explicit cpu_data;
 
   PetscCall(PetscMemcpy(&cpu_data, in, sizeof(data_Explicit)));
 
-  err = cudaMalloc(&(cpu_data.state_map), sizeof(PetscInt)*in->dim);CHKERRCUDA(err);
-  err = cudaMemcpy(cpu_data.state_map, in->state_map,
-    sizeof(PetscInt)*in->dim, cudaMemcpyHostToDevice);CHKERRCUDA(err);
+  PetscCallCUDA(cudaMalloc(&(cpu_data.state_map), sizeof(PetscInt)*in->dim));
+  PetscCallCUDA(cudaMemcpy(cpu_data.state_map, in->state_map,
+    sizeof(PetscInt)*in->dim, cudaMemcpyHostToDevice));
 
-  err = cudaMalloc(&(cpu_data.rmap_indices), sizeof(PetscInt)*in->dim);CHKERRCUDA(err);
-  err = cudaMemcpy(cpu_data.rmap_indices, in->rmap_indices,
-    sizeof(PetscInt)*in->dim, cudaMemcpyHostToDevice);CHKERRCUDA(err);
+  PetscCallCUDA(cudaMalloc(&(cpu_data.rmap_indices), sizeof(PetscInt)*in->dim));
+  PetscCallCUDA(cudaMemcpy(cpu_data.rmap_indices, in->rmap_indices,
+    sizeof(PetscInt)*in->dim, cudaMemcpyHostToDevice));
 
-  err = cudaMalloc(&(cpu_data.rmap_states), sizeof(PetscInt)*in->dim);CHKERRCUDA(err);
-  err = cudaMemcpy(cpu_data.rmap_states, in->rmap_states,
-    sizeof(PetscInt)*in->dim, cudaMemcpyHostToDevice);CHKERRCUDA(err);
+  PetscCallCUDA(cudaMalloc(&(cpu_data.rmap_states), sizeof(PetscInt)*in->dim));
+  PetscCallCUDA(cudaMemcpy(cpu_data.rmap_states, in->rmap_states,
+    sizeof(PetscInt)*in->dim, cudaMemcpyHostToDevice));
 
-  err = cudaMalloc((void **) out_p, sizeof(data_Explicit));CHKERRCUDA(err);
-  err = cudaMemcpy(*out_p, &cpu_data, sizeof(data_Explicit), cudaMemcpyHostToDevice);CHKERRCUDA(err);
+  PetscCallCUDA(cudaMalloc((void **) out_p, sizeof(data_Explicit)));
+  PetscCallCUDA(cudaMemcpy(*out_p, &cpu_data, sizeof(data_Explicit), cudaMemcpyHostToDevice));
 
   return 0;
 }
 
 PetscErrorCode DestroySubspaceData_CUDA_Explicit(data_Explicit* data) {
-  cudaError_t err;
-
   data_Explicit cpu_data;
 
-  err = cudaMemcpy(&cpu_data, data, sizeof(data_Explicit), cudaMemcpyDeviceToHost);CHKERRCUDA(err);
+  PetscCallCUDA(cudaMemcpy(&cpu_data, data, sizeof(data_Explicit), cudaMemcpyDeviceToHost));
 
-  err = cudaFree(cpu_data.state_map);CHKERRCUDA(err);
-  err = cudaFree(cpu_data.rmap_indices);CHKERRCUDA(err);
-  err = cudaFree(cpu_data.rmap_states);CHKERRCUDA(err);
-  err = cudaFree(data);CHKERRCUDA(err);
+  PetscCallCUDA(cudaFree(cpu_data.state_map));
+  PetscCallCUDA(cudaFree(cpu_data.rmap_indices));
+  PetscCallCUDA(cudaFree(cpu_data.rmap_states));
+  PetscCallCUDA(cudaFree(data));
   return 0;
 }
 
