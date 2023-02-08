@@ -1,7 +1,7 @@
 
 # Changelog
 
-## 0.2.4 - IN PROGRESS
+## 0.3.0 - 2023-01-08
 
 ### Added
  - Dynamite now automatically checks that an operator is the same across all MPI ranks before building it (thus catching bugs due to e.g. different random number generator seeds on different ranks)
