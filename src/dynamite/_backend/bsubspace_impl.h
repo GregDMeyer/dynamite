@@ -68,7 +68,7 @@ static inline PetscInt S2I_nocheck_Full(PetscInt state, const data_Full* data) {
 
 static inline PetscInt I2S_Full(PetscInt idx, const data_Full* data) {
   PetscAssert(idx >= 0 && idx < Dim_Full(data), PETSC_COMM_SELF, PETSC_ERR_ARG_OUTOFRANGE,
-              "Index %d is out of bounds for subspace of dimension %d.\n",
+              "Index %" PetscInt_FMT " is out of bounds for subspace of dimension %" PetscInt_FMT ".\n",
               idx, Dim_Full(data));
   return idx;
 }
@@ -128,7 +128,7 @@ static inline PetscInt S2I_nocheck_Parity(PetscInt state, const data_Parity* dat
 
 static inline PetscInt I2S_Parity(PetscInt idx, const data_Parity* data) {
   PetscAssert(idx >= 0 && idx < Dim_Parity(data), PETSC_COMM_SELF, PETSC_ERR_ARG_OUTOFRANGE,
-              "Index %d is out of bounds for subspace of dimension %d.\n",
+              "Index %" PetscInt_FMT " is out of bounds for subspace of dimension %" PetscInt_FMT ".\n",
               idx, Dim_Parity(data));
   return (idx<<1) | (builtin_parity(idx) ^ data->space);
 }
@@ -209,7 +209,7 @@ static inline PetscInt S2I_SpinConserve(PetscInt state, const data_SpinConserve*
 
 static inline PetscInt I2S_SpinConserve(PetscInt idx, const data_SpinConserve* data) {
   PetscAssert(idx >= 0 && idx < Dim_SpinConserve(data), PETSC_COMM_SELF, PETSC_ERR_ARG_OUTOFRANGE,
-              "Index %d is out of bounds for subspace of dimension %d.\n",
+              "Index %" PetscInt_FMT " is out of bounds for subspace of dimension %" PetscInt_FMT ".\n",
               idx, Dim_SpinConserve(data));
 
   PetscInt state = 0;
@@ -332,7 +332,7 @@ static inline PetscInt S2I_Explicit(PetscInt state, const data_Explicit* data) {
 
 static inline PetscInt I2S_Explicit(PetscInt idx, const data_Explicit* data) {
   PetscAssert(idx >= 0 && idx < Dim_Explicit(data), PETSC_COMM_SELF, PETSC_ERR_ARG_OUTOFRANGE,
-              "Index %d is out of bounds for subspace of dimension %d.\n",
+              "Index %" PetscInt_FMT " is out of bounds for subspace of dimension %" PetscInt_FMT ".\n",
               idx, Dim_Explicit(data));
   return data->state_map[idx];
 }

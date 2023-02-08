@@ -421,7 +421,7 @@ PetscErrorCode C(MatMult_CPU_General,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, Vec
 	  }
 	}
 	if (cache_idx >= VECSET_CACHE_SIZE) {
-	  SETERRQ(MPI_COMM_SELF, PETSC_ERR_MEMC, "cache out of bounds, value %d", cache_idx);
+	  SETERRQ(MPI_COMM_SELF, PETSC_ERR_MEMC, "cache out of bounds, value %" PetscInt_FMT, cache_idx);
 	}
 
 	row_idxs[cache_idx] = row_idx;
@@ -573,7 +573,7 @@ PetscErrorCode do_cache_product(
   PetscInt iterate_max, cache_idx, inner_idx, row_idx, local_start, stop;
 
   iterate_max = (PetscInt)1 << builtin_ctz(mask);
-  PetscAssert(iterate_max > (PetscInt)0, PETSC_COMM_SELF, PETSC_ERR_ARG_OUTOFRANGE, "iterate_max %ld <= 0", iterate_max);
+  PetscAssert(iterate_max > (PetscInt)0, PETSC_COMM_SELF, PETSC_ERR_ARG_OUTOFRANGE, "iterate_max %" PetscInt_FMT " <= 0", iterate_max);
 
   if (iterate_max < ITER_CUTOFF) {
     for (cache_idx=0; cache_idx < VECSET_CACHE_SIZE; ++cache_idx) {
@@ -586,8 +586,8 @@ PetscErrorCode do_cache_product(
       row_idx = (block_start+cache_idx) ^ mask;
       stop = intmin(iterate_max-(row_idx%iterate_max), VECSET_CACHE_SIZE-cache_idx);
       local_start = row_idx-x_start;
-      PetscAssert(local_start >= (PetscInt)0, PETSC_COMM_SELF, PETSC_ERR_ARG_OUTOFRANGE, "negative index %ld on x array", local_start);
-      PetscAssert(local_start+stop-(PetscInt)1 < x_end-x_start, PETSC_COMM_SELF, PETSC_ERR_ARG_OUTOFRANGE, "index %ld past end %ld of x array", local_start+stop-(PetscInt)1, x_end-x_start);
+      PetscAssert(local_start >= (PetscInt)0, PETSC_COMM_SELF, PETSC_ERR_ARG_OUTOFRANGE, "negative index %" PetscInt_FMT " on x array", local_start);
+      PetscAssert(local_start+stop-(PetscInt)1 < x_end-x_start, PETSC_COMM_SELF, PETSC_ERR_ARG_OUTOFRANGE, "index %" PetscInt_FMT " past end %" PetscInt_FMT " of x array", local_start+stop-(PetscInt)1, x_end-x_start);
       for (inner_idx=0; inner_idx < stop; ++inner_idx) {
         values[cache_idx+inner_idx] += summed_c[cache_idx+inner_idx] * x_array[local_start+inner_idx];
       }
