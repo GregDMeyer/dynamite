@@ -113,7 +113,7 @@ class Hamiltonians(EvolveChecker):
             skip = {}
 
         # otherwise just skip syk
-        self.evolve_all(50.0, skip=skip, max_its=500)
+        self.evolve_all(50.0, skip=skip, max_its=750)
 
 @ut.skipIf(not complex_enabled(), 'complex numbers not enabled')
 class Subspaces(EvolveChecker):
