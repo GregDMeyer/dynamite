@@ -17,13 +17,12 @@ test_multiply.py Subspaces.test_spin_conserve_half_filling
 test_multiply.py Subspaces.test_spin_conserve_third_filling
 
 test_operators.py SubspaceConservation.test_change_parity
-test_operators.py SubspaceConservation.test_change_spinflip
 test_operators.py SubspaceConservation.test_full
 test_operators.py SubspaceConservation.test_full_to_others
 test_operators.py SubspaceConservation.test_spinconserve
-test_operators.py SubspaceConservation.test_spinconserve_spinflip_error
-test_operators.py SubspaceConservation.test_spinconserve_spinflip_false
-test_operators.py SubspaceConservation.test_spinconserve_spinflip_heisenberg
+test_operators.py SubspaceConservation.test_spinconserve_xparity_error
+test_operators.py SubspaceConservation.test_spinconserve_xparity_false
+test_operators.py SubspaceConservation.test_spinconserve_xparity_heisenberg
 
 test_states.py PetscMethods
 test_states.py Projection.test_full
@@ -33,12 +32,12 @@ test_states.py Saving.test_save_auto
 test_states.py Saving.test_save_parity
 test_states.py Saving.test_save_simple
 test_states.py Saving.test_save_spinconserve
-test_states.py Saving.test_save_spinconserve_spinflip
+test_states.py Saving.test_save_spinconserve_xparity
 test_states.py ToNumpy.test_to_all
 test_states.py ToNumpy.test_to_zero
 
 test_subspaces.py ConfigLSetting.test_full
 test_subspaces.py ConfigLSetting.test_parity
-test_subspaces.py SpinFlipConversion.test_conversion
+test_subspaces.py XParityConversion.test_conversion
 
 test_rdm.py --skip-medium
