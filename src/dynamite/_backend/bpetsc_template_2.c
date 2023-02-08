@@ -947,7 +947,7 @@ PetscErrorCode C(CheckConserves,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
   const C(data,LEFT_SUBSPACE)* left_subspace_data,
   const C(data,RIGHT_SUBSPACE)* right_subspace_data,
   int xparity,
-  PetscInt* result)
+  PetscBool* result)
 {
   PetscLayout layout;
   PetscInt N, col_start, col_end;

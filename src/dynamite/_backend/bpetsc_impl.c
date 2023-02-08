@@ -226,7 +226,7 @@ PetscErrorCode BuildMat(const msc_t *msc, subspaces_t *subspaces, shell_impl she
 /*
  * we short-circuit some of these because they always return a particular value
  */
-PetscErrorCode CheckConserves(const msc_t *msc, subspaces_t *subspaces, int xparity, PetscInt *result)
+PetscErrorCode CheckConserves(const msc_t *msc, subspaces_t *subspaces, int xparity, PetscBool *result)
 {
   switch (subspaces->left_type) {
 

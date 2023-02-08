@@ -27,6 +27,7 @@ cdef extern from "bpetsc_impl.h":
 
     ctypedef int PetscInt
     ctypedef float PetscLogDouble
+    ctypedef bint PetscBool
 
     int DNM_PETSC_COMPLEX
 
@@ -45,13 +46,13 @@ cdef extern from "bpetsc_impl.h":
     int BuildMat(msc_t *msc,
                  subspaces_t *subspaces,
                  shell_impl shell,
-                 bint xparity,
+                 PetscInt xparity,
                  PetscMat *A)
 
     int CheckConserves(msc_t *msc,
                        subspaces_t *subspaces,
-                       bint xparity,
-                       bint *result)
+                       PetscInt xparity,
+                       PetscBool *result)
 
     int ReducedDensityMatrix(
         PetscVec vec,
@@ -145,7 +146,7 @@ def check_conserves(PetscInt [:] masks,
     cdef int ierr, nterms, nmasks
     cdef subspaces_t subspaces
     cdef msc_t msc
-    cdef bint result
+    cdef PetscBool result
 
     cdef np.float64_t [:] real_coeffs
 
