@@ -133,7 +133,7 @@ WORKDIR /home/dnm/dynamite
 
 COPY --chown=dnm:dnm . .
 
-RUN pip3 install ./
+RUN pip3 install -v ./
 
 
 FROM python:${CPU_PYTHON_VERSION}-slim as release-base-cpu
