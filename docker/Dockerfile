@@ -3,10 +3,10 @@ ARG PLATFORM=cpu
 ARG PETSC_VERSION=3.18.4
 ARG SLEPC_VERSION=3.18.2
 ARG CUDA_VERSION=11.6.2
-ARG UBUNTU_VERSION=20.04
+ARG CUDA_UBUNTU_VERSION=20.04
+ARG CPU_PYTHON_VERSION=3.11
 
-
-FROM python:3.9-bullseye AS base-cpu
+FROM python:${CPU_PYTHON_VERSION} AS base-cpu
 
 # install dependencies
 ONBUILD RUN apt-get update && \
@@ -30,7 +30,7 @@ ARG PETSC_CONFIG_FLAGS
 ENV PETSC_CONFIG_FLAGS="$PETSC_CONFIG_FLAGS --download-mumps=0 --with-mumps=1"
 
 
-FROM nvidia/cuda:${CUDA_VERSION}-devel-ubuntu${UBUNTU_VERSION} AS base-gpu
+FROM nvidia/cuda:${CUDA_VERSION}-devel-ubuntu${CUDA_UBUNTU_VERSION} AS base-gpu
 
 # install dependencies
 ONBUILD RUN apt-get update && \
@@ -133,7 +133,7 @@ COPY --chown=dnm:dnm . .
 RUN pip3 install ./
 
 
-FROM python:3.9-slim-bullseye as release-base-cpu
+FROM python:${CPU_PYTHON_VERSION}-slim as release-base-cpu
 
 ONBUILD RUN apt-get update && \
     \
@@ -151,7 +151,7 @@ ENV PETSC_ARCH=$PETSC_ARCH
 ENV OMP_NUM_THREADS=1
 
 
-FROM nvidia/cuda:${CUDA_VERSION}-runtime-ubuntu${UBUNTU_VERSION} AS release-base-gpu
+FROM nvidia/cuda:${CUDA_VERSION}-runtime-ubuntu${CUDA_UBUNTU_VERSION} AS release-base-gpu
 
 ONBUILD RUN apt-get update && \
     \
