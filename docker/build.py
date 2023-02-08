@@ -35,6 +35,9 @@ def parse_args(argv=None):
     parser.add_argument("--fresh", action='store_true',
                         help='Update cached images.')
 
+    parser.add_argument("--debug", action='store_true',
+                        help='Build in debug mode instead of release mode.')
+
     parser.add_argument("--cuda-archs", type=lambda x: x.split(','),
                         default=['70', '80'],
                         help='CUDA compute capabilities.')
@@ -144,6 +147,9 @@ def main():
 
                     if args.fresh and first_target:
                         cmd += ["--no-cache", "--pull"]
+
+                    if args.debug:
+                        cmd += ["--build-arg", "BUILD_TYPE=debug"]
 
                     if target == 'jupyter':
                         tags = [tag+'-jupyter' for tag in tags]

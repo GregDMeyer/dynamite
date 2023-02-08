@@ -1,10 +1,12 @@
 
 ARG PLATFORM=cpu
+ARG BUILD_TYPE=opt  # 'opt' or 'debug'
 ARG PETSC_VERSION=3.18.4
 ARG SLEPC_VERSION=3.18.2
 ARG CUDA_VERSION=11.8.0
 ARG CUDA_UBUNTU_VERSION=22.04
 ARG CPU_PYTHON_VERSION=3.11
+
 
 FROM python:${CPU_PYTHON_VERSION} AS base-cpu
 
@@ -23,8 +25,8 @@ ONBUILD RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-ARG PETSC_ARCH=complex-opt
-ENV PETSC_ARCH=$PETSC_ARCH
+ARG BUILD_TYPE
+ENV PETSC_ARCH=complex-$BUILD_TYPE
 
 ARG PETSC_CONFIG_FLAGS
 ENV PETSC_CONFIG_FLAGS="$PETSC_CONFIG_FLAGS --download-mumps=0 --with-mumps=1"
@@ -49,8 +51,8 @@ ONBUILD RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-ARG PETSC_ARCH=cuda-opt
-ENV PETSC_ARCH=$PETSC_ARCH
+ARG BUILD_TYPE
+ENV PETSC_ARCH=cuda-$BUILD_TYPE
 
 ARG PETSC_CONFIG_FLAGS
 ENV PETSC_CONFIG_FLAGS="$PETSC_CONFIG_FLAGS --with-mpi=0"
@@ -75,6 +77,7 @@ RUN pip3 install --no-cache-dir --upgrade pip
 from build as petsc
 
 ARG PETSC_VERSION
+ARG BUILD_TYPE
 
 # install PETSc
 USER root
@@ -146,8 +149,8 @@ ONBUILD RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-ARG PETSC_ARCH=complex-opt
-ENV PETSC_ARCH=$PETSC_ARCH
+ARG BUILD_TYPE
+ENV PETSC_ARCH=complex-$BUILD_TYPE
 ENV OMP_NUM_THREADS=1
 
 
@@ -164,8 +167,8 @@ ONBUILD RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-ARG PETSC_ARCH=cuda-opt
-ENV PETSC_ARCH=$PETSC_ARCH
+ARG BUILD_TYPE
+ENV PETSC_ARCH=cuda-$BUILD_TYPE
 ENV OMP_NUM_THREADS=1
 
 
