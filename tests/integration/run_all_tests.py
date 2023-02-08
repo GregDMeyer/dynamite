@@ -105,8 +105,11 @@ def main():
     else:
         test_names = get_test_list(params.test_set)
 
+    if params.gpu:
+        params.mpiexec = ''
+
     if params.nprocs is None:
-        if params.gpu or not params.mpiexec:
+        if not params.mpiexec:
             params.nprocs = [1]
         else:
             params.nprocs = [1,3,4]
