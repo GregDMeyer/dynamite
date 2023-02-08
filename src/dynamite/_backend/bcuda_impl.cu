@@ -121,9 +121,11 @@ PetscErrorCode CopySubspaceData_CUDA_Explicit(data_Explicit** out_p, const data_
   PetscCallCUDA(cudaMemcpy(cpu_data.state_map, in->state_map,
     sizeof(PetscInt)*in->dim, cudaMemcpyHostToDevice));
 
-  PetscCallCUDA(cudaMalloc(&(cpu_data.rmap_indices), sizeof(PetscInt)*in->dim));
-  PetscCallCUDA(cudaMemcpy(cpu_data.rmap_indices, in->rmap_indices,
-    sizeof(PetscInt)*in->dim, cudaMemcpyHostToDevice));
+  if (in->rmap_indices != NULL) {
+    PetscCallCUDA(cudaMalloc(&(cpu_data.rmap_indices), sizeof(PetscInt)*in->dim));
+    PetscCallCUDA(cudaMemcpy(cpu_data.rmap_indices, in->rmap_indices,
+                             sizeof(PetscInt)*in->dim, cudaMemcpyHostToDevice));
+  }
 
   PetscCallCUDA(cudaMalloc(&(cpu_data.rmap_states), sizeof(PetscInt)*in->dim));
   PetscCallCUDA(cudaMemcpy(cpu_data.rmap_states, in->rmap_states,
@@ -141,7 +143,9 @@ PetscErrorCode DestroySubspaceData_CUDA_Explicit(data_Explicit* data) {
   PetscCallCUDA(cudaMemcpy(&cpu_data, data, sizeof(data_Explicit), cudaMemcpyDeviceToHost));
 
   PetscCallCUDA(cudaFree(cpu_data.state_map));
-  PetscCallCUDA(cudaFree(cpu_data.rmap_indices));
+  if (cpu_data.rmap_indices != NULL) {
+    PetscCallCUDA(cudaFree(cpu_data.rmap_indices));
+  }
   PetscCallCUDA(cudaFree(cpu_data.rmap_states));
   PetscCallCUDA(cudaFree(data));
   return 0;
@@ -156,7 +160,11 @@ __device__ PetscInt S2I_CUDA_Explicit(PetscInt state, const data_Explicit* data)
   while (left <= right) {
     mid = left + (right-left)/2;
     if (data->rmap_states[mid] == state) {
-      return data->rmap_indices[mid];
+      if (data->rmap_indices != NULL) {
+        return data->rmap_indices[mid];
+      } else {
+        return mid;
+      }
     }
 
     if (data->rmap_states[mid] < state) {
