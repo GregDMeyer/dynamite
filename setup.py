@@ -15,7 +15,6 @@ def main():
     if any(e not in os.environ for e in env_vars):
         raise RuntimeError('Must set environment variables PETSC_DIR, '
                            'PETSC_ARCH and SLEPC_DIR before installing!')
-
     write_build_headers()
 
     setup(
@@ -90,14 +89,24 @@ def extensions():
 
         depends = []
         object_files = []
+        extra_compile_args = []
+        petsc_vars = get_petsc_variables()
+        CC_FLAGS = list(filter(None,petsc_vars["CC_FLAGS"].split(' ')))
+        CXX_FLAGS = list(filter(None,petsc_vars["CXX_FLAGS"].split(' ')))
 
         if name not in cython_only:
             depends += [f'src/dynamite/_backend/{name}_impl.h']
             if name not in header_only:
                 depends += [f'src/dynamite/_backend/{name}_impl.c']
                 object_files = [f'src/dynamite/_backend/{name}_impl.o']
+            else:
+                extra_compile_args+=CXX_FLAGS
 
+        else:
+            extra_compile_args+=CC_FLAGS
+ 
         if name == 'bpetsc':
+            extra_compile_args+=CC_FLAGS
             depends += ['src/dynamite/_backend/bsubspace.pxd'
                         'src/dynamite/_backend/bcuda_impl.h',
                         'src/dynamite/_backend/bcuda_impl.cu',
@@ -111,6 +120,7 @@ def extensions():
                       sources=[f'src/dynamite/_backend/{name}.pyx'],
                       depends=depends,
                       extra_objects=object_files,
+                      extra_compile_args=extra_compile_args,
                       **configure_paths())
         ]
 
@@ -164,20 +174,20 @@ class MakeBuildExt(build_ext):
                                 cwd='src/dynamite/_backend')
             print(make.decode())
 
-        # get the correct compiler from SLEPc
-        # there is probably a more elegant way to do this
-        makefile = 'include ${SLEPC_DIR}/lib/slepc/conf/slepc_common\n' + \
-                   'print_compiler:\n\t$(CC)'
-        CC = check_output(['make', '-n', '-f', '-', 'print_compiler'],
-                          input=makefile, text=True)
-
         # now set environment variables to that compiler
         if 'CC' in os.environ:
             _old_CC = os.environ['CC']
         else:
             _old_CC = None
 
-        os.environ['CC'] = CC
+        if 'CXX' in os.environ:
+            _old_CXX = os.environ['CXX']
+        else:
+            _old_CXX = None
+
+        petsc_vars = get_petsc_variables()
+        os.environ['CC'] = petsc_vars["CC"]
+        os.environ['CXX'] = petsc_vars["CXX"]
 
         try:
             build_ext.run(self)
@@ -187,6 +197,11 @@ class MakeBuildExt(build_ext):
                 os.environ['CC'] = _old_CC
             else:
                 os.environ.pop('CC')
+             # set CC back to its old value
+            if _old_CXX is not None:
+                os.environ['CXX'] = _old_CXX
+            else:
+                os.environ.pop('CXX')
 
 
 USE_CUDA = None
@@ -209,6 +224,19 @@ def check_cuda():
             USE_CUDA = False
 
     return USE_CUDA
+
+def get_petsc_variables():
+    petsc_varfname = os.path.join(os.environ['PETSC_DIR'],os.environ['PETSC_ARCH'],
+                                     'lib/petsc/conf/petscvariables')
+
+    petsc_vars  = {}
+    with open(petsc_varfname) as f:
+        for line in f:
+            (key, val) = line.rstrip('\r\n').split(" = ")
+            petsc_vars[key] = val.strip()
+
+    return petsc_vars
+
 
 
 if __name__ == '__main__':
