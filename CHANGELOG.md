@@ -5,6 +5,7 @@
 
 ### Fixed
  - compiler flags from PETSc were not being applied to the Cython parts of dynamite
+ - large memory usage due to a change in PETSc garbage collection
 
 ## 0.3.0 - 2023-01-08
 

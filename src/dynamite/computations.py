@@ -62,6 +62,7 @@ def evolve(H, state, t, result=None, tol=None, ncv=None, algo=None, max_its=None
     state.assert_initialized()
 
     config._initialize()
+    from petsc4py import PETSc
     from slepc4py import SLEPc
 
     H.establish_L()
@@ -105,6 +106,7 @@ def evolve(H, state, t, result=None, tol=None, ncv=None, algo=None, max_its=None
     mfn.setFromOptions()
     mfn.setOperator(H.get_mat(subspaces=(state.subspace, state.subspace)))
 
+    PETSc.garbage_cleanup()
     mfn.solve(state.vec,result.vec)
 
     conv = mfn.getConvergedReason()
@@ -198,6 +200,7 @@ def eigsolve(H, getvecs=False, nev=1, which='smallest', target=None, tol=None, s
         raise ValueError('Requested subspace has not been added to operator.')
 
     config._initialize()
+    from petsc4py import PETSc
     from slepc4py import SLEPc
 
     eps = SLEPc.EPS().create()
@@ -231,6 +234,7 @@ def eigsolve(H, getvecs=False, nev=1, which='smallest', target=None, tol=None, s
     eps.setTolerances(tol=tol, max_it=max_its)
 
     eps.setFromOptions()
+    PETSc.garbage_cleanup()
     eps.solve()
     nconv = eps.getConverged()
     reason = eps.getConvergedReason()
@@ -296,6 +300,7 @@ def reduced_density_matrix(state, keep):
 
     config._initialize()
     from ._backend import bpetsc
+    from petsc4py import PETSc
 
     if not state.subspace.product_state_basis:
         raise ValueError('reduced density matrices currently only supported '
@@ -317,6 +322,7 @@ def reduced_density_matrix(state, keep):
         raise ValueError('spin index greater than spin chain length minus one. keep: %s'
                          % str(keep))
 
+    PETSc.garbage_cleanup()
     dm = bpetsc.reduced_density_matrix(
         state.vec, state.subspace._to_c(), keep
     )

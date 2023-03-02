@@ -115,6 +115,7 @@ class State:
             config._initialize()
             from petsc4py import PETSc
 
+            PETSc.garbage_cleanup()
             self._vec = PETSc.Vec().create()
             self._vec.setSizes(self.subspace.get_dimension())
             self._vec.setFromOptions()

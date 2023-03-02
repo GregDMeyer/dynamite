@@ -579,6 +579,7 @@ class Operator:
 
         config._initialize()
         from ._backend import bpetsc
+        from petsc4py import PETSc
 
         self.reduce_msc()
 
@@ -600,6 +601,8 @@ class Operator:
             raise ValueError('Building non-Hermitian matrices currently not supported.')
 
         masks, mask_offsets = self._get_mask_offsets(msc)
+
+        PETSc.garbage_cleanup()
 
         # note: currently XParity is the only non-product-state basis, so we just handle
         # it explicitly here. obviously this will have to be generalized if other non-
