@@ -1,0 +1,26 @@
+{
+    "license": "MIT",
+    "creators": [
+        {
+            "orcid": "0000-0003-2174-3308",
+            "affiliation": "University of California at Berkeley",
+            "name": "Gregory D. Kahanamoku-Meyer"
+        },
+        {
+            "orcid": "0000-0002-0512-4139",
+            "affiliation": "Harvard University",
+            "name": "Julia Wei"
+        }
+    ],
+    "keywords": [
+        "quantum",
+        "parallel",
+        "Python",
+        "Krylov",
+        "PETSc",
+        "SLEPc",
+        "GPU",
+        "CUDA",
+        "MPI"
+    ]
+}
