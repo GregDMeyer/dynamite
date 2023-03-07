@@ -1,7 +1,7 @@
 
 # Changelog
 
-## 0.3.1 - IN PROGRESS
+## 0.3.1 - 2023-03-07
 
 ### Fixed
  - compiler flags from PETSc were not being applied to the Cython parts of dynamite
