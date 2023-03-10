@@ -1,6 +1,7 @@
 
 from dynamite import config
 from dynamite.operators import sigmax, sigmay, sigmaz, index_sum
+from dynamite.subspaces import SpinConserve
 from dynamite.computations import entanglement_entropy
 
 import numpy as np
@@ -81,6 +82,9 @@ def main():
 
     # set spin chain length globally for dynamite
     config.L = args.L
+
+    # work in half-filling subspace
+    config.subspace = SpinConserve(args.L, args.L//2)
 
     # column headers
     print('h,energy_point,entropy,ratio')
