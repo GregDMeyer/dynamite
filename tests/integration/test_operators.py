@@ -113,15 +113,16 @@ class SubspaceConservation(dtr.DynamiteTestCase):
 
     def test_auto(self):
         for k in (config.L//2, config.L//4):
-            for H_name in hamiltonians.get_names(complex_enabled()):
-                if H_name == 'syk' and self.skip_flags['small_only']:
-                    continue
-                H = getattr(hamiltonians, H_name)()
-                subspace = Auto(H, 'U'*k + 'D'*(config.L-k))
-                with self.subTest(H=H_name, L=config.L, k=k):
-                    self.assertTrue(
-                        H.conserves(subspace)
-                    )
+            for sort in (True, False):
+                for H_name in hamiltonians.get_names(complex_enabled()):
+                    if H_name == 'syk' and self.skip_flags['small_only']:
+                        continue
+                    H = getattr(hamiltonians, H_name)()
+                    subspace = Auto(H, 'U'*k + 'D'*(config.L-k), sort=sort)
+                    with self.subTest(H=H_name, L=config.L, k=k, sort=sort):
+                        self.assertTrue(
+                            H.conserves(subspace)
+                        )
 
     def test_change_parity(self):
         """

@@ -408,6 +408,12 @@ class Explicit(_ProductStateSubspace):
         if np.any(self.rmap_states[1:] == self.rmap_states[:-1]):
             raise ValueError('values in state_list must be unique')
 
+        # need to keep a handle on the contiguous versions of these,
+        # so they don't get garbage collected
+        self.state_map = np.ascontiguousarray(self.state_map)
+        self.rmap_indices = np.ascontiguousarray(self.rmap_indices)
+        self.rmap_states = np.ascontiguousarray(self.rmap_states)
+
         super().__init__(L=L)
 
     def check_L(self, value):
@@ -451,9 +457,9 @@ class Explicit(_ProductStateSubspace):
 
         return bsubspace.CExplicit(
             self.L,
-            np.ascontiguousarray(self.state_map),
-            np.ascontiguousarray(self.rmap_indices),
-            np.ascontiguousarray(self.rmap_states)
+            self.state_map,
+            self.rmap_indices,
+            self.rmap_states
         )
 
 
@@ -513,6 +519,9 @@ class Auto(Explicit):
 
         if sort:
             state_map.sort()
+        else:
+            # reverse Cuthill-McKee ordering needs... reverse!
+            state_map = state_map[::-1]
 
         Explicit.__init__(self, state_map, L=H.L)
 

@@ -1,6 +1,11 @@
 
 # Changelog
 
+## 0.3.2 - IN PROGRESS
+
+### Fixed
+ - Explicit subspace sometimes failed conservation check even when operator was actually conserved
+
 ## 0.3.1 - 2023-03-07
 
 ### Fixed
