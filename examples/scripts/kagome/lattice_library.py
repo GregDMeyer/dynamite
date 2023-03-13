@@ -2,67 +2,36 @@
 import numpy as np
 
 
-lattice_diagrams = {
-######
-'L6' : '''
- o o
-o   o
- o o
-''',
-######
-'L12' : '''
-   o
-o o o o
- o   o
-o o o o
-   o
-'''
+kagome_clusters = {
+    '12':  [( 2, 0), ( 0,  2)],
+    '42a': [(-1, 3), ( 5, -1)],
+    '42b': [(-2, 4), ( 4, -1)],
 }
 
 
-def parse_diagram(diagram, start_vertex=None):
+def basis_to_graph(basis, start_vertex=None):
     '''
-    Given a string denoting a subset of vertices of the triangular lattice (see examples),
-    number the vertices and return a list of the indices and their coordinates,
-    as well as a list of edges (for nearest-neighbor edges).
-
-    Coordinates are integers corresponding to the row and column of the characters
-    in the string, with (0,0) being the *bottom left* of the non-blank rows.
+    Given an pair of basis vectors defining a tiling of the Kagome lattice on a torus,
+    number the vertices in one such tile and return a list of real-space coordinates
+    for each vertex, as well as a list of edges between these vertices.
 
     start_vertex is the coordinates of the vertex from which to start the
     breadth-first search for numbering the vertices.
     '''
-    rows = diagram.split('\n')
 
-    # index rows from the bottom (so we can use x, y coords)
-    rows = rows[::-1]
-
-    # remove blank lines before and after
-    while all(c == ' ' for c in rows[0]):
-        rows = rows[1:]
-
-    while all(c == ' ' for c in rows[-1]):
-        rows = rows[:-1]
-
-    # use bottom left vertex by default
     if start_vertex is None:
-        start_vertex = (rows[0].index('o'), 0)
+        start_vertex = (0, 0)
 
-    return breadth_first_search_rows(rows, start_vertex)
-
-
-def breadth_first_search_rows(rows, start_vertex):
-    col, row = start_vertex
-    if rows[row][col] == ' ':
+    if not _is_lattice_point(start_vertex):
         raise ValueError('start point does not correspond to a vertex')
 
     neighbor_deltas = [
-        (-1, -1),
+        (0, +1),
+        (+1, 0),
         (+1, -1),
-        (+2, 0),
-        (+1, +1),
-        (-1, +1),
-        (-2, 0)
+        (0, -1),
+        (-1, 0),
+        (-1, +1)
     ]
 
     vertices = [start_vertex]
@@ -70,104 +39,75 @@ def breadth_first_search_rows(rows, start_vertex):
     pointer = 0
 
     while pointer < len(vertices):
-        cur_vertex = vertices[pointer]
+        cur = vertices[pointer]
 
         for delta in neighbor_deltas:
-            new_vertex = tuple(v+d for v, d in zip(cur_vertex, delta))
-            new_col, new_row = new_vertex
+            neighbor = tuple(v+d for v, d in zip(cur, delta))
 
-            if not ((0 <= new_row < len(rows)) and (0 <= new_col < len(rows[new_row]))):
-                continue
+            # wrap around torus if necessary
+            neighbor = _translate_point_into_tile(neighbor, basis)
 
-            if rows[new_row][new_col] != ' ':
-                if new_vertex not in vertices:
-                    vertices.append(new_vertex)
-                edges.add((pointer, vertices.index(new_vertex)))
+            if _is_lattice_point(neighbor):
+                if neighbor not in vertices:
+                    vertices.append(neighbor)
+                edges.add((pointer, vertices.index(neighbor)))
 
         pointer += 1
 
-    if len(vertices) != sum(len(row)-row.count(' ') for row in rows):
-        raise ValueError('not all vertices were found via breadth-first search'
-                         '---does your diagram contain disconnected sets?')
+    # finally transform the vertices to real space coordinates
+    vertices = [(x + y/2, np.sqrt(3)*y/2) for x, y in vertices]
 
     return vertices, edges
 
 
-def print_index_map(vertices):
-    n_rows = max(row for _, row in vertices)+1
-    for row in range(n_rows-1, -1, -1):  # start at the top
-        cols = max(col for col, crow in vertices if crow == row)+1
-        col = 0
-        while col < cols:
-            try:
-                idx = vertices.index((col, row))
-            except ValueError:
-                print(' ', end='')
-                col += 1
-            else:
-                print(idx, end='')
-                col += min(len(str(idx)), 2)
-
-        print()
+def _is_lattice_point(point):
+    return point[0] % 2 == 0 or point[1] % 2 == 1
 
 
-def diagram_from_basis(a, b):
-    # "a" should always be the one clockwise
-    if cross_product(a, b) < 0:
+def _translate_point_into_tile(point, basis_vecs):
+    # Lauchli et al use unit cells of length 2, here it will be more convenient to just use units
+    a, b = [np.array([2*v[0], 2*v[1]]) for v in basis_vecs]
+
+    # "a" should always be the "bottom" one
+    orientation = _loop_direction(a, (0, 0), b)
+    if orientation == -1:
         a, b = b, a
+    elif orientation == 0:
+        raise ValueError('basis vectors are linearly dependent')
 
-    # they use unit cells of length 2, here it will be more convenient to just use units
-    a = (2*a[0], 2*a[1])
-    b = (2*b[0], 2*b[1])
+    origin = np.array([0, 0])
+    far_corner = a + b
 
-    len_x = abs(a[0]) + abs(b[0])
-    len_y = abs(a[1]) + abs(b[1])
+    rtn = np.array(point)
 
-    origin_x = abs(min(0, a[0], b[0]))
-    origin_y = abs(min(0, a[1], b[1]))
+    if _loop_direction(a, origin, point) == -1:
+        # point is below the bottom line
+        rtn += b
+    elif _loop_direction(b, far_corner, point) != +1:
+        # point is on or above the upper line
+        rtn -= b
 
-    lattice = np.ones((len_x+1, len_y+1))
+    if _loop_direction(origin, b, point) == -1:
+        # point is to the left of the left boundary
+        rtn += a
+    elif _loop_direction(far_corner, a, point) != +1:
+        # point is on or to the right of the right boundary
+        rtn -= a
 
-    # turn it from a triangular lattice into kagome
-    lattice[1::2, 0::2] = 0
-
-    # now delete everything that is outside of the parallelogram
-    # specified by a and b
-    corners = [np.array(v) for v in [(0, 0), a, (a[0]+b[0], a[1]+b[1]), b]]
-
-    for x in range(len_x+1):
-        for y in range(len_y+1):
-            # check that point is "on the correct side" of each line
-            for i, j in [(0, 1), (1, 2), (2, 3), (3, 0)]:
-                side_vec = corners[j] - corners[i]
-                point_vec = np.array([x-origin_x, y-origin_y]) - corners[i]
-                if cross_product(side_vec, point_vec) < 0:
-                    lattice[x, y] = 0
-
-    diagram_rows = []
-    for y in range(len_y+1):
-        diagram_rows.append(y*' ')
-        for x in range(len_x+1):
-            if lattice[x, y]:
-                diagram_rows[-1] += 'o '
-            else:
-                diagram_rows[-1] += '  '
-
-    # get rid of leading spaces, and form a single string
-    to_trim = min(len(s) - len(s.lstrip(' ')) for s in diagram_rows)
-    rtn = '\n'.join(row[to_trim:] for row in diagram_rows[::-1])
-
-    return rtn
+    return tuple(rtn)
 
 
-def cross_product(a, b):
-    return a[0]*b[1] - a[1]*b[0]
+def _loop_direction(a, b, c):
+    '''
+    return whether the points form a clockwise loop (+1), a counter-clockwise loop (-1),
+    or a line (0).
+    '''
+    v1 = (a[0]-b[0], a[1]-b[1])
+    v2 = (c[0]-b[0], c[1]-b[1])
+    cross_product = v1[0]*v2[1] - v1[1]*v2[0]
 
-
-def main():
-    v, _ = parse_diagram(lattice_diagrams['L12'])
-    print_index_map(v)
-
-
-if __name__ == '__main__':
-    main()
+    # return sign of cross product
+    if cross_product != 0:
+        return int(cross_product//abs(cross_product))
+    else:
+        return 0

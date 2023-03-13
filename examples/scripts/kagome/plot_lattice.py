@@ -8,16 +8,16 @@ def plot_lattice(vertices, edges):
     f, ax = plt.subplots()
 
     # set up the plot
-    ax.set_aspect(np.sqrt(3))
+    ax.set_aspect('equal')
     ax.set_axis_off()
 
     ax.set_xlim(
-        -0.5,
-        0.5 + max(row for row, _ in vertices)
+        -0.5 + min(x for x, _ in vertices),
+        0.5 + max(x for x, _ in vertices)
     )
     ax.set_ylim(
-        -0.5,
-        0.5 + max(col for _, col in vertices)
+        -0.5 + min(y for _, y in vertices),
+        0.5 + max(y for _, y in vertices)
     )
 
     vertex_width = size_to_pts(5, f, ax)
@@ -34,18 +34,23 @@ def plot_lattice(vertices, edges):
         plt.text(
             *vertex, str(idx),
             ha='center', va='center_baseline',
-            fontweight='bold'
+            fontweight='bold',
+            size=size_to_pts(0.18, f, ax)
         )
 
-    done = set() # check for doubles
     for i, j in edges:
+        neighbors = are_neighbors(vertices[i], vertices[j])
+        color = '0.5' if neighbors else '0.8'
         plt.plot(*zip(vertices[i], vertices[j]),
-                 color='red' if (i,j) in done else '0.5',
+                 color=color,
                  linewidth=bar_width,
-                 zorder=0)
-        done.add((i,j))
+                 zorder=0 if neighbors else -1)
 
     plt.show()
+
+
+def are_neighbors(a, b):
+    return np.isclose(np.hypot(b[0]-a[0], b[1]-a[1]), 1)
 
 
 def size_to_pts(size, fig, ax):
@@ -60,14 +65,16 @@ def size_to_pts(size, fig, ax):
 
 def main():
     from sys import argv
-    from lattice_library import parse_diagram, lattice_diagrams
+    from lattice_library import basis_to_graph, kagome_clusters
 
     if len(argv) < 2:
-        lattice = 'L12'
+        lattice_name = '12'
     else:
-        lattice = argv[1]
+        lattice_name = argv[1]
 
-    plot_lattice(*parse_diagram(lattice_diagrams[lattice]))
+    plot_lattice(
+        *basis_to_graph(kagome_clusters[lattice_name])
+    )
 
 
 if __name__ == '__main__':
