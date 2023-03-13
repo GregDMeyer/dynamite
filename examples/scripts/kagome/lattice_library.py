@@ -2,10 +2,30 @@
 import numpy as np
 
 
+# The Kagome clusters listed below are from Table 1 of Lauchli et al. 2011
+# [https://doi.org/10.1103/PhysRevB.83.212401], except 48, which is from
+# Lauchli et al. 2019 [https://doi.org/10.1103/PhysRevB.100.155142]
+
 kagome_clusters = {
-    '12':  [( 2, 0), ( 0,  2)],
-    '42a': [(-1, 3), ( 5, -1)],
-    '42b': [(-2, 4), ( 4, -1)],
+    '12':  [( 2,  0), ( 0,  2)],
+    '15':  [( 2, -1), (-1,  3)],
+    '18a': [( 2, -1), ( 0,  3)],
+    '18b': [( 2, -2), (-2, -1)],
+    '21':  [( 2,  1), (-1,  3)],
+    '24':  [( 1,  2), (-3,  2)],
+    '27a': [( 2,  1), (-3,  3)],
+    '27b': [( 3,  0), ( 0,  3)],
+    '30':  [( 2,  1), (-2,  4)],
+    '33':  [( 1,  2), ( 4, -3)],
+    '36a': [(-2,  3), ( 4,  0)],
+    '36b': [( 3,  0), (-3,  4)],
+    '36c': [( 3,  0), (-1,  4)],
+    '36d': [( 4, -2), (-2,  4)],
+    '39a': [(-1,  3), ( 5, -2)],
+    '39b': [( 1,  3), (-3,  4)],
+    '42a': [(-1,  3), ( 5, -1)],
+    '42b': [(-2,  4), ( 4, -1)],
+    '48':  [( 4,  0), ( 0,  4)]
 }
 
 
@@ -13,7 +33,7 @@ def basis_to_graph(basis, start_vertex=None):
     '''
     Given an pair of basis vectors defining a tiling of the Kagome lattice on a torus,
     number the vertices in one such tile and return a list of real-space coordinates
-    for each vertex, as well as a list of edges between these vertices.
+    for each vertex, as well as a list of (nearest-neighbor) edges between these vertices.
 
     start_vertex is the coordinates of the vertex from which to start the
     breadth-first search for numbering the vertices.
@@ -49,8 +69,14 @@ def basis_to_graph(basis, start_vertex=None):
 
             if _is_lattice_point(neighbor):
                 if neighbor not in vertices:
+                    neighbor_idx = len(vertices)
                     vertices.append(neighbor)
-                edges.add((pointer, vertices.index(neighbor)))
+                else:
+                    neighbor_idx = vertices.index(neighbor)
+
+                # only add each edge once
+                if pointer < neighbor_idx:
+                    edges.add((pointer, vertices.index(neighbor)))
 
         pointer += 1
 
@@ -68,7 +94,7 @@ def _translate_point_into_tile(point, basis_vecs):
     # Lauchli et al use unit cells of length 2, here it will be more convenient to just use units
     a, b = [np.array([2*v[0], 2*v[1]]) for v in basis_vecs]
 
-    # "a" should always be the "bottom" one
+    # "a" should always be the "more clockwise" one
     orientation = _loop_direction(a, (0, 0), b)
     if orientation == -1:
         a, b = b, a
@@ -111,3 +137,34 @@ def _loop_direction(a, b, c):
         return int(cross_product//abs(cross_product))
     else:
         return 0
+
+
+def _test():
+    '''
+    basic checks---just that each graph contains the correct number of spins, and that each
+    vertex has degree exactly 4.
+    '''
+    from collections import defaultdict
+
+    for cluster_name, basis in kagome_clusters.items():
+        L = int(cluster_name[:2])
+
+        vertices, edges = basis_to_graph(basis)
+
+        if len(vertices) != L:
+            raise ValueError(f'{len(vertices)} vertices for cluster "{cluster_name}"')
+
+        assert max(max(a, b) for a, b in edges) == L-1
+
+        d = defaultdict(lambda: 0)
+        for e in edges:
+            for v in e:
+                d[v] += 1
+
+        for v in range(L):
+            if d[v] != 4:
+                raise ValueError(f'vertex {v} in cluster "{cluster_name}" has degree {d[v]}')
+
+
+if __name__ == '__main__':
+    _test()
