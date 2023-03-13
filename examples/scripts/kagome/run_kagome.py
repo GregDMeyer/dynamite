@@ -1,5 +1,6 @@
 
 from sys import argv
+from argparse import ArgumentParser
 from datetime import datetime
 
 from dynamite.operators import sigmax, sigmay, sigmaz, op_sum
@@ -28,14 +29,9 @@ def build_hamiltonian(cluster_name):
 
 
 def main():
+    args = parse_args()
 
-    # use the '12' cluster by default
-    if len(argv) == 1:
-        cluster_name = '12'
-    else:
-        cluster_name = argv[1]
-
-    H = build_hamiltonian(cluster_name)
+    H = build_hamiltonian(args.cluster)
 
     # number of spins in the support of H
     N = H.get_length()
@@ -44,6 +40,8 @@ def main():
     H.subspace = SpinConserve(N, N//2)
 
     # TODO: when can we also apply XParity? when L is even?
+
+    H.shell = args.shell
 
     # time the eigsolve!
     tick = datetime.now()
@@ -54,6 +52,17 @@ def main():
     mpi_print(f'E/N: {ground_state_energy/N}')
 
     mpi_print(f'\nSolve completed in {tock-tick}')
+
+
+def parse_args():
+    parser = ArgumentParser(description='Solve for the ground state energy of the Heisenberg model '
+                                        'on the Kagome lattice.')
+
+    parser.add_argument('cluster', default='12', help='which Kagome cluster to use '
+                                                      '(see lattice_library.py)')
+    parser.add_argument('--shell', action='store_true', help='whether to use shell matrices')
+
+    return parser.parse_args()
 
 
 if __name__ == '__main__':
