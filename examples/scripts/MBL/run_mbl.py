@@ -91,8 +91,8 @@ def main():
 
     seed = args.seed
     for _ in range(args.iters):
-        # so we get a new seed each disorder realization
-        seed = hash(seed)
+        # use a new seed each disorder realization
+        seed += 1
 
         for h in np.linspace(args.h_min, args.h_max, args.h_points):
             H = build_hamiltonian(h, seed)
