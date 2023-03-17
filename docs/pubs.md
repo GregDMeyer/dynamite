@@ -9,3 +9,4 @@
  - Schuster *et al.*, “Many-Body Quantum Teleportation via Operator Spreading in the Traversable Wormhole Protocol,” [*Phys. Rev. X*, vol. 12, no. 3, p. 031013, Jul. 2022.](https://doi.org/10.1103/PhysRevX.12.031013)
  - Schuster *et al.*, “Learning quantum systems via out-of-time-order correlators.” [arXiv, Aug. 03, 2022.](http://arxiv.org/abs/2208.02254)
  - Schuster *et al.*, “Operator Growth in Open Quantum Systems.” [arXiv, Aug. 25, 2022.](https://doi.org/10.48550/arXiv.2208.12272)
+ - Bornet *et al.*, “Scalable spin squeezing in a dipolar Rydberg atom array.” [arXiv, Mar. 14 2023.](https://doi.org/10.48550/arXiv.2303.08053)
