@@ -30,6 +30,7 @@ Below we give (non-exhaustive) lists of the computations and programming pattern
  - Mapping Majoranas onto spins
  - Imaginary time evolution
  - Ordinary time evolution
+ - Generating random states
  - The `Parity` subspace
  - Operators that cross subspaces (e.g. change the parity)
  - Out-of-time-order correlators
