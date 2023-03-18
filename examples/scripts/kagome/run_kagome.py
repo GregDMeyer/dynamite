@@ -1,5 +1,4 @@
 
-from sys import argv
 from argparse import ArgumentParser
 from datetime import datetime
 
@@ -28,6 +27,14 @@ def build_hamiltonian(cluster_name):
     return op_sum(heisenberg(i, j) for i, j in edges)
 
 
+def compute_correlation_functions(state):
+    '''
+    Compute the expectation values of various operators that are
+    useful for identifying spin liquids.
+    '''
+    raise NotImplementedError()
+
+
 def main():
     args = parse_args()
 
@@ -36,22 +43,36 @@ def main():
     # number of spins in the support of H
     N = H.get_length()
 
-    # total magnetization is conserved, plus an extra Z2 symmetry on top
-    H.subspace = SpinConserve(N, N//2)
+    # total magnetization is conserved
+    subspace = SpinConserve(N, N//2)
 
-    # TODO: when can we also apply XParity? when L is even?
+    if not args.no_z2:
+        # apply an extra Z2 symmetry on top if N is even
+        # the sector containing the ground state depends on the value of N % 4
+        if N % 4 == 0:
+            subspace = XParity(subspace, sector='+')
+        elif N % 4 == 2:
+            subspace = XParity(subspace, sector='-')
+
+    H.subspace = subspace
 
     H.shell = args.shell
 
     # time the eigsolve!
     tick = datetime.now()
-    ground_state_energy = H.eigsolve()[0]
+    # eigsolve may return more than 2 values if it converges more
+    gs_energy, e1_energy = H.eigsolve(nev=2)[:2]
     tock = datetime.now()
 
-    mpi_print(f'Ground state energy E: {ground_state_energy}')
-    mpi_print(f'E/N: {ground_state_energy/N}')
+    mpi_print(f'Ground state energy E: {gs_energy}')
+    mpi_print(f'E/N: {gs_energy/N}')
+    mpi_print()
 
-    mpi_print(f'\nSolve completed in {tock-tick}')
+    gap = e1_energy-gs_energy
+    mpi_print(f'Gap: {gap}')
+    mpi_print(f'Gap/N: {gap/N}')
+    mpi_print()
+    mpi_print(f'Solve completed in {tock-tick}')
 
 
 def parse_args():
@@ -61,6 +82,7 @@ def parse_args():
     parser.add_argument('cluster', default='12', help='which Kagome cluster to use '
                                                       '(see lattice_library.py)')
     parser.add_argument('--shell', action='store_true', help='whether to use shell matrices')
+    parser.add_argument('--no-z2', action='store_true', help='do not apply XParity subspace')
 
     return parser.parse_args()
 
