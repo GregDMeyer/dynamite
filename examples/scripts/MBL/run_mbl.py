@@ -3,6 +3,7 @@ from dynamite import config
 from dynamite.operators import sigmax, sigmay, sigmaz, index_sum
 from dynamite.subspaces import SpinConserve
 from dynamite.computations import entanglement_entropy
+from dynamite.tools import mpi_print
 
 import numpy as np
 from argparse import ArgumentParser
@@ -74,7 +75,7 @@ def print_eig_stats(evals, evecs, h, energy_point):
         ratio += min(this_gap, next_gap) / max(this_gap, next_gap)
     ratio /= len(evals)-2
 
-    print(f'{h}, {energy_point}, {entropy}, {ratio}')
+    mpi_print(f'{h}, {energy_point}, {entropy}, {ratio}')
 
 
 def main():
@@ -87,7 +88,7 @@ def main():
     config.subspace = SpinConserve(args.L, args.L//2)
 
     # column headers
-    print('h,energy_point,entropy,ratio')
+    mpi_print('h,energy_point,entropy,ratio')
 
     seed = args.seed
     for _ in range(args.iters):
