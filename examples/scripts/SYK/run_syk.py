@@ -8,6 +8,7 @@ from dynamite.operators import op_sum, op_product
 from dynamite.extras import majorana
 from dynamite.subspaces import Parity
 from dynamite.states import State
+from dynamite.tools import mpi_print
 
 
 def main():
@@ -45,7 +46,7 @@ def main():
     sorted_beta = sorted(args.b)
 
     # print the headers for the output CSV
-    print("beta,t,C")
+    mpi_print("beta,t,C")
 
     for _ in range(args.H_iters):  # disorder realizations
 
@@ -90,7 +91,7 @@ def main():
 
                     result = compute_otoc(psi0, psi1, t, H, W, V)
 
-                    print(f"{b},{t},{result}")
+                    mpi_print(f"{b},{t},{result}")
 
                     # restore psi0 to equal psi1 for the next iteration
                     psi1.copy(result=psi0)
