@@ -12,6 +12,7 @@ from dynamite.msc_tools import msc_dtype
 from dynamite.subspaces import Full, Parity, SpinConserve, Auto, XParity
 from dynamite.operators import index_sum, sigmax, sigmay, sigmaz
 from dynamite.operators import Operator
+from dynamite.states import State, UninitializedError
 
 import hamiltonians
 
@@ -257,6 +258,37 @@ class MSCConsistency(dtr.DynamiteTestCase):
 
         with self.assertRaises(RuntimeError):
             op.build_mat()
+
+
+class Expectation(dtr.DynamiteTestCase):
+    @classmethod
+    def expectation_correct(cls, H, state):
+        tmp = H*state
+        return state.dot(tmp).real
+
+    def test_simple(self):
+        for H_name in hamiltonians.get_names(complex_enabled()):
+            with self.subTest(H=H_name):
+                H = getattr(hamiltonians, H_name)()
+                state = State(state='random')
+                correct = self.expectation_correct(H, state)
+
+                self.assertEqual(
+                    H.expectation(state),
+                    correct
+                )
+
+                tmp = State()
+                self.assertEqual(
+                    H.expectation(state, tmp_state=tmp),
+                    correct
+                )
+
+    def test_uninitialized_fail(self):
+        with self.assertRaises(UninitializedError):
+            H = hamiltonians.ising()
+            state = State()
+            H.expectation(state)
 
 
 class Exceptions(dtr.DynamiteTestCase):

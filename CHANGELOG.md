@@ -3,6 +3,9 @@
 
 ## 0.3.2 - IN PROGRESS
 
+### Added
+ - `Operator.expectation()`, convenience function to compute the expectation value of the operator with respect to a state
+
 ### Fixed
  - Explicit subspace sometimes failed conservation check even when operator was actually conserved
 
