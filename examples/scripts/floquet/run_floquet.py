@@ -41,19 +41,19 @@ def main():
 
     # we create Deff and the Sz operators before the iterations start so that we
     # are not rebuilding the matrices for them every iteration
-    Szs = [0.5*sigmaz(i) for i in range(args.L)]
+    Sz_ops = [0.5*sigmaz(i) for i in range(args.L)]
 
     # a workspace vector to store the output of the evolution in
     tmp = state.copy()
 
     # output the statistics at t=0
     if cycle_start == 0:
-        print_stats(state, 0, tmp, Deff, Szs)
+        print_stats(state, 0, tmp, Deff, Sz_ops)
 
     for cycle in range(cycle_start+1, args.n_cycles+1):
         H.evolve(state, result=tmp, t=args.T)
         X.dot(tmp, result=state)  # apply the pi pulse
-        print_stats(state, cycle*args.T, tmp, Deff, Szs)
+        print_stats(state, cycle*args.T, tmp, Deff, Sz_ops)
 
         if args.checkpoint_every != 0 and cycle % args.checkpoint_every == 0:
             # remove previous checkpoint
@@ -80,7 +80,7 @@ def build_hamiltonian(alpha, Jz, Jx, h):
     return Jz*long_range_ZZ + Jx*nearest_neighbor_XX + magnetic_field
 
 
-def print_stats(state, t, tmp, Deff, Szs):
+def print_stats(state, t, tmp, Deff, Sz_ops):
     '''
     Print out statistics about the state in CSV format. Also prints the CSV headers
     if t=0.
@@ -88,9 +88,9 @@ def print_stats(state, t, tmp, Deff, Szs):
     if t == 0:
         mpi_print('t,Deff_energy,entropy,'+','.join(f'Sz{i}' for i in range(config.L)))
 
-    # we needed to pass in tmp to avoid unnecessarily allocating a new vector here
-    Deff.dot(state, result=tmp)
-    Deff_energy = state.dot(tmp).real
+    # pass in tmp to avoid unnecessarily allocating a new vector here
+    # probably doesn't actually matter that much for performance, but might as well
+    Deff_energy = Deff.expectation(state, tmp_state=tmp)
 
     # half-chain entanglement entropy
     entropy = entanglement_entropy(state, keep=range(config.L//2))
@@ -98,8 +98,7 @@ def print_stats(state, t, tmp, Deff, Szs):
     # Sz expectation values for each spin
     Sz_vals = []
     for i in range(config.L):
-        Szs[i].dot(state, result=tmp)
-        Sz_vals.append(state.dot(tmp).real)
+        Sz_vals.append(Sz_ops[i].expectation(state, tmp_state=tmp))
 
     mpi_print(t, Deff_energy, entropy, *Sz_vals, sep=',')
 
