@@ -6,6 +6,9 @@
 ### Added
  - `Operator.expectation()`, convenience function to compute the expectation value of the operator with respect to a state
 
+### Changed
+ - `Operator.msc_size` renamed to `Operator.nterms`, and now invokes a call to `Operator.reduce_msc()`
+
 ### Fixed
  - Explicit subspace sometimes failed conservation check even when operator was actually conserved
 

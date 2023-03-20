@@ -246,7 +246,7 @@ def main():
         Print(' dim:', H.dim[0])
         Print(' nnz:', H.nnz)
         Print(' density:', H.density)
-        Print(' MSC size:', H.msc_size)
+        Print(' nterms:', H.nterms)
         log_call(H.build_mat, stats)()
 
     # build some states to use in the computations

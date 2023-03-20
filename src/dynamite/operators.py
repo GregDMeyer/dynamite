@@ -205,11 +205,21 @@ class Operator:
         return msc_tools.nnz(self.msc)
 
     @property
+    def nterms(self):
+        """
+        The number of terms in the operator, when written as a sum of products of Paulis.
+        Note that Operator.reduce_msc() is called when accessing this property, which cleans
+        up and sorts the internal representation used by dynamite for the operator.
+        """
+        self.reduce_msc()
+        return len(self.msc)
+
+    @property
     def msc_size(self):
         """
-        The number of elements in the MSC representation of the matrix.
+        (deprecated)
         """
-        return len(self.msc)
+        raise DeprecationWarning('Operator.msc_size is deprecated, use Operator.nterms instead')
 
     @property
     def density(self):
