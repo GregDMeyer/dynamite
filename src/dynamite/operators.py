@@ -762,6 +762,29 @@ class Operator:
         ket = State(subspace=self.right_subspace)
         return (bra, ket)
 
+    def expectation(self, state, tmp_state=None):
+        '''
+        Convenience function to compute the expectation value with respect
+        to a given state.
+
+        Parameters
+        ----------
+        state : dynamite.states.State
+            The state for which to compute the expectation value
+
+        tmp_state : dynamite.states.State, optional
+            A "scratch space" state to use during the computation. Must be in the correct
+            subspace. A state vector is allocated internally if one is not provided.
+        '''
+        if tmp_state is None:
+            tmp_state = self.dot(state)
+        else:
+            self.dot(state, result=tmp_state)
+
+        # operators in dynamite are always Hermitian, so we can just
+        # return the real part only
+        return state.dot(tmp_state).real
+
     ### mask, sign, coefficient representation of operators
 
     @property

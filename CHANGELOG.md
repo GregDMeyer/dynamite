@@ -1,6 +1,20 @@
 
 # Changelog
 
+## 0.3.2 - IN PROGRESS
+
+### Added
+ - `Operator.expectation()`, convenience function to compute the expectation value of the operator with respect to a state
+
+### Fixed
+ - Explicit subspace sometimes failed conservation check even when operator was actually conserved
+
+## 0.3.1 - 2023-03-07
+
+### Fixed
+ - compiler flags from PETSc were not being applied to the Cython parts of dynamite
+ - large memory usage due to a change in PETSc garbage collection
+
 ## 0.3.0 - 2023-01-08
 
 ### Added
