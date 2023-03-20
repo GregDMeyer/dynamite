@@ -1119,6 +1119,9 @@ class Operator:
         x : numeric type
             The coefficient to scale by
         '''
+        if x == 1:
+            return
+
         try:
             self.msc['coeffs'] *= x
         except (ValueError, TypeError):
