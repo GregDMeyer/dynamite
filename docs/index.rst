@@ -24,6 +24,8 @@ To run the tutorial, `install Docker <containers.html#setup>`_
 Then follow the last link in the output (it should start with ``http://127.0.0.1:8887``).
 Start the tutorial by launching the notebook ``0-Welcome.ipynb`` in the left panel.
 
+You may also be interested in looking at dynamite's `example scripts <https://github.com/GregDMeyer/dynamite/tree/master/examples/scripts>`_.
+
 .. note::
     dynamite is in beta! You may find bugs. When you do,
     please submit them on the `GitHub Issues <https://github.com/GregDMeyer/dynamite/issues>`_
