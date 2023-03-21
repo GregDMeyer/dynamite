@@ -7,7 +7,13 @@ Look around, and feel free to modify and explore. Each project has its own READM
 
 ## Features demonstrated
 
-Below we give (non-exhaustive) lists of the computations and programming patterns appearing in each of the examples, to help those looking to figure out how to perform particular tasks. If you don't see something listed here, we still suggest looking at the examples, it may just have not made the list below!
+Below we give (non-exhaustive) lists of the computations and programming patterns appearing in each of the examples, to help those looking to figure out how to perform particular tasks. If you don't see what you're looking for in these lists, we still suggest looking at the examples; it may just have not made the lists below!
+
+### In all examples
+
+ - Building operators
+ - Using `mpi_print` to avoid duplicated output when running with many MPI ranks
+ - Separating "data" output and "human" output by printing to `stderr` (except Kagome example)
 
 ### MBL
 
@@ -32,33 +38,62 @@ Below we give (non-exhaustive) lists of the computations and programming pattern
  - Ordinary time evolution
  - Generating random states
  - The `Parity` subspace
- - Operators that cross subspaces (e.g. change the parity)
+ - Operators that cross subspaces (in this case, changing the parity)
  - Out-of-time-order correlators
  - Using quantum typicality to compute operators' thermal expectation values
+ - Coordinating randomness across MPI ranks
 
 ### Floquet time evolution
 
- - Time evolution under piecewise time-dependent Hamiltonians
+ - Initializing product states
+ - Time evolution under piecewise Hamiltonians
  - Computing entanglement entropy
  - Computing expectation values
  - Tracking each of the above throughout an evolution
+ - Checkpointing and restarting from a checkpoint
+
+## Running the scripts
+
+With a working dynamite installation, you can simply `cd` to the example you want to run and do
+
+```bash
+python run_<example>.py
+```
+(for example, `run_mbl.py` for the MBL example).
+
+A key feature of dynamite is the ability to run scripts in parallel via MPI. On most systems you can run (using 4 MPI ranks for example):
+```bash
+mpirun -n 4 python run_<example>.py
+```
+On certain systems, like clusters, the command to launch MPI jobs may be different---check your system's documentation!
+
+You can also try running the examples on a GPU, if you have access to one! 
+If dynamite is compiled with GPU support it will perform computations on the GPU by default. The easiest way to access a dynamite build
+that has been compiled with GPU support is probably via the Docker images; see [the documentation](https://dynamite.readthedocs.io/en/latest/containers.html) 
+for details!
 
 ## Running in docker
 
-Note that these projects are also included in dynamite's docker images, so you can easily try them out. They are located at `/home/dnm/examples/scripts/`. For example, to run the SYK example [on a GPU in a compute cluster using Singularity](https://dynamite.readthedocs.io/en/latest/containers.html#singularity-usage), just run the following command:
+Note that these examples are included in dynamite's docker images at `/home/dnm/examples/scripts/`, so you can easily try them out. For example, to run the 
+Kagome example with 21 spins you can simply do
 
-<!-- TODO: make sure this command is right once I have the scripts written! -->
 ```bash
-singularity exec --nv docker://gdmeyer/dynamite:latest-cuda python /home/dnm/examples/scripts/SYK/run_SYK.py
+docker run --rm -it gdmeyer/dynamite:latest python examples/kagome/run_kagome.py 21
+```
+
+Or to run it [on a GPU in a compute cluster using Singularity](https://dynamite.readthedocs.io/en/latest/containers.html#singularity-usage):
+
+```bash
+singularity exec --nv docker://gdmeyer/dynamite:latest-cuda python /home/dnm/examples/scripts/kagome/run_kagome.py 21
 ```
 
 ## FAQ: the `main()` function
 
-You will notice each of the projects' main script has a `main()` function, and at the bottom has
+You will notice each of the projects' run script has a `main()` function, and at the bottom has
 
 ```python
 if __name__ == '__main__':
     main()
 ```
 
-If you're not familiar with this, it causes `main()` to only run if the script is run directly (like via `python my_script.py`). This allows, for example, one to have another file with `import my_script` that can use functions from `my_script.py` without running the entire computation! This can be useful for testing and debugging. This structure also allows you to encapsulate variables into separate functions that achieve each step of the computation. Organizing your code like this is not at all required for dynamite to work, but we highly suggest it to make your development process easier and to avoid bugs!
+If you're not familiar with this, it causes `main()` to only run if the script is run directly (like via `python my_script.py`). This allows, for example, another Python script to do `import my_script` and then use functions from `my_script.py` without running the entire computation! This can be useful for testing and debugging. This structure also allows you to encapsulate variables into separate functions that achieve each step of the computation. Organizing your code like this is not at all required for dynamite to work, but we highly suggest it to make your development process easier and to avoid bugs!

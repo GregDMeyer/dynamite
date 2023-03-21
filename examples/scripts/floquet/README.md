@@ -1,6 +1,15 @@
 # Floquet
 
-## Model
+## In this example
+
+ - Initializing product states
+ - Time evolution under piecewise Hamiltonians
+ - Computing entanglement entropy
+ - Computing expectation values
+ - Tracking each of the above throughout an evolution
+ - Checkpointing and restarting from a checkpoint
+ 
+## Overview
 
 In this project we will track the time evolution of various states under a time-dependent Floquet Hamiltonian. This system is physically interesting for a number of reasons, not least of which that it can exhibit [Floquet prethermalization](https://doi.org/10.1103/PhysRevResearch.1.033202), which can support out-of-equilibrium phases of matter like [time crystals](https://journals.aps.org/prx/abstract/10.1103/PhysRevX.10.011043)!
 
@@ -26,7 +35,7 @@ build_hamiltonian(1.25, 1, 0.2, (0.2, 0.15, 0.1))
 
 
 
-$1\left(1\left[\sum_{i=0}^{10}\sigma^z_{i}\sigma^z_{i+1}\right] + 0.42\left[\sum_{i=0}^{9}\sigma^z_{i}\sigma^z_{i+2}\right] + 0.253\left[\sum_{i=0}^{8}\sigma^z_{i}\sigma^z_{i+3}\right] + \cdots\right) + 0.2\left[\sum_{i=0}^{10}\sigma^x_{i}\sigma^x_{i+1}\right] + \sum_{i=0}^{11}\left(0.2\sigma^x_{i} + 0.15\sigma^y_{i} + 0.1\sigma^z_{i}\right)$
+$\sum_{i=0}^{10}0.25\sigma^z_{i}\sigma^z_{i+1} + 0.42\left[\sum_{i=0}^{9}0.25\sigma^z_{i}\sigma^z_{i+2}\right] + 0.253\left[\sum_{i=0}^{8}0.25\sigma^z_{i}\sigma^z_{i+3}\right] + \cdots + 0.2\left[\sum_{i=0}^{10}0.25\sigma^x_{i}\sigma^x_{i+1}\right] + \sum_{i=0}^{11}\left(0.1\sigma^x_{i} + 0.075\sigma^y_{i} + 0.05\sigma^z_{i}\right)$
 
 
 
@@ -55,7 +64,67 @@ That is, the $h_y$ and $h_z$ terms approximately average to zero.
 
 Of course, since we are driving the system and there is no dissipation, the temperature will eventually go to infinity. However, we hope to observe that for the right frequency (inverse of the period $T$) we should see a "prethermal plateau" in which the system first thermalizes with respect to the $D_\mathrm{eff}$, but the expectation value $\langle D_\mathrm{eff} \rangle$ is approximately conserved. This is *Floquet prethermalization*---the system thermalizes early with respect to an approximate Hamiltonian, and only much later thermalizes to the infinite temperature state.
 
+## Remark: checkpointing
+
+Especially on HPC clusters, we may encounter situations where our compute jobs are killed before they complete. Or, we may look at the results of a completed job and decide we want to evolve for a longer time. Whatever the reason, the ability to save our progress and re-start computations where we left off can be extremely useful.
+
+This can often be quite easy to accomplish, and it is implemented in this example. Here, every $n$ iterations (where $n$ is set on the command line by the user), the state vector is saved to a file, with the cycle number contained in the filename. When the script starts up, it checks to see if such a file already exists, and if it does, it reads in the vector and starts the evolution from there. Pretty straightforward!
+
+## Remark: operator arithmetic
+
+Note that in `run_floquet.py` we compute the "averaged" Hamiltonian $D_\mathrm{eff}$ simply as
+
+```python
+Deff = (H + X*H*X)/2
+```
+where `X` is the global pi pulse operator.
+
+This showcases the operator arithmetic that is possible in dynamite. You may sometimes find dynamite useful just as a "calculator" for doing arithmetic with strings of Paulis! Note in particular that due to the symbolic way that dynamite stores operators, calculations like the above can be done in milliseconds on a laptop even when multiplying the operators as matrices would be extremely expensive.
+
 ## Usage
 
-## Checkpointing
+The computation is implemented in `run_floquet.py`. The script will output, in CSV format, the half-chain entanglement entropy, the effective energy $\langle D_\mathrm{eff} \rangle$, and the expectation value of $S^z$ for each spin. Note that the data is written to stdout and any other information is written to stderr, so you can do for example `python run_floquet.py -L 12 > data.csv` and only the data will be written to the CSV file.
 
+Here are the command line options:
+
+
+```python
+! python run_floquet.py -h
+```
+
+    usage: run_floquet.py [-h] [-L L] [--Jx JX] [--h-vec H_VEC] [--alpha ALPHA]
+                          [-T T] [--initial-state-dwalls INITIAL_STATE_DWALLS]
+                          [--n-cycles N_CYCLES]
+                          [--checkpoint-path CHECKPOINT_PATH]
+                          [--checkpoint-every CHECKPOINT_EVERY]
+    
+    Evolve under a Floquet Hamiltonian
+    
+    options:
+      -h, --help            show this help message and exit
+      -L L                  number of spins
+      --Jx JX               coefficient on the XX term
+      --h-vec H_VEC         magnetic field vector
+      --alpha ALPHA         power law for long range ZZ interaction
+      -T T                  Floquet period
+      --initial-state-dwalls INITIAL_STATE_DWALLS
+                            Number of domain walls to include in initial product
+                            state
+      --n-cycles N_CYCLES   Total number of Floquet cycles
+      --checkpoint-path CHECKPOINT_PATH
+                            where to save the state vector for
+                            checkpointing/restarting. [default: ./]
+      --checkpoint-every CHECKPOINT_EVERY
+                            how frequently to save checkpoints, in number of
+                            cycles. if this option is omitted, checkpoints will
+                            not be saved.
+
+
+## References
+
+TODO
+
+
+```python
+
+```

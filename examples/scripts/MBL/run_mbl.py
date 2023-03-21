@@ -1,4 +1,6 @@
 
+from sys import stderr
+
 from dynamite import config
 from dynamite.operators import sigmax, sigmay, sigmaz, index_sum
 from dynamite.subspaces import SpinConserve
@@ -26,9 +28,9 @@ def parse_args():
     parser.add_argument('--h-points', type=int, default=5,
                         help='number of disorder strengths to test')
     parser.add_argument('--h-min', type=float, default=1,
-                        help='minimum value of h')
+                        help='minimum value of disorder strength h')
     parser.add_argument('--h-max', type=float, default=5,
-                        help='maximum value of h')
+                        help='maximum value of disorder strength h')
     parser.add_argument('--nev', type=int, default=32,
                         help='number of eigenpairs to compute at each point')
 
@@ -80,6 +82,12 @@ def print_eig_stats(evals, evecs, h, energy_point):
 
 def main():
     args = parse_args()
+
+    # print this to stderr to separate it from the data output below
+    mpi_print('== Run parameters: ==', file=stderr)
+    for key, value in vars(args).items():
+        mpi_print(f'  {key}, {value}', file=stderr)
+    mpi_print(file=stderr)  # extra newline
 
     # set spin chain length globally for dynamite
     config.L = args.L

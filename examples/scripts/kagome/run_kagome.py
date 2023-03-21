@@ -38,6 +38,10 @@ def compute_correlation_functions(state):
 def main():
     args = parse_args()
 
+    mpi_print('Heisenberg interaction on the Kagome lattice')
+    mpi_print(f'Cluster: {args.cluster}')
+    mpi_print(f'Use shell matrices: {args.shell}')
+
     H = build_hamiltonian(args.cluster)
 
     # number of spins in the support of H
@@ -46,13 +50,22 @@ def main():
     # total magnetization is conserved
     subspace = SpinConserve(N, N//2)
 
+    sector = None
     if not args.no_z2:
         # apply an extra Z2 symmetry on top if N is even
         # the sector containing the ground state depends on the value of N % 4
         if N % 4 == 0:
-            subspace = XParity(subspace, sector='+')
+            sector = +1
         elif N % 4 == 2:
-            subspace = XParity(subspace, sector='-')
+            sector = -1
+
+    if sector is None:
+        mpi_print(f'Not applying XParity (Z2) subspace')
+    else:
+        mpi_print(f'XParity (Z2) symmetry sector: {sector}')
+        subspace = XParity(subspace, sector=sector)
+
+    mpi_print()
 
     H.subspace = subspace
 

@@ -3,6 +3,7 @@ from argparse import ArgumentParser
 from glob import glob
 from os.path import join
 from os import remove
+from sys import stderr
 
 from dynamite import config
 from dynamite.operators import sigmax, sigmay, sigmaz, index_sum, index_product, op_sum
@@ -18,6 +19,12 @@ from dynamite.tools import mpi_print
 
 def main():
     args = parse_args()
+
+    # print this to stderr to separate it from the data output below
+    mpi_print('== Run parameters: ==', file=stderr)
+    for key, value in vars(args).items():
+        mpi_print(f'  {key}, {value}', file=stderr)
+    mpi_print(file=stderr)  # an extra newline
 
     config.L = args.L
 
@@ -146,10 +153,11 @@ def parse_args():
 
     parser.add_argument('-L', type=int, default=14, help='number of spins')
 
-    parser.add_argument('--Jx', type=float, default=0.19)
+    parser.add_argument('--Jx', type=float, default=0.19, help='coefficient on the XX term')
     parser.add_argument('--h-vec', type=lambda s: [float(x) for x in s.split(',')],
-                        default=[0.21, 0.17, 0.13])
-    parser.add_argument('--alpha', type=float, default=1.25)
+                        default=[0.21, 0.17, 0.13], help='magnetic field vector')
+    parser.add_argument('--alpha', type=float, default=1.25,
+                        help='power law for long range ZZ interaction')
 
     parser.add_argument('-T', type=float, default=0.12,
                         help='Floquet period')
