@@ -14,7 +14,7 @@ This project uses dynamite to explore many-body localization (MBL), a surprising
 
 In this project we explore a model of nearest-neighbor Heisenberg interactions on a 1D chain, with disorder implemented as random Z fields on each site:
 
-$$H = \sum_{\left<i,j\right>} \vec{S}_i \cdot \vec{S}_j + \sum_i h_i S^z_i$$
+$$H = \sum_{\left< i,j \right> } \vec{S}_i \cdot \vec{S}_j + \sum_i h_i S^z_i$$
 
 where $\vec{S} = (S^x, S^y, S^z)$, the subscripts indicate the index of the spin in the chain, and the angle brackets indicate that the indices run over nearest neighbors. The values of $h_i$ are drawn from a uniform distribution $\left[-h, h\right]$ where $h$ is a parameter that controls the strength of the disorder.
 
@@ -23,7 +23,7 @@ In the script `run_mbl.py` this is implemented by the `build_hamiltonian` functi
 
 ```python
 from dynamite import config
-config.L = 10
+config.L = 6
 
 from run_mbl import build_hamiltonian
 build_hamiltonian(h=2)
@@ -32,7 +32,7 @@ build_hamiltonian(h=2)
 
 
 
-$\sum_{i=0}^{8}0.25\left(\sigma^x_{i}\sigma^x_{i+1} + \sigma^y_{i}\sigma^y_{i+1} + \sigma^z_{i}\sigma^z_{i+1}\right) + -0.961\sigma^z_{0} + 0.798\sigma^z_{1} + -0.461\sigma^z_{2} + -0.151\sigma^z_{3} + -0.8\sigma^z_{4} + 0.339\sigma^z_{5} + -0.072\sigma^z_{6} + 0.57\sigma^z_{7} + -0.652\sigma^z_{8} + -0.114\sigma^z_{9}$
+$\sum\limits_{i=0}^{4}0.25\left(\sigma^x_{i}\sigma^x_{i+1} + \sigma^y_{i}\sigma^y_{i+1} + \sigma^z_{i}\sigma^z_{i+1}\right) + 0.855\sigma^z_{0} + 0.143\sigma^z_{1} + 0.307\sigma^z_{2} + 0.398\sigma^z_{3} + -0.776\sigma^z_{4} + 0.875\sigma^z_{5}$
 
 
 

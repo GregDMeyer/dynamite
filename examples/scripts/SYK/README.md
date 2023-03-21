@@ -54,7 +54,7 @@ from run_syk import build_hamiltonian, build_hamiltonian_simple
 %timeit -n 1 -r 1 build_hamiltonian(N=16)
 ```
 
-    201 ms ± 0 ns per loop (mean ± std. dev. of 1 run, 1 loop each)
+    185 ms ± 0 ns per loop (mean ± std. dev. of 1 run, 1 loop each)
 
 
 
@@ -62,7 +62,7 @@ from run_syk import build_hamiltonian, build_hamiltonian_simple
 %timeit -n 1 -r 1 build_hamiltonian_simple(N=16)
 ```
 
-    2.16 s ± 0 ns per loop (mean ± std. dev. of 1 run, 1 loop each)
+    1.99 s ± 0 ns per loop (mean ± std. dev. of 1 run, 1 loop each)
 
 
 ## Goals

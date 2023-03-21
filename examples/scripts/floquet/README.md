@@ -35,7 +35,7 @@ build_hamiltonian(1.25, 1, 0.2, (0.2, 0.15, 0.1))
 
 
 
-$\sum_{i=0}^{10}0.25\sigma^z_{i}\sigma^z_{i+1} + 0.42\left[\sum_{i=0}^{9}0.25\sigma^z_{i}\sigma^z_{i+2}\right] + 0.253\left[\sum_{i=0}^{8}0.25\sigma^z_{i}\sigma^z_{i+3}\right] + \cdots + 0.2\left[\sum_{i=0}^{10}0.25\sigma^x_{i}\sigma^x_{i+1}\right] + \sum_{i=0}^{11}\left(0.1\sigma^x_{i} + 0.075\sigma^y_{i} + 0.05\sigma^z_{i}\right)$
+$\sum\limits_{i=0}^{10}0.25\sigma^z_{i}\sigma^z_{i+1} + 0.42\left[\sum\limits_{i=0}^{9}0.25\sigma^z_{i}\sigma^z_{i+2}\right] + 0.253\left[\sum\limits_{i=0}^{8}0.25\sigma^z_{i}\sigma^z_{i+3}\right] + \cdots + 0.2\left[\sum\limits_{i=0}^{10}0.25\sigma^x_{i}\sigma^x_{i+1}\right] + \sum\limits_{i=0}^{11}\left(0.1\sigma^x_{i} + 0.075\sigma^y_{i} + 0.05\sigma^z_{i}\right)$
 
 
 
@@ -52,7 +52,7 @@ pi_pulse
 
 
 
-$\prod_{i=0}^{11}\sigma^x_{i}$
+$\prod\limits_{i=0}^{11}\sigma^x_{i}$
 
 
 
