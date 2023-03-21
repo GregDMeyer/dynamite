@@ -1399,7 +1399,7 @@ def index_sum(op, size = None, start = 0, boundary = 'open'):
     sub_tex = sub_tex.replace('{IDX', '{IDX'+idx+'+')
     sub_tex = sub_tex.replace('{IDX'+idx+'+0', '{IDX'+idx)
 
-    rtn._string_rep.tex = r'\sum_{'+idx+'=%d}^{%d}' % (start, stop-1) + sub_tex
+    rtn._string_rep.tex = r'\sum\limits_{'+idx+'=%d}^{%d}' % (start, stop-1) + sub_tex
     rtn._string_rep.brackets = '[]'
 
     return rtn
@@ -1447,7 +1447,7 @@ def index_product(op, size = None, start = 0):
     idx = _get_next_index(sub_tex)
     sub_tex = sub_tex.replace('{IDX', '{IDX'+idx+'+')
     sub_tex = sub_tex.replace('{IDX'+idx+'+0', '{IDX'+idx)
-    rtn._string_rep.tex = r'\prod_{'+idx+'=%d}^{%d}' % (start, stop-1)
+    rtn._string_rep.tex = r'\prod\limits_{'+idx+'=%d}^{%d}' % (start, stop-1)
     rtn._string_rep.tex += sub_tex
     rtn._string_rep.brackets = '[]'
 
