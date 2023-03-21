@@ -67,18 +67,18 @@ mpirun -n 4 python run_<example>.py
 ```
 On certain systems, like clusters, the command to launch MPI jobs may be different---check your system's documentation!
 
-You can also try running the examples on a GPU, if you have access to one! 
+You can also try running the examples on a GPU, if you have access to one!
 If dynamite is compiled with GPU support it will perform computations on the GPU by default. The easiest way to access a dynamite build
-that has been compiled with GPU support is probably via the Docker images; see [the documentation](https://dynamite.readthedocs.io/en/latest/containers.html) 
+that has been compiled with GPU support is probably via the Docker images; see [the documentation](https://dynamite.readthedocs.io/en/latest/containers.html)
 for details!
 
 ## Running in docker
 
-Note that these examples are included in dynamite's docker images at `/home/dnm/examples/scripts/`, so you can easily try them out. For example, to run the 
+Note that these examples are included in dynamite's docker images at `/home/dnm/examples/scripts/`, so you can easily try them out. For example, to run the
 Kagome example with 21 spins you can simply do
 
 ```bash
-docker run --rm -it gdmeyer/dynamite:latest python examples/kagome/run_kagome.py 21
+docker run --rm -it gdmeyer/dynamite:latest python examples/scripts/kagome/run_kagome.py 21
 ```
 
 Or to run it [on a GPU in a compute cluster using Singularity](https://dynamite.readthedocs.io/en/latest/containers.html#singularity-usage):
