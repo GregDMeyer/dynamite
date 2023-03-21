@@ -13,7 +13,8 @@ from . import config, validate, msc_tools
 from .computations import evolve, eigsolve
 from .subspaces import Full, Explicit, XParity
 from .states import State
-from .tools import complex_enabled
+from .tools import complex_enabled, MPI_COMM_WORLD
+
 
 class Operator:
     """
@@ -517,13 +518,12 @@ class Operator:
         filename : str
             The path to the file to save the operator in.
         """
-        config._initialize()
-        from petsc4py import PETSc
-        if PETSc.COMM_WORLD.rank == 0:
+        comm = MPI_COMM_WORLD()
+        if comm.rank == 0:
             with open(filename, mode='wb') as f:
                 f.write(self.serialize())
 
-        PETSc.COMM_WORLD.barrier()
+        comm.barrier()
 
     @classmethod
     def load(cls, filename):
@@ -633,14 +633,14 @@ class Operator:
 
     @classmethod
     def _check_consistent_msc(cls, msc):
-        config._initialize()
-        from petsc4py import PETSc
+        comm = MPI_COMM_WORLD()
 
         # msc cannot be inconsistent with only 1 rank
-        if PETSc.COMM_WORLD.size == 1:
+        if comm.size == 1:
             return
 
-        comm = PETSc.COMM_WORLD.tompi4py()
+        # otherwise we need the full machinery of mpi4py
+        comm = comm.tompi4py()
 
         checksum = crc32(msc.data)
         all_checksums = comm.allgather(checksum)
@@ -716,9 +716,7 @@ class Operator:
             The expected memory usage, in gigabytes
         '''
         if mpi_size is None:
-            config._initialize()
-            from petsc4py import PETSc
-            mpi_size = PETSc.COMM_WORLD.size
+            mpi_size = MPI_COMM_WORLD().size
 
         if self.shell:
             usage_bytes = self.msc.nbytes

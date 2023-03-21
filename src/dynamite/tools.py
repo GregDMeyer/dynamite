@@ -2,6 +2,18 @@
 Various tools useful for writing and analyzing dynamite programs.
 '''
 
+
+def MPI_COMM_WORLD():
+    '''
+    Returns PETSc's COMM_WORLD object. Can be converted to an mpi4py
+    communicator object via the ``.tompi4py()`` method.
+    '''
+    from . import config
+    config._initialize()  # dynamite must be initialized before importing PETSc
+    from petsc4py import PETSc
+    return PETSc.COMM_WORLD
+
+
 def mpi_print(*args, rank=0, **kwargs):
     '''
     Print from only a single MPI rank, default rank 0.
@@ -9,12 +21,9 @@ def mpi_print(*args, rank=0, **kwargs):
     Aside from the extra "rank" keywork argument, call signature is the same
     as Python 3's ``print()`` function.
     '''
-    from . import config
-    config._initialize()
-    from petsc4py import PETSc
-
-    if PETSc.COMM_WORLD.rank == rank:
+    if MPI_COMM_WORLD().rank == rank:
         print(*args, **kwargs)
+
 
 def get_version():
     '''
@@ -43,6 +52,7 @@ def get_version():
     rtn['dynamite']['version'] = bbuild.get_build_version()
     return rtn
 
+
 def get_version_str():
     '''
     Get a string with the version information for PETSc, SLEPc, and dynamite.
@@ -70,6 +80,7 @@ def get_version_str():
         f'"{dnm_branch}") built with PETSc {PETSc_v} and SLEPc {SLEPc_v}'
     return rtn
 
+
 def track_memory():
     '''
     Begin tracking memory usage for a later call to :meth:`get_max_memory_usage`.
@@ -78,6 +89,7 @@ def track_memory():
     config._initialize()
     from ._backend import bpetsc
     return bpetsc.track_memory()
+
 
 def get_max_memory_usage(which='all'):
     '''
@@ -106,6 +118,7 @@ def get_max_memory_usage(which='all'):
     from ._backend import bpetsc
     return bpetsc.get_max_memory_usage(which=which)/1E9
 
+
 def get_cur_memory_usage(which='all'):
     '''
     Get the current memory usage (resident set size) in gigabytes.
@@ -125,6 +138,7 @@ def get_cur_memory_usage(which='all'):
     config._initialize()
     from ._backend import bpetsc
     return bpetsc.get_cur_memory_usage(which=which)/1E9
+
 
 def complex_enabled():
     from ._backend import bbuild

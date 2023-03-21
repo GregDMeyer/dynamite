@@ -1,6 +1,6 @@
 
 from . import config, validate, subspaces
-from .tools import complex_enabled
+from .tools import complex_enabled, MPI_COMM_WORLD
 from .msc_tools import dnm_int_t
 
 import numpy as np
@@ -252,24 +252,22 @@ class State:
 
     @classmethod
     def generate_time_seed(cls):
+        comm = MPI_COMM_WORLD()
 
-        config._initialize()
-        from petsc4py import PETSc
-
-        if PETSc.COMM_WORLD.size == 1:
+        if comm.size == 1:
             # in this case it works without needing mpi4py
             return int(time())
 
         else:
             # otherwise we have to coordinate among the ranks
-            CW = PETSc.COMM_WORLD.tompi4py()
+            comm = comm.tompi4py()
 
-            if CW.rank == 0:
+            if comm.rank == 0:
                 seed = int(time())
             else:
                 seed = None
 
-            return CW.bcast(seed, root = 0)
+            return comm.bcast(seed, root=0)
 
     def set_random(self, seed = None, normalize = True):
         """
@@ -289,10 +287,6 @@ class State:
         normalize : bool
             Whether to rescale the random state to have norm 1.
         """
-
-        config._initialize()
-        from petsc4py import PETSc
-
         istart, iend = self.vec.getOwnershipRange()
 
         R = np.random.RandomState()
@@ -305,7 +299,7 @@ class State:
 
         # if my code is still being used in year 2038, wouldn't want it to
         # overflow numpy's PRNG seed range ;)
-        R.seed((seed + PETSc.COMM_WORLD.rank) % 2**32)
+        R.seed((seed + MPI_COMM_WORLD().rank) % 2**32)
 
         local_size = iend-istart
 
@@ -426,11 +420,11 @@ class State:
             A numpy array of the vector, or ``None``
             on all processes other than 0 if `to_all == False`.
         '''
-
+        config._initialize()
         from petsc4py import PETSc
 
         # scatter seems to be broken for CUDA vectors
-        if PETSc.COMM_WORLD.size > 1:
+        if MPI_COMM_WORLD().size > 1:
             # collect to process 0
             if to_all:
                 sc, v0 = PETSc.Scatter.toAll(vec)
@@ -440,7 +434,7 @@ class State:
             sc.begin(vec, v0)
             sc.end(vec, v0)
 
-            if not to_all and PETSc.COMM_WORLD.rank != 0:
+            if not to_all and MPI_COMM_WORLD().rank != 0:
                 return None
         else:
             v0 = vec
@@ -476,13 +470,12 @@ class State:
         '''
         self.assert_initialized()
 
+        comm = MPI_COMM_WORLD()
+
         # get the functions we need, but without requiring mpi4py
         # if we're running on only 1 rank
-        config._initialize()
-        from petsc4py import PETSc
-        if PETSc.COMM_WORLD.size > 1:
-            allgather = PETSc.COMM_WORLD.tompi4py().allgather
-
+        if comm.size > 1:
+            allgather = comm.tompi4py().allgather
             start, end = self.vec.getOwnershipRange()
             local_vec = np.ndarray((end-start,), dtype=np.complex128)
             local_vec[:] = self.vec[start:end]
@@ -499,11 +492,11 @@ class State:
 
             # only take the first 3 and final 1
             n_nonzero_preceding = 0
-            for rank in range(0, PETSc.COMM_WORLD.rank):
+            for rank in range(0, comm.rank):
                 n_nonzero_preceding += all_nonzero[rank]
 
             n_nonzero_after = 0
-            for rank in range(PETSc.COMM_WORLD.size-1, PETSc.COMM_WORLD.rank, -1):
+            for rank in range(comm.size-1, comm.rank, -1):
                 n_nonzero_after += all_nonzero[rank]
 
             local_take_indices = []
@@ -645,7 +638,7 @@ class State:
         config._initialize()
         from petsc4py import PETSc
 
-        if PETSc.COMM_WORLD.rank == 0:
+        if MPI_COMM_WORLD().rank == 0:
             with open(fname+'.metadata', 'wb') as f:
                 pickle.dump(self.subspace, f)
 

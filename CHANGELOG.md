@@ -5,6 +5,7 @@
 
 ### Added
  - `Operator.expectation()`, convenience function to compute the expectation value of the operator with respect to a state
+ - `dynamite.tools.MPI_COMM_WORLD()` which returns PETSc's MPI communicator object
 
 ### Changed
  - `Operator.msc_size` renamed to `Operator.nterms`, and now invokes a call to `Operator.reduce_msc()`
