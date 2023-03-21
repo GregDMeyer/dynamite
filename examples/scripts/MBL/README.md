@@ -32,7 +32,7 @@ build_hamiltonian(h=2)
 
 
 
-$\sum_{i=0}^{8}0.25\left(\sigma^x_{i}\sigma^x_{i+1} + \sigma^y_{i}\sigma^y_{i+1} + \sigma^z_{i}\sigma^z_{i+1}\right) + -0.11\sigma^z_{0} + 0.699\sigma^z_{1} + 0.428\sigma^z_{2} + -0.081\sigma^z_{3} + 0.413\sigma^z_{4} + 0.454\sigma^z_{5} + -0.026\sigma^z_{6} + 0.661\sigma^z_{7} + -0.883\sigma^z_{8} + -0.957\sigma^z_{9}$
+$\sum_{i=0}^{8}0.25\left(\sigma^x_{i}\sigma^x_{i+1} + \sigma^y_{i}\sigma^y_{i+1} + \sigma^z_{i}\sigma^z_{i+1}\right) + -0.961\sigma^z_{0} + 0.798\sigma^z_{1} + -0.461\sigma^z_{2} + -0.151\sigma^z_{3} + -0.8\sigma^z_{4} + 0.339\sigma^z_{5} + -0.072\sigma^z_{6} + 0.57\sigma^z_{7} + -0.652\sigma^z_{8} + -0.114\sigma^z_{9}$
 
 
 
@@ -54,9 +54,9 @@ Thus, you will find solving for interior eigenvalues to be much more computation
 
 (also discussed in the SYK example)
 
-The MBL Hamiltonian is a case in which getting good data requires disorder averaging---that is, running the computation many times with fresh randomness. Given $N$ CPU cores there are two broad ways one can parallelize that process: (1) running $N$ disorder realizations independently at the same time, each using one core, and (2) using MPI to parallelize one computation across all $N$ cores and then doing each disorder realization in sequence. In this case, (1) will almost always be faster and should be prioritized---while the MPI parallelism in dynamite is highly optimized, there will always be some cost to the communication between cores.
+The MBL Hamiltonian is a case in which getting good data requires disorder averaging---that is, running the computation many times with fresh randomness. Given $N$ CPU cores there are two main ways one can parallelize that process: (1) running $N$ disorder realizations independently at the same time, each using one core, and (2) using MPI to parallelize one computation across all $N$ cores and then doing each disorder realization in sequence. In this case, (1) will almost always be faster and should be prioritized---while the MPI parallelism in dynamite is highly optimized, there will always be some cost to the communication between cores.
 
-However, there are situations in which using MPI may be preferable, for example if running $N$ independent disorder realizations uses too much memory. Ultimately, the user should experiment with different configurations to determine what gives the best performance. Ideally, in practice one would simply make use of a large cluster of GPUs, running independent disorder realizations on each one.
+However, there are situations in which using MPI may be preferable, for example if running $N$ independent disorder realizations uses too much memory. Ultimately, the user should experiment with different configurations to determine what gives the best performance. Unfortunately, PETSc currently only supports performing part of the shift-invert computation on GPUs, so for this computation GPU performance is bottlenecked (hopefully this will change soon).
 
 ## Remark: using randomness in dynamite
 

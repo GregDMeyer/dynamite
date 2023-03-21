@@ -10,9 +10,9 @@
 
 ## Overview
 
-The Kagome lattice is physically interesting because its unique connectivity yields a frustrated magnet---with an antiferromagnetic interaction, there is no way to configure the spins so that neighbors are all anti-aligned. This has the potential to produce a *quantum spin liquid*. In this example we explore the behavior of spins in the Kagome lattice on a torus.
+The Kagome lattice is physically interesting because its unique connectivity yields a frustrated magnet---with an antiferromagnetic interaction, there is no way to configure the spins so that neighbors are all anti-aligned. This has the potential to produce a *quantum spin liquid*. In this example we explore the behavior of spins in the Kagome lattice on a torus. Like in the MBL example, iterative algorithms such as those used in dynamite have proved a crucial tool for the analysis of these types of systems: reaching the largest system sizes possible is important for reducing finite-size effects, but tensor network methods cannot be used due to extensive entanglement even in the ground state. For this problem, iterative methods have been successfully used for system sizes up to 48 spins.[<sup>1,2</sup>](#ref1)
 
-In the file `lattice_library.py`, we provide the Python dict `kagome_clusters` which contains a set of finite-size Kagome lattice clusters specified by their basis vectors (see [TODO]()), as well as a function `basis_to_graph` to generate a list of vertices and edges from those basis vectors. We've also included some code in `plot_lattice.py` to plot these lattices, which also shows how the spins are numbered. Here is an example:
+In the file `lattice_library.py`, we provide the Python dict `kagome_clusters` which contains a set of finite-size Kagome lattice clusters specified by their basis vectors (see reference[<sup>1</sup>](#ref1)), as well as a function `basis_to_graph` to generate a list of vertices and edges from those basis vectors. We've also included some code in `plot_lattice.py` to plot these lattices, which also shows how the spins are numbered. Here is an example:
 
 
 ```python
@@ -38,11 +38,7 @@ where $\langle i, j \rangle$ means the indices of spins that are nearest-neighbo
 
 ## Goals
 
-Our computational task in this example is quite simple: compute the ground state and energy gap of the system. TODO: Do we also want to compute correlators etc? Maybe show that there is no magnetic order?
-
-## Remark: the SpinConserve and XParity subspaces
-
-TODO
+Our computational task in this example is quite simple: compute the ground state and energy gap of the system. TODO: flesh this out a bit. Also, do we also want to compute correlators etc? Maybe show that there is no magnetic order?
 
 ## Remark: computing with very large spin systems
 
@@ -54,9 +50,17 @@ Another thing to note is that dynamite by default uses the bits of 32 bit intege
 
 ## Usage
 
-The computation is implemented in `run_kagome.py`. It takes the name of one of the Kagome clusters defined in `lattice_library.kagome_clusters` as its first command line argument.
+The computation is implemented in `run_kagome.py`. It takes the name of one of the Kagome clusters defined in `lattice_library.kagome_clusters` as its first command line argument. Here is a list of those clusters for your reference:
 
-Here are the full command line options:
+
+```python
+print(*kagome_clusters, sep=', ')
+```
+
+    12, 15, 18a, 18b, 21, 24, 27a, 27b, 30, 33, 36a, 36b, 36c, 36d, 39a, 39b, 42a, 42b, 48
+
+
+and here are the full command line options for `run_kagome.py`:
 
 
 ```python
@@ -79,4 +83,5 @@ Here are the full command line options:
 
 ## References
 
-TODO
+<span id="ref1"><sup>1</sup> [Läuchli et al., "Ground-state energy and spin gap of spin-1/2 Kagomé-Heisenberg antiferromagnetic clusters: Large-scale exact diagonalization results"](https://doi.org/10.1103/PhysRevB.83.212401)</span>  
+<span id="ref2"><sup>2</sup> [Läuchli et al., "S=1/2 kagome Heisenberg antiferromagnet revisited"](https://doi.org/10.1103/PhysRevB.100.155142)</span>  

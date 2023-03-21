@@ -14,9 +14,10 @@
 
 ## Overview
 
-This example explores the Sachdev-Ye-Kitaev (SYK) model. In spirit it represents the flipside of the localization explored in the MBL example: the SYK model we explore here is expected to exhibit *fast scrambling*. That is, quantum information is scrambled at the maximum possible rate.
+This example explores the Sachdev-Ye-Kitaev (SYK) model. In spirit it represents the opposite of the localization explored in the MBL example: it is expected to exhibit *fast scrambling*, where quantum information is scrambled at the maximum possible rate. It is a particularly interesting system because it can be connected to the dynamics of quantum information in black holes, providing a testbed for surprising phenomena such as scrambling-based teleportation. The example code here mirrors closely a study which used dynamite to show numerical evidence of fast scrambling behavior in the SYK model.[<sup>1</sup>](#ref1)
+TODO: I'd like to add several more references---is there a nice review paper that we could cite here?
 
-This example also gives us a chance to look at how quantum systems other than spins can be explored with dynamite, by transforming them onto a spin system. The SYK model we'll use consists of Majoranas interacting in 0D, with random couplings. Specifically it consists of every possible 4-body interaction among N Majoranas, with each one having a random coupling strength:
+The SYK model gives us a chance to look at how quantum systems other than spins can be explored with dynamite, by transforming them onto a spin system. The SYK model we'll use consists of Majoranas interacting in 0D, with random couplings. Specifically it consists of every possible 4-body interaction among N Majoranas, with each term having a random coupling strength:
 
 $$H = \frac{6}{N^3} \sum_{ijkl} J_{ijkl} \chi_i \chi_j \chi_k \chi_l$$
 
@@ -53,7 +54,7 @@ from run_syk import build_hamiltonian, build_hamiltonian_simple
 %timeit -n 1 -r 1 build_hamiltonian(N=16)
 ```
 
-    187 ms ± 0 ns per loop (mean ± std. dev. of 1 run, 1 loop each)
+    201 ms ± 0 ns per loop (mean ± std. dev. of 1 run, 1 loop each)
 
 
 
@@ -61,7 +62,7 @@ from run_syk import build_hamiltonian, build_hamiltonian_simple
 %timeit -n 1 -r 1 build_hamiltonian_simple(N=16)
 ```
 
-    1.98 s ± 0 ns per loop (mean ± std. dev. of 1 run, 1 loop each)
+    2.16 s ± 0 ns per loop (mean ± std. dev. of 1 run, 1 loop each)
 
 
 ## Goals
@@ -133,7 +134,7 @@ In general, the tradeoff is that performing computations matrix-free can be some
 
 (also discussed in MBL example)
 
-The SYK Hamiltonian is a case in which getting good data requires disorder averaging---that is, running the computation many times with fresh randomness. Given $N$ CPU cores there are two broad ways one can parallelize that process: (1) running $N$ disorder realizations independently at the same time, each using one core, and (2) using MPI to parallelize one computation across all $N$ cores and then doing each disorder realization in sequence. In this case, (1) will almost always be faster and should be prioritized---while the MPI parallelism in dynamite is highly optimized, there will always be some cost to the communication between cores.
+The SYK Hamiltonian is a case in which getting good data requires disorder averaging---that is, running the computation many times with fresh randomness. Given $N$ CPU cores there are two main ways one can parallelize that process: (1) running $N$ disorder realizations independently at the same time, each using one core, and (2) using MPI to parallelize one computation across all $N$ cores and then doing each disorder realization in sequence. In this case, (1) will almost always be faster and should be prioritized---while the MPI parallelism in dynamite is highly optimized, there will always be some cost to the communication between cores.
 
 However, there are situations in which using MPI may be preferable, for example if running $N$ independent disorder realizations uses too much memory. Ultimately, the user should experiment with different configurations to determine what gives the best performance. Ideally, in practice one would simply make use of a large cluster of GPUs, running independent disorder realizations on each one.
 
@@ -194,4 +195,4 @@ Try running this computation with MPI, or on a GPU if you have one, and compare 
 
 ## References
 
-TODO
+<span id="ref1"><sup>1</sup> [Kobrin et al., "Many-Body Chaos in the Sachdev-Ye-Kitaev Model"](https://doi.org/10.1103/PhysRevLett.126.030602)</span>  
