@@ -10,15 +10,13 @@
 
 ## Overview
 
-This project uses dynamite to explore the phenomenon of many-body localization (MBL). Iterative methods (including the Krylov subspace methods upon which dynamite is built) have proved to be one of the only numerical methods that can effectively explore the MBL transition, in particular the region of parameter space in which the eigenvectors become thermal and thus tensor network methods break down.
+This project uses dynamite to explore many-body localization (MBL), a surprising phenomenon in which certain many-body systems with sufficiently strong disorder fail to thermalize. In particular we will study the *MBL transition*, in which the system moves from thermalizing to localized as the disorder strength is increased. Characterization of this transition has remained elusive: finite size effects seem hard to avoid, and tensor network methods break down due to extensive entanglement in states near the transition. Thus, iterative methods like the Krylov subspace methods used by dynamite have proved to be one of the best tools for its study.[<sup>1</sup>](#ref1) We refer readers interested in learning more about the physics of MBL to one of the excellent review papers on the subject.[<sup>2</sup>](#ref2)
 
-We do not endeavor to write a full review of the physics of MBL in this README, but we refer interested readers to *TODO: add references*.
-
-In this project we explore a model of nearest-neighbor Heisenberg interactions on a 1D chain, with random Z fields on each site:
+In this project we explore a model of nearest-neighbor Heisenberg interactions on a 1D chain, with disorder implemented as random Z fields on each site:
 
 $$H = \sum_{\left<i,j\right>} \vec{S}_i \cdot \vec{S}_j + \sum_i h_i S^z_i$$
 
-where $\vec{S} = (S^x, S^y, S^z)$ and the subscripts indicate the index of the spin in the chain. The values of $h_i$ are drawn from a uniform distribution $\left[-h, h\right]$ where $h$ is a parameter that controls the strength of the disorder.
+where $\vec{S} = (S^x, S^y, S^z)$, the subscripts indicate the index of the spin in the chain, and the angle brackets indicate that the indices run over nearest neighbors. The values of $h_i$ are drawn from a uniform distribution $\left[-h, h\right]$ where $h$ is a parameter that controls the strength of the disorder.
 
 In the script `run_mbl.py` this is implemented by the `build_hamiltonian` function:
 
@@ -34,7 +32,7 @@ build_hamiltonian(h=2)
 
 
 
-$\sum_{i=0}^{8}0.25\left(\sigma^x_{i}\sigma^x_{i+1} + \sigma^y_{i}\sigma^y_{i+1} + \sigma^z_{i}\sigma^z_{i+1}\right) + -0.465\sigma^z_{0} + 0.952\sigma^z_{1} + -0.24\sigma^z_{2} + -0.688\sigma^z_{3} + -0.234\sigma^z_{4} + 0.231\sigma^z_{5} + -0.57\sigma^z_{6} + 0.399\sigma^z_{7} + 0.87\sigma^z_{8} + -0.765\sigma^z_{9}$
+$\sum_{i=0}^{8}0.25\left(\sigma^x_{i}\sigma^x_{i+1} + \sigma^y_{i}\sigma^y_{i+1} + \sigma^z_{i}\sigma^z_{i+1}\right) + -0.11\sigma^z_{0} + 0.699\sigma^z_{1} + 0.428\sigma^z_{2} + -0.081\sigma^z_{3} + 0.413\sigma^z_{4} + 0.454\sigma^z_{5} + -0.026\sigma^z_{6} + 0.661\sigma^z_{7} + -0.883\sigma^z_{8} + -0.957\sigma^z_{9}$
 
 
 
@@ -66,21 +64,29 @@ However, there are situations in which using MPI may be preferable, for example 
 
 One needs to take extra care when using randomness in code that will be run under MPI with multiple ranks. Each rank is its own Python process, and by default will have a different random seed---so if you are not careful, each of your ranks may end up trying to build a different Hamiltonian! (dynamite does check that the Hamiltonian is the same on all ranks before building the underlying matrix, so you will get an error if this happens).
 
-In this example, we handle this by explicitly setting the random number generator's seed. This is convenient because it means that the "random" numbers will be the same on each rank. It also makes your science more reproducible. You have to be careful, however, to remember to change that seed when you want new disorder realizations! The example given here has a command line switch to set the seed.
+There are two ways to handle this: one is to have rank 0 pick a random seed and use MPI to communicate it to all the other ranks, and the other is to simply pass a seed on the command line. Both are implemented in this example for demonstration purposes: if no seed is passed on the command line, then one is generated and communicated to all MPI ranks. If you pass a random seed on the command line, make sure to change it each time you run the code if you want new disorder realizations!
 
-If you want, there is another way to handle this issue: have MPI rank 0 pick a seed, and share it with the rest of the ranks. A code snippet implementing this can be found in the file `bcast_seed.py` in this directory.
-
-**Note 1:** when setting a random state via `State(state='random')`, dynamite is already careful about coordinating randomness between MPI ranks, so the user does not need to worry about it in this case.
+**Note 1:** when setting a random state via `State(state='random')`, dynamite is already careful about coordinating randomness between MPI ranks, so the user does not need to worry about it in that case.
 
 **Note 2:** If you will never run your code on multiple MPI ranks, you don't need to worry about this at all. In particular, running on a GPU with 1 CPU process will not encounter this issue.
 
 ## Usage
 
-The computation is implemented in `run_mbl.py`. The script will output, in CSV format, statistics of eigenpairs clustered around equally-spaced points throughout the spectrum. Note that the data is written to stdout and any other information is written to stderr, so you can do for example `python run_mbl.py -L 12 > data.csv` and only the data will be written to the CSV file.
+The computation is implemented in `run_mbl.py`. The script will output, in CSV format, statistics of eigenpairs clustered around equally-spaced points throughout the spectrum. 
 
-TODO: also describe plotting script
+This example also includes a script `plot_result.py` which can be used to plot the results using matplotlib. Data can either be piped directly to it:
+```bash
+python run_mbl.py -L 14 | python plot_result.py
+```
+or one can save the data to a file and pass the filename on the command line:
+```bash
+python run_mbl.py -L 14 > output.csv
+python plot_result.py output.csv
+```
 
-Here are the command line options:
+We also provide an example output file `example_output.csv` which was run with... # TODO: update details when job finishes
+
+Here are the command line options for `run_mbl.py`:
 
 
 ```python
@@ -94,16 +100,18 @@ Here are the command line options:
     options:
       -h, --help            show this help message and exit
       -L L                  spin chain length
-      --seed SEED           seed for random number generator
+      --seed SEED           seed for random number generator. if omitted, a random
+                            seed is chosen by querying system hardware randomness
       --iters ITERS         number of disorder realizations
       --energy-points ENERGY_POINTS
                             number of points in the spectrum to target
       --h-points H_POINTS   number of disorder strengths to test
-      --h-min H_MIN         minimum value of h
-      --h-max H_MAX         maximum value of h
+      --h-min H_MIN         minimum value of disorder strength h
+      --h-max H_MAX         maximum value of disorder strength h
       --nev NEV             number of eigenpairs to compute at each point
 
 
 ## References
 
-TODO
+<span id="ref1"><sup>1</sup> [Pietracaprina et al., "Shift-invert diagonalization of large many-body localizing spin chains"](https://doi.org/10.21468/SciPostPhys.5.5.045)</span>  
+<span id="ref2"><sup>2</sup> [Abanin et al., "Many-body localization, thermalization, and entanglement"](https://doi.org/10.1103/RevModPhys.91.021001)</span>

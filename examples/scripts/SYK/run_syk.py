@@ -9,17 +9,29 @@ from dynamite.operators import op_sum, op_product
 from dynamite.extras import majorana
 from dynamite.subspaces import Parity
 from dynamite.states import State
-from dynamite.tools import mpi_print
+from dynamite.tools import mpi_print, MPI_COMM_WORLD
 
 
 def main():
     args = parse_args()
 
-    # print this to stderr to separate it from the data output below
+    # we print this to stderr to separate it from the data output below
     mpi_print('== Run parameters: ==', file=stderr)
     for key, value in vars(args).items():
+        if key == 'seed':
+            continue  # we handle seed below
         mpi_print(f'  {key}, {value}', file=stderr)
-    mpi_print(file=stderr)  # extra newline
+
+    # set a random seed, and output it for reproducibility
+    if args.seed is None:
+        seed = get_shared_seed()
+    else:
+        seed = args.seed
+    mpi_print(f'  seed, {seed}', file=stderr)
+    random.seed(seed)
+    
+    # extra newline for readability of the output
+    mpi_print(file=stderr)
 
     # globally enable shell matrices (unless command line told us not to)
     config.shell = not args.no_shell
@@ -200,6 +212,38 @@ def compute_otoc(psi0, psi1, t, H, W, V):
     return 2*result.real + 0.5
 
 
+def get_shared_seed():
+    '''
+    Generate a seed for the random number generator, that is shared by all MPI ranks
+    '''
+    from random import SystemRandom
+    
+    # get PETSc's MPI communicator object
+    comm = MPI_COMM_WORLD()
+    
+    # have rank 0 pick a seed
+    if comm.rank == 0:
+        # get a hardware-random number from the system to use as a seed
+        seed = SystemRandom().randrange(2**32)
+    else:
+        seed = None
+    
+    # if there is only one rank, don't need to do anything fancy
+    # doing this before using mpi4py below allows us to avoid needing mpi4py installed
+    # when we only use one rank
+    if comm.size == 1:
+        return seed
+    
+    # otherwise, we need to communicate the seed among the ranks, using mpi4py
+    # so we convert to a full-fledged mpi4py communicator class
+    comm = comm.tompi4py()
+    
+    # now broadcast from rank 0 to all other ranks
+    seed = comm.bcast(seed, root=0)
+    
+    return seed
+
+
 def parse_args():
     parser = ArgumentParser(description='Compute OTOCs for the SYK model.')
 
@@ -213,10 +257,9 @@ def parse_args():
     parser.add_argument('--state-iters', default=1, type=int,
                         help='number of random states per Hamiltonian')
 
-    # we pass the random seed on the command line to ensure it is the same for all MPI ranks.
-    # do NOT try to seed with time(), for example, because it could be different across ranks
-    parser.add_argument('-s', '--seed', default=0xB0BACAFE, type=int,
-                        help='seed for the random number generator')
+    parser.add_argument('-s', '--seed', type=int,
+                        help='seed for random number generator. if omitted, a random '
+                             'seed is chosen by querying system hardware randomness')
 
     parser.add_argument('--no-shell', action='store_true',
                         help='disable shell matrices (they are enabled by default)')

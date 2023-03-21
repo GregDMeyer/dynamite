@@ -143,11 +143,9 @@ However, there are situations in which using MPI may be preferable, for example 
 
 One needs to take extra care when using randomness in code that will be run under MPI with multiple ranks. Each rank is its own Python process, and by default will have a different random seed---so if you are not careful, each of your ranks may end up trying to build a different Hamiltonian! (dynamite does check that the Hamiltonian is the same on all ranks before building the underlying matrix, so you will get an error if this happens).
 
-In this example, we handle this by explicitly setting the random number generator's seed. This is convenient because it means that the "random" numbers will be the same on each rank. It also makes your science more reproducible. You have to be careful, however, to remember to change that seed when you want new disorder realizations! The example given here has a command line switch to set the seed.
+There are two ways to handle this: one is to have rank 0 pick a random seed and use MPI to communicate it to all the other ranks, and the other is to simply pass a seed on the command line. Both are implemented in this example for demonstration purposes: if no seed is passed on the command line, then one is generated and communicated to all MPI ranks. If you pass a random seed on the command line, make sure to change it each time you run the code if you want new disorder realizations!
 
-If you want, there is another way to handle this issue: have MPI rank 0 pick a seed, and share it with the rest of the ranks. A code snippet implementing this can be found in the file `bcast_seed.py` in this directory.
-
-**Note 1:** when setting a random state via `State(state='random')`, dynamite is already careful about coordinating randomness between MPI ranks, so the user does not need to worry about it in this case.
+**Note 1:** when setting a random state via `State(state='random')`, dynamite is already careful about coordinating randomness between MPI ranks, so the user does not need to worry about it in that case.
 
 **Note 2:** If you will never run your code on multiple MPI ranks, you don't need to worry about this at all. In particular, running on a GPU with 1 CPU process will not encounter this issue.
 
@@ -187,7 +185,8 @@ The computation is implemented in `run_syk.py`. The script will output, in CSV f
       --H-iters H_ITERS     number of Hamiltonian disorder realizations
       --state-iters STATE_ITERS
                             number of random states per Hamiltonian
-      -s SEED, --seed SEED  seed for the random number generator
+      -s SEED, --seed SEED  seed for random number generator. if omitted, a random
+                            seed is chosen by querying system hardware randomness
       --no-shell            disable shell matrices (they are enabled by default)
 
 
