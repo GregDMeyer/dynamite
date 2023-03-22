@@ -14,7 +14,7 @@
 
 ## Overview
 
-This example explores the Sachdev-Ye-Kitaev (SYK) model. In spirit it represents the opposite of the localization explored in the MBL example: it is expected to scramble information at the maximum possible rate.[<sup>1,2</sup>](#ref1) Furthermore it exhibits *maximal chaos*: the Lyapunov exponent, which characterizes how rapidly chaotic trajectories diverge, saturates its upper bound of $2\pi T$, where $T$ is the temperature of the system.[<sup>3</sup>](#ref3) Its physics can also be connected to the dynamics of quantum information in black holes, providing a testbed for exotic phenomena such as scrambling-based teleportation.[<sup>4,5,6,7</sup>](#ref4) The example code here mirrors closely a study which used dynamite to show numerical evidence for many-body chaos and gravitational dynamics in the SYK model.[<sup>8</sup>](#ref8)
+This example explores the Sachdev-Ye-Kitaev (SYK) model. In spirit it represents the opposite of the localization explored in the MBL example: it is expected to scramble information at the maximum possible rate.[<sup>1,2</sup>](#ref1) Furthermore it exhibits *maximal chaos*: the Lyapunov exponent, which characterizes how rapidly chaotic trajectories diverge, saturates its upper bound of $2\pi T$, where $T$ is the temperature of the system.[<sup>3</sup>](#ref3) Its physics can be connected to the dynamics of quantum information in black holes, providing a testbed for exotic phenomena such as scrambling-based teleportation.[<sup>4,5,6,7</sup>](#ref4) The example code here mirrors closely a study which used dynamite to show numerical evidence for many-body chaos and gravitational dynamics in the SYK model.[<sup>8</sup>](#ref8)
 
 The SYK model gives us a chance to look at how quantum systems other than spins can be explored with dynamite, by transforming them onto a spin system. The SYK model we'll use consists of Majoranas interacting in 0D, with random couplings. Specifically it consists of every possible 4-body interaction among N Majoranas, with each term having a random coupling strength:
 
@@ -22,7 +22,7 @@ $$H = \sqrt{\frac{6}{N^3}} \sum_{ijkl} J_{ijkl} \chi_i \chi_j \chi_k \chi_l$$
 where $J_{ijkl}$ are randomly chosen from a Gaussian distribution with variance 1.
 
 To map the Majoranas onto the spin systems that are natively supported in dynamite, we can use the following transformation. For the Majorana with index $i$, let $q = \lfloor i/2 \rfloor$. Then
-$$\chi_i = \sigma^{\{x, y\}}_q \prod_{m \in [0, q-1]} \sigma^z$$
+$$\chi_i = \sigma^{\lbrace x, y\rbrace}_q \prod_{m \in [0, q-1]} \sigma^z$$
 where the first Pauli is $\sigma^x$ if $i$ is even and $\sigma^y$ if it's odd. In words, the Majorana consists of a $\sigma^x$ or $\sigma^y$ with a string of $\sigma^z$ extending to the edge of the spin chain. Note that we get two Majoranas for each spin!
 
 This is straightforward to implement in dynamite, but is actually already built in in the `dynamite.extras` module so we don't have to do it ourselves:
