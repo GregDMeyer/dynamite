@@ -2,7 +2,7 @@
 from itertools import combinations
 from argparse import ArgumentParser
 from sys import stderr
-from numpy import random
+import numpy as np
 
 from dynamite import config
 from dynamite.operators import op_sum, op_product
@@ -28,7 +28,7 @@ def main():
     else:
         seed = args.seed
     mpi_print(f'  seed, {seed}', file=stderr)
-    random.seed(seed)
+    np.random.seed(seed)
 
     # extra newline for readability of the output
     mpi_print(file=stderr)
@@ -38,9 +38,6 @@ def main():
 
     # globally set the number of spins to ceil(N/2)
     config.L = (args.N+1)//2
-
-    # ensures we get the same random numbers on all MPI ranks
-    random.seed(args.seed)
 
     # the Hamiltonian conserves spin parity in the Z basis (Z2 symmetry)
     # but the majorana operators W and V take us between the two symmetry sectors
@@ -120,10 +117,10 @@ def build_hamiltonian_simple(N):
         for j in range(i+1, N):
             for k in range(j+1, N):
                 for l in range(k+1, N):
-                    Jijkl = random.uniform(-1, 1)
+                    Jijkl = np.random.normal()
                     H += Jijkl*majorana(i)*majorana(j)*majorana(k)*majorana(l)
 
-    return 6/N**3 * H
+    return np.sqrt(6/N**3) * H
 
 
 def build_hamiltonian(N):
@@ -145,7 +142,7 @@ def build_hamiltonian(N):
             p = op_product(majoranas[idx] for idx in idxs)
 
             # random value is the same on each rank because we set the seed explicitly in main()
-            Jijkl = random.uniform(-1, 1)
+            Jijkl = np.random.normal()
 
             # using scale() is faster than doing 'Jijkl*p' because it does not create
             # a new operator object, instead just scaling the coeffs of the existing one
@@ -160,7 +157,7 @@ def build_hamiltonian(N):
     # global prefactor
     # again, using scale() is much more efficient than "return 6/N**3 * H"
     # because it doesn't create a copy of the whole gigantic Hamiltonian
-    H.scale(6/N**3)
+    H.scale(np.sqrt(6/N**3))
 
     return H
 
