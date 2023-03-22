@@ -22,7 +22,9 @@ $$H = \sqrt{\frac{6}{N^3}} \sum_{ijkl} J_{ijkl} \chi_i \chi_j \chi_k \chi_l$$
 where $J_{ijkl}$ are randomly chosen from a Gaussian distribution with variance 1.
 
 To map the Majoranas onto the spin systems that are natively supported in dynamite, we can use the following transformation. For the Majorana with index $i$, let $q = \lfloor i/2 \rfloor$. Then
-$$\chi_i = \sigma^{\lbrace x, y\rbrace}_q \prod_{m \in [0, q-1]} \sigma^z$$
+
+$$\chi_i = \sigma^{\lbrace x, y\rbrace}_q \prod\limits_{m \in [0, q-1]} \sigma^z_m$$
+
 where the first Pauli is $\sigma^x$ if $i$ is even and $\sigma^y$ if it's odd. In words, the Majorana consists of a $\sigma^x$ or $\sigma^y$ with a string of $\sigma^z$ extending to the edge of the spin chain. Note that we get two Majoranas for each spin!
 
 This is straightforward to implement in dynamite, but is actually already built in in the `dynamite.extras` module so we don't have to do it ourselves:
