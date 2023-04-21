@@ -33,12 +33,9 @@ configure_option_dict = {
 
     # may need/want to adjust to match your hardware's compute capability,
     # e.g. '80' for compute capability 8.0
-    # can also adjust with DNM_CUDA_ARCH environment variable (see below)
-    '--with-cuda-arch': '75',
+    # can also supply a comma-separated list
+    #'--with-cuda-arch': '75',
 }
-
-if 'DNM_CUDA_ARCH' in environ:
-    configure_option_dict['--with-cuda-arch'] = environ['DNM_CUDA_ARCH']
 
 if __name__ == '__main__':
     import sys

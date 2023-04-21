@@ -33,11 +33,11 @@ def get_cython_includes():
     return [
         os.path.join(
             os.environ['PETSC_DIR'],
-            'src/binding/petsc4py/src/include'
+            'src/binding/petsc4py/src'
         ),
         os.path.join(
             os.environ['SLEPC_DIR'],
-            'src/binding/slepc4py/src/include'
+            'src/binding/slepc4py/src'
         )
     ]
 

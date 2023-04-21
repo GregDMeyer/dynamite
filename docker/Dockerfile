@@ -1,9 +1,9 @@
 
 ARG PLATFORM=cpu
 ARG BUILD_TYPE=opt  # 'opt' or 'debug'
-ARG PETSC_VERSION=3.18.4
-ARG SLEPC_VERSION=3.18.2
-ARG CUDA_VERSION=11.8.0
+ARG PETSC_VERSION=3.19.0
+ARG SLEPC_VERSION=3.19.0
+ARG CUDA_VERSION=12.1.0
 ARG CUDA_UBUNTU_VERSION=22.04
 ARG CPU_PYTHON_VERSION=3.11
 
@@ -11,7 +11,7 @@ ARG CPU_PYTHON_VERSION=3.11
 FROM python:${CPU_PYTHON_VERSION} AS base-cpu
 
 # install dependencies
-ONBUILD RUN apt-get update && \
+RUN apt-get update && \
     \
     DEBIAN_FRONTEND="noninteractive" \
     apt-get install -y --no-install-recommends \
@@ -35,7 +35,7 @@ ENV PETSC_CONFIG_FLAGS="$PETSC_CONFIG_FLAGS --download-mumps=0 --with-mumps=1"
 FROM nvidia/cuda:${CUDA_VERSION}-devel-ubuntu${CUDA_UBUNTU_VERSION} AS base-gpu
 
 # install dependencies
-ONBUILD RUN apt-get update && \
+RUN apt-get update && \
     \
     DEBIAN_FRONTEND="noninteractive" \
     apt-get install -y --no-install-recommends \
@@ -54,8 +54,9 @@ ONBUILD RUN apt-get update && \
 ARG BUILD_TYPE
 ENV PETSC_ARCH=cuda-$BUILD_TYPE
 
+ARG CUDA_ARCH=all
 ARG PETSC_CONFIG_FLAGS
-ENV PETSC_CONFIG_FLAGS="$PETSC_CONFIG_FLAGS --with-mpi=0"
+ENV PETSC_CONFIG_FLAGS="$PETSC_CONFIG_FLAGS --with-mpi=0 --with-cuda-arch=$CUDA_ARCH"
 
 
 FROM base-${PLATFORM} as build
@@ -90,8 +91,7 @@ USER dnm
 WORKDIR /opt/petsc
 ENV PETSC_DIR=/opt/petsc
 COPY --chown=dnm:dnm petsc_config/$PETSC_ARCH.py .
-ARG CUDA_ARCH=70
-RUN DNM_CUDA_ARCH=$CUDA_ARCH ./$PETSC_ARCH.py ${PETSC_CONFIG_FLAGS} && \
+RUN ./$PETSC_ARCH.py ${PETSC_CONFIG_FLAGS} && \
     make all
 
 
@@ -156,7 +156,7 @@ ENV OMP_NUM_THREADS=1
 
 FROM nvidia/cuda:${CUDA_VERSION}-runtime-ubuntu${CUDA_UBUNTU_VERSION} AS release-base-gpu
 
-ONBUILD RUN apt-get update && \
+RUN apt-get update && \
     \
     DEBIAN_FRONTEND="noninteractive" \
     apt-get install -y --no-install-recommends \
