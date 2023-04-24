@@ -72,7 +72,7 @@ USER dnm
 # activate venv
 ENV VIRTUAL_ENV=/venv
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
-RUN pip3 install --no-cache-dir --upgrade pip
+RUN pip3 install --no-cache-dir --upgrade pip wheel
 
 
 from build as petsc
@@ -121,6 +121,7 @@ RUN ./configure && make
 
 from petsc as dynamite-build
 
+RUN pip3 install --no-cache-dir numpy
 RUN pip3 install --no-cache-dir $PETSC_DIR/src/binding/petsc4py
 
 COPY --from=slepc /opt/slepc /opt/slepc
