@@ -38,9 +38,8 @@ def parse_args(argv=None):
     parser.add_argument("--debug", action='store_true',
                         help='Build in debug mode instead of release mode.')
 
-    parser.add_argument("--cuda-archs", type=lambda x: x.split(','),
-                        default=['70', '80'],
-                        help='CUDA compute capabilities.')
+    parser.add_argument("--cuda-arch", default='60,61,70,75,80,86',
+                        help='CUDA compute capability (or comma-separated list of several).')
 
     parser.add_argument("--int-sizes", type=lambda x: [int(v) for v in x.split(',')],
                         default=[32, 64],
@@ -105,65 +104,53 @@ def main():
 
         builds = []
         for platform in args.platform:
-            if platform == 'gpu':
-                cuda_archs = args.cuda_archs
-            else:
-                cuda_archs = [None]
+            for int_size in args.int_sizes:
 
-            for cuda_arch in cuda_archs:
-                for int_size in args.int_sizes:
+                # this configuration is currently not supported
+                if platform == 'gpu' and int_size == 64:
+                    print('Skipping unsupported 64-bit GPU build')
+                    continue
 
-                    # this configuration is currently not supported
-                    if platform == 'gpu' and int_size == 64:
-                        print('Skipping unsupported 64-bit GPU build')
-                        continue
+                tags = ["latest", version]
 
-                    tags = ["latest", version]
+                if platform == 'gpu':
+                    tags = [tag+'-cuda' for tag in tags]
 
-                    if platform == 'gpu':
-                        tags = [tag+'-cuda' for tag in tags]
-                        no_cc_tags = tags.copy()
-                        tags = [tag+'.cc'+cuda_arch for tag in tags]
+                cmd = [
+                    "docker", "build",
+                    "--build-arg", f"PLATFORM={platform}",
+                    "-f", "docker/Dockerfile",
+                    "--target", target
+                ]
 
-                        # default is cc 7.0
-                        if cuda_arch == '70':
-                            tags = no_cc_tags + tags
+                if args.cuda_arch is not None:
+                    cmd += ["--build-arg", f"CUDA_ARCH={args.cuda_arch}"]
 
-                    cmd = [
-                        "docker", "build",
-                        "--build-arg", f"PLATFORM={platform}",
-                        "-f", "docker/Dockerfile",
-                        "--target", target
-                    ]
+                if int_size == 64:
+                    cmd += ["--build-arg", "PETSC_CONFIG_FLAGS=--with-64-bit-indices"]
+                    tags = [tag+'-int64' for tag in tags]
+                elif int_size != 32:
+                    raise ValueError(f"Unknown int size '{int_size}'")
 
-                    if cuda_arch is not None:
-                        cmd += ["--build-arg", f"CUDA_ARCH={cuda_arch}"]
+                if args.fresh and first_target:
+                    cmd += ["--no-cache", "--pull"]
 
-                    if int_size == 64:
-                        cmd += ["--build-arg", "PETSC_CONFIG_FLAGS=--with-64-bit-indices"]
-                        tags = [tag+'-int64' for tag in tags]
-                    elif int_size != 32:
-                        raise ValueError(f"Unknown int size '{int_size}'")
+                if args.debug:
+                    cmd += ["--build-arg", "BUILD_TYPE=debug"]
 
-                    if args.fresh and first_target:
-                        cmd += ["--no-cache", "--pull"]
+                if target == 'jupyter':
+                    tags = [tag+'-jupyter' for tag in tags]
 
-                    if args.debug:
-                        cmd += ["--build-arg", "BUILD_TYPE=debug"]
+                for tag in tags:
+                    cmd += ["-t", f"gdmeyer/dynamite:{tag}"]
 
-                    if target == 'jupyter':
-                        tags = [tag+'-jupyter' for tag in tags]
+                cmd += ["."]
 
-                    for tag in tags:
-                        cmd += ["-t", f"gdmeyer/dynamite:{tag}"]
+                build_dict = {}
+                build_dict['cmd'] = cmd
+                build_dict['tags'] = tags
 
-                    cmd += ["."]
-
-                    build_dict = {}
-                    build_dict['cmd'] = cmd
-                    build_dict['tags'] = tags
-
-                    builds.append(build_dict)
+                builds.append(build_dict)
 
         if not args.no_parallel:
             build_parallel(builds, build_dir, args)
