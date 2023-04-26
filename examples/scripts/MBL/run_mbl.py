@@ -85,6 +85,8 @@ def print_eig_stats(evals, evecs, h, energy_point):
     for the provided eigenvalues and eigenstates
     '''
     # sum the entropy for all evecs then divide by nev for the mean
+    # NOTE: entanglement_entropy returns the EE value only on MPI rank 0, and -1 on all other ranks.
+    #       this is OK here because mpi_print below only prints on rank 0
     entropy = sum(entanglement_entropy(v, keep=range(config.L//2)) for v in evecs)
     entropy /= len(evecs)
 

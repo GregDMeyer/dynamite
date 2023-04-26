@@ -100,6 +100,8 @@ def print_stats(state, t, tmp, Deff, Sz_ops):
     Deff_energy = Deff.expectation(state, tmp_state=tmp)
 
     # half-chain entanglement entropy
+    # NOTE: entanglement_entropy returns the EE value only on MPI rank 0, and -1 on all other ranks.
+    #       this is OK here because mpi_print below only prints on rank 0
     entropy = entanglement_entropy(state, keep=range(config.L//2))
 
     # Sz expectation values for each spin
