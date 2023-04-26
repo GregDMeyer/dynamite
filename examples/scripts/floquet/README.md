@@ -14,7 +14,7 @@
 In this project we will track the time evolution of various states under a time-dependent Floquet Hamiltonian. The quantum system we analyze is physically interesting for a number of reasons, not least of which that it can exhibit Floquet prethermalization,[<sup>1</sup>](#ref1) which can support out-of-equilibrium phases of matter like time crystals! [<sup>2</sup>](#ref2)
 
 The specific model we will implement is the following. The 1D spin chain will evolve under a long range $ZZ$ interaction decaying as a power law, along with a nearest-neighbor $XX$ interaction and a uniform, static magnetic field $\vec{h}$:
-$$H = J_z \sum_{i<j} \frac{\sigma^z_i \sigma^z_j}{|i-j|^\alpha} + J_x \sum_{\langle i, j \rangle} \sigma^x_i + \sum_i \vec{h} \cdot \vec{\sigma}$$
+$$H = J_z \sum_{i < j} \frac{\sigma^z_i \sigma^z_j}{|i-j|^\alpha} + J_x \sum_{\langle i, j \rangle} \sigma^x_i + \sum_i \vec{h} \cdot \vec{\sigma}$$
 where the angle brackets on the second term indicates it is only a nearest-neighbor interaction.
 
 In addition, after every period $T$ of time evolution the system will undergo a global $\pi$-pulse, rotating all spins by $180^\circ$ around the $X$-axis. (We can equivalently think of this as flipping the direction of the magnetic field $\vec{h}$ across the $X$ axis every time $T$).
