@@ -74,15 +74,22 @@ def main():
 
 def build_hamiltonian(alpha, Jz, Jx, h):
     # sums over all ranges of interaction
-    # index_sum takes the interaction sigmaz(0)*sigmaz(r) and translates it along the spin chain
+    # index_sum takes the interaction sigmaz(0)*sigmaz(r) and
+    # translates it along the spin chain
     long_range_ZZ = op_sum(
         1/r**alpha * index_sum(0.25*sigmaz(0)*sigmaz(r))
         for r in range(1, config.L)
     )
 
+    # an XX interaction on every neighboring pair of sites
+    # the 0.25 is because spin operators are 1/2 times the Pauli
     nearest_neighbor_XX = index_sum(0.25*sigmax(0)*sigmax(1))
 
-    magnetic_field = index_sum(op_sum(hi*0.5*s() for hi, s in zip(h, [sigmax, sigmay, sigmaz])))
+    # op_sum combines the three components of the magnetic field vector, and then
+    # index_sum translates the resulting operator to every site along the spin chain
+    magnetic_field = index_sum(
+        op_sum(hi*0.5*s() for hi, s in zip(h, [sigmax, sigmay, sigmaz]))
+    )
 
     return Jz*long_range_ZZ + Jx*nearest_neighbor_XX + magnetic_field
 
