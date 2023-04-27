@@ -4,8 +4,8 @@
 #include <petscmat.h>
 #include "bcuda_template.h"
 
-#define GPU_BLOCK_SIZE 128
-#define GPU_BLOCK_NUM 128
+#define GPU_BLOCK_SIZE 1024
+#define GPU_BLOCK_NUM 1024
 
 PetscErrorCode C(BuildContext_CUDA,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
   const msc_t *msc,
