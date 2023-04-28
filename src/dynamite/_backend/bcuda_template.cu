@@ -188,6 +188,12 @@ __global__ void C(device_MatMult,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
     for (mask_idx = 0; mask_idx < nmasks; ++mask_idx) {
       tmp = 0;
       bra = ket ^ masks[mask_idx];
+
+      col_idx = C(S2I_CUDA,RIGHT_SUBSPACE)(bra, right_subspace_data);
+      if (col_idx == -1) {  // state is outside of the subspace; skip it
+        continue;
+      }
+
       /* sum all terms for this matrix element */
       for (term_idx = mask_offsets[mask_idx]; term_idx < mask_offsets[mask_idx+1]; ++term_idx) {
 #if defined(PETSC_USE_64BIT_INDICES)
@@ -203,12 +209,7 @@ __global__ void C(device_MatMult,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
           add_imag(&tmp, sign * real_coeffs[term_idx]);
         }
       }
-
-      col_idx = C(S2I_CUDA,RIGHT_SUBSPACE)(bra, right_subspace_data);
-
-      if (col_idx != -1) {
-	val += tmp * xarray[col_idx];
-      }
+      val += tmp * xarray[col_idx];
     }
 
     barray[row_idx] = val;
