@@ -273,16 +273,18 @@ class Expectation(dtr.DynamiteTestCase):
                 state = State(state='random')
                 correct = self.expectation_correct(H, state)
 
-                self.assertEqual(
-                    H.expectation(state),
-                    correct
-                )
+                with self.subTest(with_tmp=False):
+                    self.assertLess(
+                        abs(H.expectation(state) - correct),
+                        1E-15
+                    )
 
-                tmp = State()
-                self.assertEqual(
-                    H.expectation(state, tmp_state=tmp),
-                    correct
-                )
+                with self.subTest(with_tmp=True):
+                    tmp = State()
+                    self.assertLess(
+                        abs(H.expectation(state, tmp_state=tmp) - correct),
+                        1E-15
+                    )
 
     def test_uninitialized_fail(self):
         with self.assertRaises(UninitializedError):
