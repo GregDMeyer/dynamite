@@ -220,74 +220,90 @@ __device__ static __inline__ void add_imag(PetscScalar *x, PetscReal c) {
 #define SpinConserve_SP 2
 #define Explicit_SP 3
 
+#define SUBSPACE Full
+  #include "bcuda_template_1.cu"
+#undef SUBSPACE
+
+#define SUBSPACE Parity
+  #include "bcuda_template_1.cu"
+#undef SUBSPACE
+
+#define SUBSPACE SpinConserve
+  #include "bcuda_template_1.cu"
+#undef SUBSPACE
+
+#define SUBSPACE Explicit
+  #include "bcuda_template_1.cu"
+#undef SUBSPACE
+
 #define LEFT_SUBSPACE Full
   #define RIGHT_SUBSPACE Full
-    #include "bcuda_template.cu"
+    #include "bcuda_template_2.cu"
   #undef RIGHT_SUBSPACE
 
   #define RIGHT_SUBSPACE Parity
-    #include "bcuda_template.cu"
+    #include "bcuda_template_2.cu"
   #undef RIGHT_SUBSPACE
 
   #define RIGHT_SUBSPACE SpinConserve
-    #include "bcuda_template.cu"
+    #include "bcuda_template_2.cu"
   #undef RIGHT_SUBSPACE
 
   #define RIGHT_SUBSPACE Explicit
-    #include "bcuda_template.cu"
+    #include "bcuda_template_2.cu"
   #undef RIGHT_SUBSPACE
 #undef LEFT_SUBSPACE
 
 #define LEFT_SUBSPACE Parity
   #define RIGHT_SUBSPACE Full
-    #include "bcuda_template.cu"
+    #include "bcuda_template_2.cu"
   #undef RIGHT_SUBSPACE
 
   #define RIGHT_SUBSPACE Parity
-    #include "bcuda_template.cu"
+    #include "bcuda_template_2.cu"
   #undef RIGHT_SUBSPACE
 
   #define RIGHT_SUBSPACE SpinConserve
-    #include "bcuda_template.cu"
+    #include "bcuda_template_2.cu"
   #undef RIGHT_SUBSPACE
 
   #define RIGHT_SUBSPACE Explicit
-    #include "bcuda_template.cu"
+    #include "bcuda_template_2.cu"
   #undef RIGHT_SUBSPACE
 #undef LEFT_SUBSPACE
 
 #define LEFT_SUBSPACE SpinConserve
   #define RIGHT_SUBSPACE Full
-    #include "bcuda_template.cu"
+    #include "bcuda_template_2.cu"
   #undef RIGHT_SUBSPACE
 
   #define RIGHT_SUBSPACE Parity
-    #include "bcuda_template.cu"
+    #include "bcuda_template_2.cu"
   #undef RIGHT_SUBSPACE
 
   #define RIGHT_SUBSPACE SpinConserve
-    #include "bcuda_template.cu"
+    #include "bcuda_template_2.cu"
   #undef RIGHT_SUBSPACE
 
   #define RIGHT_SUBSPACE Explicit
-    #include "bcuda_template.cu"
+    #include "bcuda_template_2.cu"
   #undef RIGHT_SUBSPACE
 #undef LEFT_SUBSPACE
 
 #define LEFT_SUBSPACE Explicit
   #define RIGHT_SUBSPACE Full
-    #include "bcuda_template.cu"
+    #include "bcuda_template_2.cu"
   #undef RIGHT_SUBSPACE
 
   #define RIGHT_SUBSPACE Parity
-    #include "bcuda_template.cu"
+    #include "bcuda_template_2.cu"
   #undef RIGHT_SUBSPACE
 
   #define RIGHT_SUBSPACE SpinConserve
-    #include "bcuda_template.cu"
+    #include "bcuda_template_2.cu"
   #undef RIGHT_SUBSPACE
 
   #define RIGHT_SUBSPACE Explicit
-    #include "bcuda_template.cu"
+    #include "bcuda_template_2.cu"
   #undef RIGHT_SUBSPACE
 #undef LEFT_SUBSPACE

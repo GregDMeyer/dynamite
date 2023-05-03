@@ -26,6 +26,8 @@ def parse_args(argv=None):
 
     parser.add_argument('--shell', action='store_true',
                         help='Make a shell matrix instead of a regular matrix.')
+    parser.add_argument('--no-precompute-diagonal', action='store_true',
+                        help='Turn off precomputation of the matrix diagonal for shell matrices.')
     parser.add_argument('--gpu', action='store_true',
                         help='Run computations on GPU instead of CPU.')
 
@@ -242,6 +244,10 @@ def main():
     subspace = log_call(build_subspace, stats)(arg_params, H)
     if H is not None:
         H.subspace = subspace
+
+        if arg_params.no_precompute_diagonal:
+            H.precompute_diagonal = False
+
         Print('H statistics:')
         Print(' dim:', H.dim[0])
         Print(' nnz:', H.nnz)

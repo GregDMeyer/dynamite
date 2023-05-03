@@ -61,16 +61,23 @@ class FullSpace(dtr.DynamiteTestCase):
 @generate_hamiltonian_tests
 class FullHamiltonians(dtr.DynamiteTestCase):
     def check_hamiltonian(self, H_name):
+        self._check_hamiltonian(H_name)
+
+        with self.subTest(no_diag=True):
+            if config.shell:
+                self._check_hamiltonian(H_name, no_diag=True)
+
+    def _check_hamiltonian(self, H_name, no_diag=False):
         if H_name == 'syk':
             self.skip_on_flag('small_only')
         if H_name == 'long_range':
             self.skip_on_flag('medium_only')
         H = getattr(hamiltonians, H_name)()
         bra, ket = H.create_states()
-
-        #ket.set_product(0)
         ket.set_random(seed = 0)
-        #ket.vec.set(1)
+
+        if no_diag:
+            H.precompute_diagonal = False
 
         H.dot(ket, bra)
         self.assertLess(1E-3, bra.vec.norm(), msg = 'petsc vec norm incorrect')
@@ -117,6 +124,15 @@ class Subspaces(dtr.DynamiteTestCase):
         check_subspace : dynamite.subspace.Subspace
             The subspace to multiply under.
         '''
+        self._compare_to_full(H, x_sub, x_full, check_subspace)
+
+        if config.shell:
+            with self.subTest(no_diag=True):
+                H.precompute_diagonal = False
+                self._compare_to_full(H, x_sub, x_full, check_subspace)
+                H.precompute_diagonal = True
+
+    def _compare_to_full(self, H, x_sub, x_full, check_subspace):
         extra_conversion = isinstance(check_subspace, XParity)
 
         # compare all possible combinations of going to and from the full space
@@ -201,7 +217,8 @@ class Subspaces(dtr.DynamiteTestCase):
         check multiplication from subspace to subspace
         '''
         H.add_subspace(check_subspace)
-        result = H.dot(x_sub)
+        result = State(subspace=check_subspace)
+        H.dot(x_sub, result=result)
 
         eps = H.nnz*np.finfo(msc_dtype[2]).eps
         self.check_vec_equal(correct, result, eps=eps)

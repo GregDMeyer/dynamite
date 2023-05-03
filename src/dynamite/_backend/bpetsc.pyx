@@ -49,6 +49,8 @@ cdef extern from "bpetsc_impl.h":
                  PetscInt xparity,
                  PetscMat *A)
 
+    int PrecomputeDiagonal(PetscMat A)
+
     int CheckConserves(msc_t *msc,
                        subspaces_t *subspaces,
                        PetscInt xparity,
@@ -133,6 +135,15 @@ def build_mat(PetscInt [:] masks,
         raise Error(ierr)
 
     return M
+
+
+def precompute_diagonal(Mat A):
+
+    cdef int ierr
+    ierr = PrecomputeDiagonal(A.mat)
+
+    if ierr != 0:
+        raise Error(ierr)
 
 
 def check_conserves(PetscInt [:] masks,

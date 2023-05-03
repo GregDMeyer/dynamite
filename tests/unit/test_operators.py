@@ -883,6 +883,15 @@ class Properties(ut.TestCase):
         with self.assertRaises(ValueError):
             o._string_rep.brackets = '<>'
 
+    def test_precompute_diagonal_fail(self):
+        # this should only work when shell=True
+        o = sigmaz()
+        with self.assertRaises(ValueError):
+            o.precompute_diagonal
+
+        with self.assertRaises(ValueError):
+            o.precompute_diagonal = True
+
 
 class MSC(ut.TestCase):
     '''

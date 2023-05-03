@@ -30,6 +30,7 @@ class Operator:
         self._msc = None
         self._is_reduced = False
         self._shell = config.shell
+        self._precompute_diagonal = True
         self._allow_projection = False
 
         if config.subspace is not None:
@@ -272,6 +273,33 @@ class Operator:
         if value != self._shell:
             self.destroy_mat()
         self._shell = value
+
+    @property
+    def precompute_diagonal(self):
+        """
+        Whether shell matrices should precompute and store the matrix diagonal.
+        Usually should only be turned off if a matrix will be "single-use" (destroyed
+        after a single multiplication).
+
+        .. note::
+            Changing this value after the matrix has been built will invoke a call
+            to :meth:`Operator.destroy_mat`.
+        """
+        if not self.shell:
+            raise ValueError("precompute_diagonal only applies when shell=True")
+        return self._precompute_diagonal
+
+    @precompute_diagonal.setter
+    def precompute_diagonal(self, value):
+        value = bool(value)
+
+        if not self.shell:
+            raise ValueError("precompute_diagonal only applies when shell=True")
+
+        if value != self.precompute_diagonal:
+            self.destroy_mat()
+
+        self._precompute_diagonal = value
 
     @property
     def left_subspace(self):
@@ -628,6 +656,10 @@ class Operator:
             shell=self.shell,
             gpu=config.gpu,
         )
+
+        if (self.shell and self.precompute_diagonal
+                and subspaces[0] == subspaces[1] and masks[0] == 0):
+            bpetsc.precompute_diagonal(mat)
 
         self._mats[subspaces] = mat
 

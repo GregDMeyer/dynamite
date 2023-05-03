@@ -7,9 +7,11 @@
  - Detailed example scripts (in `examples/scripts`)
  - `Operator.expectation()`, convenience function to compute the expectation value of the operator with respect to a state
  - `dynamite.tools.MPI_COMM_WORLD()` which returns PETSc's MPI communicator object
+ - `Operator.precompute_diagonal` flag allows user to tune whether the matrix diagonal should be precomputed and saved, for shell matrices
 
 ### Changed
  - `Operator.msc_size` renamed to `Operator.nterms`, and now invokes a call to `Operator.reduce_msc()`
+ - shell matrix-vector multiplications are now considerably faster
 
 ### Fixed
  - Explicit subspace sometimes failed conservation check even when operator was actually conserved

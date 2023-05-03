@@ -14,6 +14,10 @@
 #define SpinConserve_SP 2
 #define Explicit_SP 3
 
+#define Full_ENUM FULL
+#define Parity_ENUM PARITY
+#define SpinConserve_ENUM SPIN_CONSERVE
+#define Explicit_ENUM EXPLICIT
 
 #define SUBSPACE Full
   #include "bpetsc_template_1.c"
@@ -55,6 +59,30 @@ PetscErrorCode ReducedDensityMatrix(
       break;
     case EXPLICIT:
       PetscCall(rdm_Explicit(vec, sub_data_p, keep_size, keep, triang, rtn_dim, rtn));
+      break;
+    default: // shouldn't happen, but give ierr some (nonzero) value for consistency
+      return 1;
+  }
+  return 0;
+}
+
+#undef  __FUNCT__
+#define __FUNCT__ "PrecomputeDiagonal"
+PetscErrorCode PrecomputeDiagonal(Mat A){
+  shell_context *ctx;
+  PetscCall(MatShellGetContext(A, &ctx));
+  switch (ctx->right_subspace_type) {
+    case FULL:
+      PetscCall(PrecomputeDiagonal_Full(A));
+      break;
+    case PARITY:
+      PetscCall(PrecomputeDiagonal_Parity(A));
+      break;
+    case SPIN_CONSERVE:
+      PetscCall(PrecomputeDiagonal_SpinConserve(A));
+      break;
+    case EXPLICIT:
+      PetscCall(PrecomputeDiagonal_Explicit(A));
       break;
     default: // shouldn't happen, but give ierr some (nonzero) value for consistency
       return 1;

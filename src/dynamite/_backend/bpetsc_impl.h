@@ -43,6 +43,8 @@ PetscErrorCode BuildMat(const msc_t *msc, subspaces_t *subspaces, shell_impl she
 
 PetscErrorCode CheckConserves(const msc_t *msc, subspaces_t *subspaces, int xparity, PetscBool *result);
 
+PetscErrorCode PrecomputeDiagonal(Mat A);
+
 PetscErrorCode BuildContext(const msc_t *msc,
                             const void* left_subspace_data,
                             const void* right_subspace_data,

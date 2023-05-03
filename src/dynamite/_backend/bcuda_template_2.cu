@@ -1,5 +1,5 @@
 
-#include "bcuda_template_private.h"
+#include "bcuda_template_2_private.h"
 
 PetscErrorCode C(BuildGPUShell,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
   const msc_t *msc,
@@ -48,6 +48,8 @@ PetscErrorCode C(BuildContext_CUDA,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
   const C(data,RIGHT_SUBSPACE)* right_subspace_data,
   shell_context **ctx_p)
 {
+  /* NOTE: some data shared by GPU and CPU implementations is set in BuildMat */
+
   PetscReal *cpu_real_coeffs, real_part;
   PetscInt nterms, i;
   shell_context *ctx;
@@ -55,8 +57,7 @@ PetscErrorCode C(BuildContext_CUDA,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
   PetscCall(PetscMalloc(sizeof(shell_context), ctx_p));
   ctx = (*ctx_p);
 
-  ctx->nmasks = msc->nmasks;
-  ctx->nrm = -1;
+  ctx->gpu = PETSC_TRUE;
   nterms = msc->mask_offsets[msc->nmasks];
 
   PetscCallCUDA(cudaMalloc((void **) &(ctx->masks),
@@ -108,6 +109,10 @@ PetscErrorCode C(MatDestroyCtx_GPU,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A)
   PetscCallCUDA(cudaFree(ctx->signs));
   PetscCallCUDA(cudaFree(ctx->real_coeffs));
 
+  if (ctx->diag) {
+    PetscCallCUDA(cudaFree(ctx->diag));
+  }
+
   PetscCall(C(DestroySubspaceData_CUDA,LEFT_SUBSPACE)(
     (C(data,LEFT_SUBSPACE)*) ctx->left_subspace_data));
   PetscCall(C(DestroySubspaceData_CUDA,RIGHT_SUBSPACE)(
@@ -146,6 +151,7 @@ PetscErrorCode C(MatMult_GPU,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, Vec x, Vec 
     ctx->nmasks,
     (C(data,LEFT_SUBSPACE)*) ctx->left_subspace_data,
     (C(data,RIGHT_SUBSPACE)*) ctx->right_subspace_data,
+    ctx->diag,
     xarray,
     barray);
 
@@ -166,6 +172,7 @@ __global__ void C(device_MatMult,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
   PetscInt nmasks,
   C(data,LEFT_SUBSPACE) *left_subspace_data,
   C(data,RIGHT_SUBSPACE) *right_subspace_data,
+  PetscReal* diag,
   const PetscScalar* xarray,
   PetscScalar* barray)
 {
@@ -184,8 +191,16 @@ __global__ void C(device_MatMult,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
 
   for (row_idx = this_start; row_idx < vec_stop_index; row_idx += blockDim.x) {
     ket = C(I2S_CUDA,LEFT_SUBSPACE)(row_idx,left_subspace_data);
-    val = 0;
-    for (mask_idx = 0; mask_idx < nmasks; ++mask_idx) {
+
+    if (diag) {
+      val = diag[row_idx] * xarray[row_idx];
+      mask_idx = 1;
+    } else {
+      val = 0;
+      mask_idx = 0;
+    }
+
+    for (; mask_idx<nmasks; ++mask_idx) {
       tmp = 0;
       bra = ket ^ masks[mask_idx];
 

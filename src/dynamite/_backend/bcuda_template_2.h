@@ -1,6 +1,5 @@
 
-#define CONCAT_U(a, b) a ## _ ## b
-#define C(a, b) CONCAT_U(a, b)
+#include "bcuda_template_shared.h"
 
 #ifdef __cplusplus
 extern "C" {
