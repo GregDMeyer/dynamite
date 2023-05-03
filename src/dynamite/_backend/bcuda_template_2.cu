@@ -216,12 +216,18 @@ __global__ void C(device_MatMult,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
 #else
         sign = __popc(bra & signs[term_idx])&1;
 #endif
-        sign = 1 - 2*sign;
         if TERM_REAL_CUDA(masks[mask_idx], signs[term_idx]) {
-	  add_real(&tmp, sign * real_coeffs[term_idx]);
-        }
-        else {
-          add_imag(&tmp, sign * real_coeffs[term_idx]);
+          if (sign) {
+            add_real(&tmp, -real_coeffs[term_idx]);
+          } else {
+            add_real(&tmp, real_coeffs[term_idx]);
+          }
+        } else {
+          if (sign) {
+            add_imag(&tmp, -real_coeffs[term_idx]);
+          } else {
+            add_imag(&tmp, real_coeffs[term_idx]);
+          }
         }
       }
       val += tmp * xarray[col_idx];
