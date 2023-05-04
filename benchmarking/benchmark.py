@@ -3,6 +3,7 @@ import argparse as ap
 from random import uniform,seed
 from timeit import default_timer
 from itertools import combinations
+import numpy as np
 
 from dynamite import config
 from dynamite.states import State
@@ -120,19 +121,19 @@ def build_hamiltonian(params):
 
     if params.H == 'MBL':
         # dipolar interaction
-        rtn = index_sum(op_sum(s(0)*s(1) for s in (sigmax, sigmay, sigmaz)))
+        rtn = index_sum(op_sum(0.25*s(0)*s(1) for s in (sigmax, sigmay, sigmaz)))
         # quenched disorder in z direction
         seed(0)
         for i in range(params.L):
-            rtn += uniform(-1, 1) * sigmaz(i)
+            rtn += uniform(-3, 3) * 0.5 * sigmaz(i)
 
     elif params.H == 'long_range':
         # long-range ZZ interaction
-        rtn = op_sum(index_sum(sigmaz(0)*sigmaz(i)) for i in range(1, params.L))
+        rtn = op_sum(index_sum(0.25*sigmaz(0)*sigmaz(i)) for i in range(1, params.L))
         # nearest neighbor XX
-        rtn += 0.5 * index_sum(sigmax(0)*sigmax(1))
+        rtn += 0.5 * index_sum(0.25*sigmax(0)*sigmax(1))
         # some other fields
-        rtn += sum(0.1*index_sum(s()) for s in [sigmax, sigmay, sigmaz])
+        rtn += sum(0.05*index_sum(s()) for s in [sigmax, sigmay, sigmaz])
 
     elif params.H == 'SYK':
         seed(0)
@@ -147,15 +148,16 @@ def build_hamiltonian(params):
                 yield p
 
         rtn = op_sum(gen_products(params.L))
+        rtn.scale(np.sqrt(6/(params.L*2)**3))
 
     elif params.H == 'ising':
-        rtn = index_sum(sigmaz(0)*sigmaz(1)) + 0.2*index_sum(sigmax())
+        rtn = index_sum(0.25*sigmaz(0)*sigmaz(1)) + 0.1*index_sum(sigmax())
 
     elif params.H == 'XX':
-        rtn = index_sum(sigmax(0)*sigmax(1))
+        rtn = index_sum(0.25*sigmax(0)*sigmax(1))
 
     elif params.H == 'heisenberg':
-        rtn = index_sum(sigmax(0)*sigmax(1) + sigmay(0)*sigmay(1) + sigmaz(0)*sigmaz(1))
+        rtn = index_sum(op_sum(0.25*s(0)*s(1) for s in (sigmax, sigmay, sigmaz)))
 
     else:
         raise ValueError('Unrecognized Hamiltonian.')
