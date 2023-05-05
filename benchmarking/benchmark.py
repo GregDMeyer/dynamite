@@ -232,6 +232,8 @@ def log_call(function, stat_dict, alt_name=None):
     return rtn
 
 def main():
+    main_start = default_timer()
+
     arg_params = parse_args()
     slepc_args = arg_params.slepc_args.split(' ')
     config.initialize(slepc_args, gpu=arg_params.gpu)
@@ -313,6 +315,8 @@ def main():
             in_state.vec.destroy()
 
         stats['Gb_memory'] = get_max_memory_usage()
+
+    stats['total_time'] = default_timer() - main_start
 
     Print('---RESULTS---')
     for k,v in stats.items():
