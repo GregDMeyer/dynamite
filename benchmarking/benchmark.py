@@ -11,7 +11,7 @@ from dynamite.operators import sigmax, sigmay, sigmaz
 from dynamite.operators import op_sum, op_product, index_sum
 from dynamite.extras import majorana
 from dynamite.subspaces import Full, Parity, SpinConserve, Auto, XParity
-from dynamite.tools import track_memory, get_max_memory_usage
+from dynamite.tools import track_memory, get_max_memory_usage, MPI_COMM_WORLD, mpi_print
 from dynamite.computations import reduced_density_matrix
 
 
@@ -35,7 +35,7 @@ def parse_args(argv=None):
     parser.add_argument('--slepc_args', type=str, default='',
                         help='Arguments to pass to SLEPc.')
     parser.add_argument('--track_memory', action='store_true',
-                        help='Whether to compute max memory usage')
+                        help='Whether to compute max memory usage (summed across all ranks)')
 
     parser.add_argument('--subspace', choices=['full', 'parity',
                                                'spinconserve',
@@ -205,10 +205,6 @@ def do_check_conserves(hamiltonian):
 
 # this decorator keeps track of and times function calls
 def log_call(function, stat_dict, alt_name=None):
-    config._initialize()
-    from petsc4py.PETSc import Sys
-    Print = Sys.Print
-
     if alt_name is None:
         fn_name = function.__name__
     else:
@@ -216,14 +212,14 @@ def log_call(function, stat_dict, alt_name=None):
 
     def rtn(*args, **kwargs):
         if __debug__:
-            Print('beginning', fn_name)
+            mpi_print('beginning', fn_name)
 
         tick = default_timer()
         rtn_val = function(*args, **kwargs)
         tock = default_timer()
 
         if __debug__:
-            Print('completed', fn_name)
+            mpi_print('completed', fn_name)
 
         stat_dict[fn_name] = tock-tick
 
@@ -240,13 +236,10 @@ def main():
     config.L = arg_params.L
     config.shell = arg_params.shell
 
-    from petsc4py.PETSc import Sys
-    Print = Sys.Print
-
     if not __debug__:
-        Print('---ARGUMENTS---')
+        mpi_print('---ARGUMENTS---')
         for k,v in vars(arg_params).items():
-            Print(str(k)+','+str(v))
+            mpi_print(str(k)+','+str(v))
 
     if arg_params.track_memory:
         track_memory()
@@ -270,11 +263,11 @@ def main():
         if arg_params.no_precompute_diagonal:
             H.precompute_diagonal = False
 
-        Print('H statistics:')
-        Print(' dim:', H.dim[0])
-        Print(' nnz:', H.nnz)
-        Print(' density:', H.density)
-        Print(' nterms:', H.nterms)
+        mpi_print('H statistics:')
+        mpi_print(' dim:', H.dim[0])
+        mpi_print(' nnz:', H.nnz)
+        mpi_print(' density:', H.density)
+        mpi_print(' nterms:', H.nterms)
         log_call(H.build_mat, stats)()
 
     # build some states to use in the computations
@@ -309,18 +302,25 @@ def main():
 
     if arg_params.track_memory:
         # trigger memory measurement
+        # TODO: is this still required?
         if H is not None:
             H.destroy_mat()
         elif in_state is not None:
             in_state.vec.destroy()
 
-        stats['Gb_memory'] = get_max_memory_usage()
+        # sum the memory usage from all ranks
+        local_mem = get_max_memory_usage()
+        if MPI_COMM_WORLD().size == 1:
+            stats['Gb_memory'] = local_mem
+        else:
+            comm = MPI_COMM_WORLD().tompi4py()
+            stats['Gb_memory'] = comm.allreduce(local_mem)
 
     stats['total_time'] = default_timer() - main_start
 
-    Print('---RESULTS---')
+    mpi_print('---RESULTS---')
     for k,v in stats.items():
-        Print('{0}, {1:0.4f}'.format(k, v))
+        mpi_print('{0}, {1:0.4f}'.format(k, v))
 
 if __name__ == '__main__':
     main()
