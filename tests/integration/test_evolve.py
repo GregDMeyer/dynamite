@@ -39,6 +39,9 @@ class EvolveChecker(dtr.DynamiteTestCase):
         H_np = H.to_numpy()
         ket_np = ket.to_numpy()
 
+        # make the evolutions not affected by normalization of H
+        t /= H.infinity_norm()
+
         H.evolve(ket, t=t, result=bra, **kwargs)
 
         if t.imag == 0:
@@ -74,7 +77,7 @@ class Hamiltonians(EvolveChecker):
                 # do without complex numbers
                 evolve_types += ['real']
 
-            if t < 20:  # imaginary doesn't converge for huge t
+            if t < 200:  # imaginary doesn't converge for huge t
                 evolve_types += ['imaginary']
 
             for evolve_type in evolve_types:
@@ -100,7 +103,7 @@ class Hamiltonians(EvolveChecker):
         else:
             skip = {}
 
-        self.evolve_all(0.1, skip=skip)
+        self.evolve_all(1.0, skip=skip)
 
     def test_long(self):
         # skip all hamiltonians for this test on medium-only
@@ -113,7 +116,7 @@ class Hamiltonians(EvolveChecker):
             skip = {}
 
         # otherwise just skip syk
-        self.evolve_all(50.0, skip=skip, max_its=750)
+        self.evolve_all(500.0, skip=skip)
 
 @ut.skipIf(not complex_enabled(), 'complex numbers not enabled')
 class Subspaces(EvolveChecker):
@@ -155,7 +158,7 @@ class Subspaces(EvolveChecker):
                 with self.subTest(subspace=subspace):
                     H.add_subspace(subspace)
                     H.allow_projection = True
-                    self.evolve_check(H, 0.1)
+                    self.evolve_check(H, 1.5)
 
     def test_parity_exceptions(self):
         H = identity()

@@ -54,8 +54,12 @@ def parse_args(argv=None):
 
     parser.add_argument('--evolve', action='store_true',
                         help='Request that the Hamiltonian evolves a state.')
-    parser.add_argument('-t', type=float, default=1.0,
+    parser.add_argument('-t', type=float, default=50.0,
                         help='The time to evolve for.')
+    parser.add_argument('--no_normalize_t', action='store_true',
+                        help='Turn off the default behavior of dividing the evolve time by the '
+                             'matrix norm, which should yield a fairer comparison across models'
+                             ' and system sizes.')
 
     parser.add_argument('--mult', action='store_true',
                         help='Simply multiply the Hamiltonian by a vector.')
@@ -79,9 +83,16 @@ def parse_args(argv=None):
                         'RDM computation. By default, the first half are kept.')
 
     parser.add_argument('--check-conserves', action='store_true',
-                        help='Check whether the given subspace is conserved by the matrix.')
+                        help='Benchmark the check for whether the given subspace is conserved by '
+                             'the matrix.')
 
-    return parser.parse_args(argv)
+    args = parser.parse_args(argv)
+
+    # we need the norm anyway for this; might as well benchmark it
+    if args.evolve and not args.no_normalize_t:
+        args.norm = True
+
+    return args
 
 def build_subspace(params, hamiltonian=None):
     space = params.which_space
@@ -162,18 +173,25 @@ def build_hamiltonian(params):
     else:
         raise ValueError('Unrecognized Hamiltonian.')
 
+    # conservation check can take a long time; we benchmark it separately
+    # TODO: speed up CheckConserves and remove this
+    rtn.allow_projection = True
+
     return rtn
 
 def compute_norm(hamiltonian):
-    config._initialize()
-    from petsc4py.PETSc import NormType
-    return hamiltonian.get_mat().norm(NormType.INFINITY)
+    return hamiltonian.infinity_norm()
 
 def do_eigsolve(params, hamiltonian):
     hamiltonian.eigsolve(nev=params.nev,target=params.target)
 
 def do_evolve(params, hamiltonian, state, result):
-    hamiltonian.evolve(state, t=params.t, result=result)
+    # norm should be precomputed by now so the following shouldn't affect
+    # the measured cost of time evolution
+    t = params.t
+    if not params.no_normalize_t:
+        t /= hamiltonian.infinity_norm()
+    hamiltonian.evolve(state, t=t, result=result)
 
 def do_mult(params, hamiltonian, state, result):
     for _ in range(params.mult_count):
