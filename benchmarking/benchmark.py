@@ -290,6 +290,7 @@ def main():
 
     if arg_params.mult:
         log_call(do_mult, stats)(arg_params, H, in_state, out_state)
+        stats['avg_mult_time'] = stats['do_mult'] / arg_params.mult_count
 
     if arg_params.rdm:
         keep_idxs = arg_params.keep
