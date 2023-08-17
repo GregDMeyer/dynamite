@@ -9,6 +9,9 @@ def read_data():
     reader = DictReader(fileinput.input())
     rtn = defaultdict(lambda: defaultdict(list))
     for row in reader:
+        # encountered another header row
+        if row['h'] == 'h':
+            continue
         # average over data points
         key = (float(row['h']), float(row['energy_point']))
         for k in ('entropy', 'ratio'):
