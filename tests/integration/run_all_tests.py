@@ -6,6 +6,7 @@ various configurations.
 from subprocess import run, PIPE, TimeoutExpired
 from glob import glob
 import argparse
+from time import sleep
 
 def parse_command_line(cmd_argv=None):
     parser = argparse.ArgumentParser(description='Run all tests for dynamite.')
@@ -140,6 +141,7 @@ def main():
             for nproc in params.nprocs:
                 run_test(params.mpiexec, nproc, test_name,
                          options+const_options, timeout=params.timeout)
+                sleep(0.1)
 
 if __name__ == '__main__':
     main()
