@@ -10,3 +10,4 @@
  - Schuster *et al.*, “Learning quantum systems via out-of-time-order correlators.” [arXiv, Aug. 03, 2022.](http://arxiv.org/abs/2208.02254)
  - Schuster *et al.*, “Operator Growth in Open Quantum Systems.” [arXiv, Aug. 25, 2022.](https://doi.org/10.48550/arXiv.2208.12272)
  - Bornet *et al.*, “Scalable spin squeezing in a dipolar Rydberg atom array.” [arXiv, Mar. 14 2023.](https://doi.org/10.48550/arXiv.2303.08053)
+ - Gong *et al.*, “Coherent dynamics of strongly interacting electronic spin defects in hexagonal boron nitride.” [Nat. Commun. 14, 3299 (2023).](https://doi.org/10.1038/s41467-023-39115-y)
