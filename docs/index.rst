@@ -17,7 +17,7 @@ To run the tutorial, `install Docker <containers.html#setup>`_
 
 .. code::
 
-    docker run --rm -p 8887:8887 -w /home/dnm/examples/tutorial gdmeyer/dynamite:latest
+    docker run --rm -p 8887:8887 -w /home/dnm/examples/tutorial gdmeyer/dynamite:latest-jupyter
 
 Then follow the last link in the output (it should start with ``http://127.0.0.1:8887``).
 Start the tutorial by launching the notebook ``0-Welcome.ipynb`` in the left panel.
