@@ -216,9 +216,9 @@ class _ProductStateSubspace(Subspace):
 class Full(_ProductStateSubspace):
 
     _enum = bsubspace.SubspaceType.FULL
-    _c_get_dimension = bsubspace.get_dimension_Full
-    _c_idx_to_state = bsubspace.idx_to_state_Full
-    _c_state_to_idx = bsubspace.state_to_idx_Full
+    _c_get_dimension = staticmethod(bsubspace.get_dimension_Full)
+    _c_idx_to_state = staticmethod(bsubspace.idx_to_state_Full)
+    _c_state_to_idx = staticmethod(bsubspace.state_to_idx_Full)
 
     def __init__(self, L=None):
         super().__init__(L)
@@ -260,9 +260,9 @@ class Parity(_ProductStateSubspace):
     '''
 
     _enum = bsubspace.SubspaceType.PARITY
-    _c_get_dimension = bsubspace.get_dimension_Parity
-    _c_idx_to_state = bsubspace.idx_to_state_Parity
-    _c_state_to_idx = bsubspace.state_to_idx_Parity
+    _c_get_dimension = staticmethod(bsubspace.get_dimension_Parity)
+    _c_idx_to_state = staticmethod(bsubspace.idx_to_state_Parity)
+    _c_state_to_idx = staticmethod(bsubspace.state_to_idx_Parity)
 
     def __init__(self, space, L=None):
         super().__init__(L)
@@ -319,9 +319,9 @@ class SpinConserve(_ProductStateSubspace):
     '''
 
     _enum = bsubspace.SubspaceType.SPIN_CONSERVE
-    _c_get_dimension = bsubspace.get_dimension_SpinConserve
-    _c_idx_to_state = bsubspace.idx_to_state_SpinConserve
-    _c_state_to_idx = bsubspace.state_to_idx_SpinConserve
+    _c_get_dimension = staticmethod(bsubspace.get_dimension_SpinConserve)
+    _c_idx_to_state = staticmethod(bsubspace.idx_to_state_SpinConserve)
+    _c_state_to_idx = staticmethod(bsubspace.state_to_idx_SpinConserve)
 
     def __init__(self, L, k, spinflip=None):
         super().__init__(L=L)
@@ -388,9 +388,9 @@ class Explicit(_ProductStateSubspace):
     '''
 
     _enum = bsubspace.SubspaceType.EXPLICIT
-    _c_get_dimension = bsubspace.get_dimension_Explicit
-    _c_idx_to_state = bsubspace.idx_to_state_Explicit
-    _c_state_to_idx = bsubspace.state_to_idx_Explicit
+    _c_get_dimension = staticmethod(bsubspace.get_dimension_Explicit)
+    _c_idx_to_state = staticmethod(bsubspace.idx_to_state_Explicit)
+    _c_state_to_idx = staticmethod(bsubspace.state_to_idx_Explicit)
 
     def __init__(self, state_list, L=None):
         self.state_map = np.asarray(state_list, dtype=bsubspace.dnm_int_t)

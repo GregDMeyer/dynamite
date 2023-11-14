@@ -72,6 +72,11 @@ paste that, and run it. It should look like:
 Building dynamite
 -----------------
 
+.. note::
+   Due to `an issue <https://gitlab.com/petsc/petsc/-/issues/1369>`_ in PETSc/SLEPc, ``dynamite``
+   will only build successfully with ``pip < 23.1``. To ensure a successful build we recommend
+   running ``pip install pip~=23.0.1`` before running the below commands.
+
 Make sure ``PETSC_DIR`` and ``PETSC_ARCH`` environment variables are still set
 from the above exports (or re-set them). You should also set ``SLEPC_DIR``:
 
@@ -89,9 +94,7 @@ Now, you can install everything by simply running
     cd dynamite
     pip install ./
 
-Now you should be all set to use dynamite! If you want to work on the dynamite
-source code, or just easily pull updates from GitHub, you might want to do
-``pip install -e ./`` to keep the source files in-place.
+Now you should be all set to use dynamite!
 
 .. note::
 

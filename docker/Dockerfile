@@ -1,9 +1,9 @@
 
 ARG PLATFORM=cpu
 ARG BUILD_TYPE=opt  # 'opt' or 'debug'
-ARG PETSC_VERSION=3.19.0
-ARG SLEPC_VERSION=3.19.0
-ARG CUDA_VERSION=11.8.0
+ARG PETSC_VERSION=3.20.1
+ARG SLEPC_VERSION=3.20.0
+ARG CUDA_VERSION=12.2.2
 ARG CUDA_UBUNTU_VERSION=22.04
 ARG CPU_PYTHON_VERSION=3.11
 ARG SCALAR_TYPE=complex
@@ -20,7 +20,6 @@ RUN apt-get update && \
     cmake \
     mpi-default-dev \
     libopenblas-dev \
-    libmumps-dev \
     git \
     && \
     apt-get clean && \
@@ -31,7 +30,7 @@ ENV PETSC_ARCH=complex-$BUILD_TYPE
 
 ARG SCALAR_TYPE
 ARG PETSC_CONFIG_FLAGS
-ENV PETSC_CONFIG_FLAGS="$PETSC_CONFIG_FLAGS --download-mumps=0 --with-mumps=1 --with-scalar-type=$SCALAR_TYPE"
+ENV PETSC_CONFIG_FLAGS="$PETSC_CONFIG_FLAGS --download-mumps=1 --with-scalar-type=$SCALAR_TYPE"
 
 
 FROM nvidia/cuda:${CUDA_VERSION}-devel-ubuntu${CUDA_UBUNTU_VERSION} AS base-gpu
@@ -75,7 +74,7 @@ USER dnm
 # activate venv
 ENV VIRTUAL_ENV=/venv
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
-RUN pip3 install --no-cache-dir --upgrade pip wheel
+RUN pip3 install --no-cache-dir --upgrade pip~=23.0.1 wheel
 
 
 from build as petsc
@@ -86,7 +85,7 @@ ARG BUILD_TYPE
 # install PETSc
 USER root
 WORKDIR /opt
-RUN curl --no-progress-meter https://ftp.mcs.anl.gov/pub/petsc/release-snapshots/petsc-$PETSC_VERSION.tar.gz | tar xzf -
+RUN curl --no-progress-meter https://web.cels.anl.gov/projects/petsc/download/release-snapshots/petsc-$PETSC_VERSION.tar.gz | tar xzf -
 RUN mv petsc-$PETSC_VERSION petsc
 RUN chown -R dnm:dnm petsc
 USER dnm
@@ -148,7 +147,6 @@ ONBUILD RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     mpi-default-bin \
     libopenblas0 \
-    libmumps-5.3 \
     && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
