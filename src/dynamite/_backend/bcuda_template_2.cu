@@ -263,7 +263,7 @@ PetscErrorCode C(MatNorm_GPU,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, NormType ty
   PetscCallCUDA(cudaMalloc((void **) &d_maxs, sizeof(PetscReal)*GPU_BLOCK_NUM));
   PetscCall(PetscMalloc1(GPU_BLOCK_NUM, &h_maxs));
 
-  PetscCall(MatGetSize(A, &M, NULL));
+  PetscCall(MatGetSize(A, &M, PETSC_NULLPTR));
 
   C(device_MatNorm,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))<<<GPU_BLOCK_NUM, GPU_BLOCK_SIZE, sizeof(PetscReal)*GPU_BLOCK_SIZE>>>(
     M,

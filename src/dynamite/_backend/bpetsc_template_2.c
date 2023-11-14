@@ -45,7 +45,7 @@ PetscErrorCode C(BuildMat,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
 
     ctx->nmasks = msc->nmasks;
     ctx->nrm = -1;
-    ctx->diag = NULL;  // diag is allocated later, if filled
+    ctx->diag = PETSC_NULLPTR;  // diag is allocated later, if filled
     ctx->left_subspace_type = C(LEFT_SUBSPACE,ENUM);
     ctx->right_subspace_type = C(RIGHT_SUBSPACE,ENUM);
   }
@@ -110,7 +110,7 @@ PetscErrorCode C(BuildPetsc,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
   /* compute matrix elements */
   PetscCall(MatSetOption(*A, MAT_NO_OFF_PROC_ENTRIES, PETSC_TRUE));
   PetscCall(MatGetOwnershipRange(*A, &row_start, &row_end));
-  PetscCall(MatGetOwnershipRangeColumn(*A, &col_start, NULL));
+  PetscCall(MatGetOwnershipRangeColumn(*A, &col_start, PETSC_NULLPTR));
 
   for (row_idx = row_start; row_idx < row_end; ++row_idx) {
 
@@ -699,7 +699,7 @@ void C(compute_mask_starts,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
     // in parity case, we drop the last bit of the mask (by calling S2I on it)
     while (
         mask_idx < nmasks &&
-        C(S2I_nocheck,LEFT_SUBSPACE)(masks[mask_idx], NULL) < (proc_idx << n_local_spins)
+        C(S2I_nocheck,LEFT_SUBSPACE)(masks[mask_idx], PETSC_NULLPTR) < (proc_idx << n_local_spins)
       ) {
       ++mask_idx;
     }
@@ -793,7 +793,7 @@ PetscErrorCode C(MatMult_CPU_Fast,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, Vec x,
     if (mask_starts[proc_idx] == ctx->nmasks) break;
 
     /* the first index of the target */
-    m = C(S2I_nocheck,LEFT_SUBSPACE)(ctx->masks[mask_starts[proc_idx]], NULL);
+    m = C(S2I_nocheck,LEFT_SUBSPACE)(ctx->masks[mask_starts[proc_idx]], PETSC_NULLPTR);
     proc_start_idx = proc_mask & (proc_me ^ m);
 
     for (block_start_idx = proc_start_idx;
@@ -828,7 +828,7 @@ PetscErrorCode C(MatMult_CPU_Fast,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, Vec x,
 
         m = C(S2I_nocheck,LEFT_SUBSPACE)(
           ctx->masks[mask_idx],
-          NULL
+          PETSC_NULLPTR
         );
 
         for (
@@ -838,7 +838,7 @@ PetscErrorCode C(MatMult_CPU_Fast,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, Vec x,
 
           s = C(S2I_nocheck,LEFT_SUBSPACE)(
             ctx->signs[term_idx],
-            NULL
+            PETSC_NULLPTR
           );
 
           ms_parity = builtin_parity(ctx->masks[mask_idx] & ctx->signs[term_idx]);

@@ -7,7 +7,7 @@ PetscErrorCode C(PrecomputeDiagonal_GPU,SUBSPACE)(Mat A)
   shell_context *ctx;
   PetscCall(MatShellGetContext(A, &ctx));
 
-  PetscCall(MatGetSize(A, &size, NULL));
+  PetscCall(MatGetSize(A, &size, PETSC_NULLPTR));
 
   PetscCallCUDA(cudaMalloc((void **) &(ctx->diag), sizeof(PetscReal)*size));
 

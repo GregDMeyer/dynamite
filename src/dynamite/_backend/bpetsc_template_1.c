@@ -175,7 +175,7 @@ PetscErrorCode C(PrecomputeDiagonal_CPU,SUBSPACE)(Mat A){
   PetscCall(MatShellGetContext(A, &ctx));
 
   if (ctx->masks[0] != 0) {
-    /* there is no diagonal! leave diag as NULL */
+    /* there is no diagonal! leave diag as PETSC_NULLPTR */
     return 0;
   }
 
