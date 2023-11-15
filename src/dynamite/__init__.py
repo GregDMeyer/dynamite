@@ -206,13 +206,13 @@ def check_version():
     from urllib import request
     import json
     from os import remove
-    from os.path import isfile
+    from os.path import isfile, expanduser
     from time import time
     from sys import stderr
 
     # only check once a day for a new version so that we don't DOS GitHub
     # we save a file with the time of the last check in it
-    filename = '.dynamite'
+    filename = expanduser('~/.dynamite')
     if isfile(filename):
         with open(filename) as f:
             last_check = float(f.read().strip())
@@ -232,24 +232,20 @@ def check_version():
                 f.write(str(time()))
         remove(filename+'_lock')
 
-    # another process is doing this at the same time,
-    # or we don't have write permission here
-    except (FileExistsError, PermissionError, OSError):
-        return
-
-    # finally do the check
-
-    url = 'https://api.github.com/repos/GregDMeyer/dynamite/releases/latest'
-    try:
-        with request.urlopen(url, timeout=1) as url_req:
-            data = json.load(url_req)
-
     # in general, catching all exceptions is a bad idea. but here, no matter
     # what happens we just want to give up on the check
     except:
         return
 
-    release_version = data["tag_name"][1:]  # tag_name starts with 'v'
+    # finally do the check
+
+    url = 'https://raw.githubusercontent.com/GregDMeyer/dynamite/master/VERSION'
+    try:
+        with request.urlopen(url, timeout=1) as url_req:
+            release_version = url_req.read().strip()
+    except:
+        return
+
     if release_version != bbuild.get_build_version():
         print('A new version of dynamite has been released!', file=stderr)
 
