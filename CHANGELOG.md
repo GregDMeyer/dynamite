@@ -17,6 +17,8 @@
 
 ### Fixed
  - Explicit subspace sometimes failed conservation check even when operator was actually conserved
+ - Build was broken with Cython 3
+ - Work around broken `petsc4py` and `slepc4py` builds with `pip>=23.1` (see [PETSc issue](https://gitlab.com/petsc/petsc/-/issues/1369))
 
 ## 0.3.1 - 2023-03-07
 
