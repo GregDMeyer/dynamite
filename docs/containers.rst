@@ -24,16 +24,18 @@ With Docker or podman installed (see :ref:`setup` below), run
 
 .. code:: bash
 
-    docker run --rm -it -w /home/dnm/work -v $PWD:/home/dnm/work gdmeyer/dynamite python your_script.py
+    docker run --rm -it -v $PWD:/home/dnm gdmeyer/dynamite python your_script.py
     # or replace 'docker' with 'podman' if you are using that
     # for podman you may need to add "docker.io/" in front of "gdmeyer" in the command
 
 A quick explanation of the options:
 
  - ``--rm -it``: run interactively, and automatically remove the container when finished
- - ``-w /home/dnm/work -v $PWD:/home/dnm/work``: mount the current working directory into the
+ - ``-v $PWD:/home/dnm``: mount the current working directory into the
    container---this lets dynamite see your script! If you need to give dynamite access to
-   another directory, be sure to add another ``-v`` command.
+   another directory, be sure to add another ``-v`` command. (However note that if you are
+   not on Linux, there is a CPU cost every time a mounted file is modified, either
+   by the host or container---so mounting e.g. your entire home directory is in general a bad idea).
 
 .. note::
    On Windows, you need to replace ``$PWD`` with ``%cd%`` (or whatever Windows path you want to mount
@@ -55,7 +57,7 @@ However, if you prefer to use the GUI, that works fine too.
 The only thing you must do from the command line is pull the image: ``docker pull gdmeyer/dynamite:latest``.
 
 Now in the "Images" tab, hover over the dynamite image you just pulled, and hit "Run".
-Expand the "Optional Settings" menu, and under "Volumes", mount a directory on your computer ("Host Path") onto ``/home/dnm/work`` in the container ("Container Path").
+Expand the "Optional Settings" menu, and under "Volumes", mount a directory on your computer ("Host Path") onto ``/home/dnm`` in the container ("Container Path").
 You can also give the container a name if you want (otherwise Docker will pick a random name for you).
 Then hit "Run"!
 
@@ -114,11 +116,10 @@ Command line
 
 .. code:: bash
 
-    docker run --rm -p 8887:8887 -w /home/dnm/work -v $PWD:/home/dnm/work gdmeyer/dynamite:latest-jupyter
+    docker run --rm -p 8887:8887 -v $PWD:/home/dnm gdmeyer/dynamite:latest-jupyter
     # or replace 'docker' with 'podman'
 
 Then follow the last link that you see (it should start with ``http://127.0.0.1:8887``).
-Your files will be in the ``work`` directory visible in JupyterLab.
 
 Docker Desktop
 --------------
@@ -198,20 +199,20 @@ Installing other packages in your container
 ===========================================
 
 If you want to install other Python packages or other software to use alongside dynamite, it is possible to do this with Docker.
-However, it's a little annoying; if the extra software is for analysis or similar we recommend saving the output of your dynamite computation to a file in your mounted directory (e.g. ``/home/dnm/work``) and then performing the analysis after-the-fact.
+However, it's a little annoying; if the extra software is for analysis or similar we recommend saving the output of your dynamite computation to a file in your mounted directory (e.g. ``/home/dnm``) and then performing the analysis after-the-fact.
 
 A quick explainer of what's happening here: when you run dynamite using the commands in the `Quick Usage Guide`_ section above, Docker creates a "container" on top of the dynamite image.
 With the ``--rm`` flag as described above, this container is simply removed when the program run inside docker exits.
 However, by removing the ``--rm`` flag (and perhaps adding a ``--name``), we can keep the container around, make changes, add things, etc.
 
-So, to make a persistent container, which mounts the current directory at ``/home/dnm/work``, run dynamite like this:
+So, to make a persistent container, which mounts the current directory at the container user's home directory ``/home/dnm``, run dynamite like this:
 
 .. code:: bash
 
-    docker run --name my_dnm_container -it -v $PWD:/home/dnm/work gdmeyer/dynamite bash
+    docker run --name my_dnm_container -it -v $PWD:/home/dnm gdmeyer/dynamite bash
 
 This will give you a bash shell, where you can run ``pip install <whatever>`` or anything else you would like.
-Note that the directory mount (the ``-v`` option) is a part of the container, so when you run the commands below the same directory will always be mounted at ``/home/dnm/work``.
+Note that the directory mount (the ``-v`` option) is a part of the container, so when you run the commands below the same directory will always be mounted at ``/home/dnm``.
 
 After you exit the bash shell above, the next time you want to use the same container, run
 

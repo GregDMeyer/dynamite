@@ -14,6 +14,7 @@
  - shell matrix-vector multiplications are now considerably faster
  - Improved automatic version check; no longer leaves `.dynamite` files in working directory
  - GPU builds now automatically switch to CPU if a GPU is not found (and print a warning)
+ - Changed default bind mount location for Docker images to the container user's home directory, `/home/dnm`
 
 ### Fixed
  - Explicit subspace sometimes failed conservation check even when operator was actually conserved

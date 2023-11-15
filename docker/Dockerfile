@@ -202,8 +202,8 @@ COPY --chown=dnm:dnm examples /home/dnm/examples
 ENV DNM_DOCKER=1
 
 # make work directory for mounting local files
+# (now deprecated but we leave it for backwards compatibility)
 RUN mkdir -p /home/dnm/work  # for permissions
-VOLUME /home/dnm/work
 WORKDIR /home/dnm
 
 
