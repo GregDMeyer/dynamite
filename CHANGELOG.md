@@ -13,6 +13,7 @@
  - `Operator.msc_size` renamed to `Operator.nterms`, and now invokes a call to `Operator.reduce_msc()`
  - shell matrix-vector multiplications are now considerably faster
  - Improved automatic version check; no longer leaves `.dynamite` files in working directory
+ - GPU builds now automatically switch to CPU if a GPU is not found (and print a warning)
 
 ### Fixed
  - Explicit subspace sometimes failed conservation check even when operator was actually conserved
