@@ -102,7 +102,7 @@ class Operator:
         method is a wrapper on :meth:`dynamite.computations.eigsolve`. Any keyword
         arguments are passed to that function; see its documentation for details.
 
-        By default, finds one (or possibly a few) eigenvalues with the smallest real
+        By default, finds one (or possibly a few) eigenvalues with the lowest
         values (i.e. the ground state).
 
         .. note:: The spin chain length ``L`` must be set before calling ``eigsolve``.

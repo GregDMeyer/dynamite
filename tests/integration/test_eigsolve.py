@@ -100,22 +100,22 @@ class Analytic(Checker):
     def test_uniform_field(self):
         H = index_sum(sigmax())
 
-        with self.subTest(which = 'smallest'):
+        with self.subTest(which = 'lowest'):
             nev = 2
             evals, evecs = H.eigsolve(nev=nev,
                                       getvecs=True,
-                                      which='smallest',
+                                      which='lowest',
                                       tol=1E-10)
             evals_correct = [-H.get_length() + 2*i for i in range(nev)]
             for i in range(nev):
                 self.is_close(evals[i], evals_correct[i])
                 self.check_is_evec(H, evecs[i], evals[i], tol=1E-10, evec_tol=1E-9)
 
-        with self.subTest(which = 'largest'):
+        with self.subTest(which = 'highest'):
             nev = 2
             evals, evecs = H.eigsolve(nev=nev,
                                       getvecs=True,
-                                      which='largest',
+                                      which='highest',
                                       tol=1E-10)
             evals_correct = [H.get_length() - 2*i for i in range(nev)]
             for i in range(nev):
@@ -124,7 +124,7 @@ class Analytic(Checker):
 
 class Hamiltonians(Checker):
 
-    def test_all_smallest(self):
+    def test_all_lowest(self):
         for H_name in hamiltonians.get_names(complex_enabled()):
             if H_name == 'syk' and 'small_only' in self.skip_flags:
                 continue
@@ -132,7 +132,7 @@ class Hamiltonians(Checker):
             with self.subTest(H=H_name):
                 H = getattr(hamiltonians, H_name)()
 
-                with self.subTest(which='smallest'):
+                with self.subTest(which='lowest'):
                     evals, evecs = H.eigsolve(nev=5, getvecs=True, tol=1E-12)
                     self.check_all(H, evals, evecs, tol=1E-12, evec_tol=1E-11)
 
@@ -144,8 +144,8 @@ class Hamiltonians(Checker):
             with self.subTest(H=H_name):
                 H = getattr(hamiltonians, H_name)()
 
-                lowest_eval = H.eigsolve(which='smallest')[0]
-                highest_eval = H.eigsolve(which='largest')[0]
+                lowest_eval = H.eigsolve(which='lowest')[0]
+                highest_eval = H.eigsolve(which='highest')[0]
 
                 self.assertLess(lowest_eval, highest_eval)
 
@@ -157,7 +157,7 @@ class Hamiltonians(Checker):
 
 class ZeroDiagonal(Checker):
 
-    def test_smallest(self):
+    def test_lowest(self):
         H = op_sum(0.1*i*sigmax(i) for i in range(config.L))
         evals, evecs = H.eigsolve(nev=5, getvecs=True, tol=1E-12)
         self.check_all(H, evals, evecs, tol=1E-11, evec_tol=1E-9)
