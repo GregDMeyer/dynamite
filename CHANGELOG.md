@@ -10,6 +10,9 @@
  - `Operator.precompute_diagonal` flag allows user to tune whether the matrix diagonal should be precomputed and saved, for shell matrices
  - `State.entanglement_entropy` member function (a more convenient way of using `computations.entanglement_entropy`, which also remains)
 
+### Removed
+ - `--track_memory` flag to `benchmark.py`---now memory usage is always reported by the benchmarking script
+
 ### Changed
  - `Operator.msc_size` renamed to `Operator.nterms`, and now invokes a call to `Operator.reduce_msc()`
  - shell matrix-vector multiplications are now considerably faster

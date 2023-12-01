@@ -34,8 +34,6 @@ def parse_args(argv=None):
 
     parser.add_argument('--slepc_args', type=str, default='',
                         help='Arguments to pass to SLEPc.')
-    parser.add_argument('--track_memory', action='store_true',
-                        help='Whether to compute max memory usage (summed across all ranks)')
 
     parser.add_argument('--subspace', choices=['full', 'parity',
                                                'spinconserve',
@@ -241,8 +239,7 @@ def main():
         for k,v in vars(arg_params).items():
             mpi_print(str(k)+','+str(v))
 
-    if arg_params.track_memory:
-        track_memory()
+    track_memory()
 
     stats = {}
 
@@ -301,21 +298,20 @@ def main():
     if arg_params.check_conserves:
         log_call(do_check_conserves, stats)(H)
 
-    if arg_params.track_memory:
-        # trigger memory measurement
-        # TODO: is this still required?
-        if H is not None:
-            H.destroy_mat()
-        elif in_state is not None:
-            in_state.vec.destroy()
+    # trigger memory measurement
+    # TODO: is this still required?
+    if H is not None:
+        H.destroy_mat()
+    elif in_state is not None:
+        in_state.vec.destroy()
 
-        # sum the memory usage from all ranks
-        local_mem = get_max_memory_usage()
-        if MPI_COMM_WORLD().size == 1:
-            stats['Gb_memory'] = local_mem
-        else:
-            comm = MPI_COMM_WORLD().tompi4py()
-            stats['Gb_memory'] = comm.allreduce(local_mem)
+    # sum the memory usage from all ranks
+    local_mem = get_max_memory_usage()
+    if MPI_COMM_WORLD().size == 1:
+        stats['Gb_memory'] = local_mem
+    else:
+        comm = MPI_COMM_WORLD().tompi4py()
+        stats['Gb_memory'] = comm.allreduce(local_mem)
 
     stats['total_time'] = default_timer() - main_start
 
