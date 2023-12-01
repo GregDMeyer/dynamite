@@ -7,6 +7,7 @@ from itertools import chain
 from zlib import crc32
 import re
 from string import ascii_lowercase
+import warnings
 import numpy as np
 
 from . import config, validate, msc_tools
@@ -68,52 +69,9 @@ class Operator:
         return rtn
 
     ### computations
-
-    def evolve(self, state, t, **kwargs):
-        r"""
-        Time-evolve a state, using the operator as the Hamiltonian.
-
-        This method wraps :meth:`dynamite.computations.evolve` (see that documentation
-        for a full description of the method's functionality).
-
-        Parameters
-        ----------
-        state : dynamite.states.State
-            The initial state.
-
-        t : float
-            The time :math:`t` for which to evolve the state (can be negative or complex).
-
-        **kwargs :
-            Any further keyword arguments are passed to the underlying call to
-            :meth:`dynamite.computations.evolve`. See that documentation for a
-            detailed description of possible arguments.
-
-        Returns
-        -------
-        dynamite.states.State
-            The result vector :math:`\Psi_f`.
-        """
-        return evolve(self, state, t, **kwargs)
-
-    def eigsolve(self, **kwargs):
-        """
-        Find eigenvalues (and eigenvectors if requested) of the Hamiltonian. This class
-        method is a wrapper on :meth:`dynamite.computations.eigsolve`. Any keyword
-        arguments are passed to that function; see its documentation for details.
-
-        By default, finds one (or possibly a few) eigenvalues with the lowest
-        values (i.e. the ground state).
-
-        .. note:: The spin chain length ``L`` must be set before calling ``eigsolve``.
-
-        Returns
-        -------
-        numpy.array or tuple(numpy.array, list(dynamite.states.State))
-            Either a 1D numpy array of eigenvalues, or a pair containing that array
-            and a list of the corresponding eigenvectors.
-        """
-        return eigsolve(self, **kwargs)
+    # directly uses the definitions from computations.py
+    evolve = evolve
+    eigsolve = eigsolve
 
     ### properties
 
@@ -221,7 +179,12 @@ class Operator:
         """
         (deprecated)
         """
-        raise DeprecationWarning('Operator.msc_size is deprecated, use Operator.nterms instead')
+        warnings.warn(
+            'Operator.msc_size is deprecated, use Operator.nterms instead',
+            DeprecationWarning,
+            stacklevel=2
+        )
+        return self.nterms
 
     @property
     def density(self):
@@ -1276,16 +1239,24 @@ def load_from_file(filename):
     '''
     DEPRECATED: use dynamite.operators.Operator.load
     '''
-    raise DeprecationWarning("operators.load_from_file is deprecated; "
-                             "use operators.Operator.load")
+    warnings.warn(
+        "operators.load_from_file is deprecated; use operators.Operator.load",
+        DeprecationWarning,
+        stacklevel=2
+    )
+    return Operator.load(filename)
 
 
 def from_bytes(data):
     """
     DEPRECATED: use dynamite.operators.Operator.from_bytes
     """
-    raise DeprecationWarning("operators.from_bytes is deprecated; "
-                             "use operators.Operator.from_bytes")
+    warnings.warn(
+        "operators.from_bytes is deprecated; use operators.Operator.from_bytes",
+        DeprecationWarning,
+        stacklevel=2
+    )
+    return Operator.from_bytes(data)
 
 
 def op_sum(terms, nshow = 3):

@@ -1,5 +1,6 @@
 
 from os import environ
+from sys import stderr
 import subprocess
 import slepc4py
 from threadpoolctl import threadpool_limits
@@ -73,12 +74,15 @@ class _Config:
 
                 gpu = gpu_check and gpu_check.returncode == 0
                 if not gpu:
-                    print('Warning: dynamite was built for GPU usage but failed to find either '
-                          'the nvidia-smi command or the GPU itself. Switching to CPU.\n'
-                          'To force dynamite to attempt to use GPU, use '
-                          'dynamite.config.initialize(gpu=True)\n'
-                          'To disable this warning, use '
-                          'dynamite.config.initialize(gpu=False)')
+                    print(
+                        'WARNING: dynamite was built for GPU usage but failed to find either '
+                        'the nvidia-smi command or the GPU itself. Switching to CPU.\n'
+                        'To force dynamite to attempt to use GPU, use '
+                        'dynamite.config.initialize(gpu=True)\n'
+                        'To disable this warning, use '
+                        'dynamite.config.initialize(gpu=False)',
+                        file=stderr
+                    )
 
             else:
                 gpu = False

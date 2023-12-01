@@ -228,9 +228,10 @@ def eigsolve(H, getvecs=False, nev=1, which='lowest', target=None, tol=None, sub
 
     if which in ['smallest', 'largest']:
         warnings.warn(
-            'Warning: values "smallest" and "largest" for eigsolve parameter "which" '
+            'values "smallest" and "largest" for eigsolve parameter "which" '
             'are deprecated, and have been replaced by "lowest" and "highest" respectively.',
-            DeprecationWarning
+            DeprecationWarning,
+            stacklevel=2
         )
         which = {
             'smallest': 'lowest',
