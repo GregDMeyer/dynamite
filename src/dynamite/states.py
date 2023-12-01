@@ -1,5 +1,5 @@
 
-from . import config, validate, subspaces
+from . import config, validate, subspaces, computations
 from .tools import complex_enabled, MPI_COMM_WORLD
 from .msc_tools import dnm_int_t
 
@@ -358,6 +358,8 @@ class State:
         self.vec.assemblyEnd()
 
         self.set_initialized()
+
+    entanglement_entropy = computations.entanglement_entropy
 
     def project(self, index, value):
         '''

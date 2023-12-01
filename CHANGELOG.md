@@ -8,6 +8,7 @@
  - `Operator.expectation()`, convenience function to compute the expectation value of the operator with respect to a state
  - `dynamite.tools.MPI_COMM_WORLD()` which returns PETSc's MPI communicator object
  - `Operator.precompute_diagonal` flag allows user to tune whether the matrix diagonal should be precomputed and saved, for shell matrices
+ - `State.entanglement_entropy` member function (a more convenient way of using `computations.entanglement_entropy`, which also remains)
 
 ### Changed
  - `Operator.msc_size` renamed to `Operator.nterms`, and now invokes a call to `Operator.reduce_msc()`

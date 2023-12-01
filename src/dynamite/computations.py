@@ -3,7 +3,6 @@ import warnings
 import numpy as np
 
 from . import config
-from .states import State
 from .tools import complex_enabled
 from .msc_tools import dnm_int_t
 
@@ -74,6 +73,7 @@ def evolve(H, state, t, result=None, tol=None, ncv=None, algo=None, max_its=None
                          'subspaces.')
 
     if result is None:
+        from .states import State  # avoids circular import
         result = State(L=H.L, subspace=state.subspace)
     elif state.subspace != result.subspace:
         raise ValueError('input and result states are on different subspaces.')
@@ -274,6 +274,7 @@ def eigsolve(H, getvecs=False, nev=1, which='lowest', target=None, tol=None, sub
     for i in range(nconv):
         evals[i] = eps.getEigenpair(i, None).real
         if getvecs:
+            from .states import State  # avoids circular import
             v = State(L=H.L, subspace=H.subspace)
             eps.getEigenpair(i, v.vec)
             v.set_initialized()
@@ -357,7 +358,7 @@ def entanglement_entropy(state, keep):
         A dynamite State object.
 
     keep : array-like
-        A list of spin indices to keep. See :meth:`reduced_density_matrix` for
+        A list of spin indices to keep. See :meth:`dynamite.computations.reduced_density_matrix` for
         details.
 
     Returns

@@ -4,7 +4,6 @@ from sys import stderr
 from dynamite import config
 from dynamite.operators import sigmax, sigmay, sigmaz, index_sum
 from dynamite.subspaces import SpinConserve
-from dynamite.computations import entanglement_entropy
 from dynamite.tools import mpi_print, MPI_COMM_WORLD
 
 import numpy as np
@@ -87,7 +86,7 @@ def print_eig_stats(evals, evecs, h, energy_point):
     # sum the entropy for all evecs then divide by nev for the mean
     # NOTE: entanglement_entropy returns the EE value only on MPI rank 0, and -1 on all other ranks.
     #       this is OK here because mpi_print below only prints on rank 0
-    entropy = sum(entanglement_entropy(v, keep=range(config.L//2)) for v in evecs)
+    entropy = sum(v.entanglement_entropy(keep=range(config.L//2)) for v in evecs)
     entropy /= len(evecs)
 
     # compute the adjacent gap ratio of the eigenvals
