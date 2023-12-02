@@ -20,11 +20,16 @@ class Tools(dtr.DynamiteTestCase):
         self.assertTrue(isinstance(tools.get_version_str(), str))
 
     def test_cur_memory(self):
-        self.assertTrue(isinstance(tools.get_cur_memory_usage(), float))
+        self.assertTrue(isinstance(tools.get_memory_usage(group_by='all'), float))
+        self.assertTrue(isinstance(tools.get_memory_usage(group_by='rank'), float))
+        self.assertTrue(isinstance(tools.get_memory_usage(group_by='node'), float))
 
     def test_max_memory(self):
         tools.track_memory()
-        self.assertTrue(isinstance(tools.get_max_memory_usage(), float))
+        self.assertTrue(isinstance(tools.get_memory_usage(group_by='all', max_usage=True), float))
+        self.assertTrue(isinstance(tools.get_memory_usage(group_by='rank', max_usage=True), float))
+        self.assertTrue(isinstance(tools.get_memory_usage(group_by='node', max_usage=True), float))
+
 
 if __name__ == '__main__':
     dtr.main()

@@ -11,7 +11,7 @@ from dynamite.operators import sigmax, sigmay, sigmaz
 from dynamite.operators import op_sum, op_product, index_sum
 from dynamite.extras import majorana
 from dynamite.subspaces import Full, Parity, SpinConserve, Auto, XParity
-from dynamite.tools import track_memory, get_max_memory_usage, MPI_COMM_WORLD, mpi_print
+from dynamite.tools import track_memory, get_memory_usage, mpi_print
 from dynamite.computations import reduced_density_matrix
 
 
@@ -299,20 +299,13 @@ def main():
         log_call(do_check_conserves, stats)(H)
 
     # trigger memory measurement
-    # TODO: is this still required?
     if H is not None:
         H.destroy_mat()
     elif in_state is not None:
         in_state.vec.destroy()
 
     # sum the memory usage from all ranks
-    local_mem = get_max_memory_usage()
-    if MPI_COMM_WORLD().size == 1:
-        stats['Gb_memory'] = local_mem
-    else:
-        comm = MPI_COMM_WORLD().tompi4py()
-        stats['Gb_memory'] = comm.allreduce(local_mem)
-
+    stats['Gb_memory'] = get_memory_usage(group_by='all', max_usage=True)
     stats['total_time'] = default_timer() - main_start
 
     mpi_print('---RESULTS---')

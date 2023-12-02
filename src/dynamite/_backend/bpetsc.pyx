@@ -201,21 +201,13 @@ def track_memory():
     if ierr != 0:
         raise Error(ierr)
 
-def get_max_memory_usage(which='all'):
+def get_max_memory_usage():
     '''
     Get the maximum memory usage up to this point. Only updated whenever
     objects are destroyed (i.e. with :meth:`dynamite.operators.Operator.destroy_mat`)
 
     ..note ::
-        :meth:`track_memory` must be called before this function is called,
-        and the option `'-malloc'` must be supplied to PETSc at runtime to track
-        PETSc memory allocations
-
-    Parameters
-    ----------
-    which : str
-        `'all'` to return all memory usage for the process, `'petsc'` to return
-        only memory allocated by PETSc.
+        :meth:`track_memory` must be called before this function is called
 
     Returns
     -------
@@ -225,26 +217,15 @@ def get_max_memory_usage(which='all'):
     cdef int ierr
     cdef PetscLogDouble mem
 
-    if which == 'all':
-        ierr = PetscMemoryGetMaximumUsage(&mem)
-    elif which == 'petsc':
-        ierr = PetscMallocGetMaximumUsage(&mem)
-    else:
-        raise ValueError("argument 'which' must be 'all' or 'petsc'")
+    ierr = PetscMemoryGetMaximumUsage(&mem)
 
     if ierr != 0:
         raise Error(ierr)
     return mem
 
-def get_cur_memory_usage(which='all'):
+def get_cur_memory_usage():
     '''
     Get the current memory usage (resident set size) in bytes.
-
-    Parameters
-    ----------
-    type : str
-        'all' to return all memory usage for the process, 'petsc' to return
-        only memory allocated by PETSc.
 
     Returns
     -------
@@ -254,12 +235,7 @@ def get_cur_memory_usage(which='all'):
     cdef int ierr
     cdef PetscLogDouble mem
 
-    if which == 'all':
-        ierr = PetscMemoryGetCurrentUsage(&mem)
-    elif which == 'petsc':
-        ierr = PetscMallocGetCurrentUsage(&mem)
-    else:
-        raise ValueError("argument 'which' must be 'all' or 'petsc'")
+    ierr = PetscMemoryGetCurrentUsage(&mem)
 
     if ierr != 0:
         raise Error(ierr)

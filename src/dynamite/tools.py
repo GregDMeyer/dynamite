@@ -2,6 +2,8 @@
 Various tools useful for writing and analyzing dynamite programs.
 '''
 
+import warnings
+
 
 def MPI_COMM_WORLD():
     '''
@@ -83,7 +85,7 @@ def get_version_str():
 
 def track_memory():
     '''
-    Begin tracking memory usage for a later call to :meth:`get_max_memory_usage`.
+    Begin tracking memory usage for a later call to ``get_memory_usage(..., max_usage=True)``.
     '''
     from . import config
     config._initialize()
@@ -91,53 +93,95 @@ def track_memory():
     return bpetsc.track_memory()
 
 
-def get_max_memory_usage(which='all'):
+def get_memory_usage(group_by='all', max_usage=False):
     '''
-    Get the maximum memory usage up to this point, in gigabytes.
-    Only updated whenever objects are destroyed (e.g. with
-    :meth:`dynamite.operators.Operator.destroy_mat`)
+    Get the memory usage, in gigabytes.
 
     .. note::
-        :meth:`track_memory` must be called before this function is called,
-        and the option ``'-malloc'`` must be supplied to PETSc at runtime if
-        ``which == 'petsc'``.
+        :meth:`track_memory` must be called before this function is called
+        with ``max_usage=True``.
+
+    .. note::
+        Grouping by node only works if MPI is configured to allow shared memory between ranks on
+        the same node. If it is not, it may consider each rank its own "node." Whether this is the
+        case can be seen by observing whether the value returned by this function is identical for
+        all ranks on the same node, or if it is instead the same as the value returned for
+        ``group_by='rank'``.
 
     Parameters
     ----------
-    which : str
-        ``'all'`` to return all memory usage for the process, ``'petsc'`` to return
-        only memory allocated by PETSc.
+    group_by : str
+        What ranks to sum memory usage over. Options are "rank", which will return each rank's
+        individual memory usage (which may be different across ranks); "node", which will sum
+        over ranks sharing the same memory (and thus again the result may differ between
+        ranks); and "all", which returns the total memory usage of all ranks.
+
+    max_usage : bool
+        Instead of current memory usage, report maximum since the call to :meth:`track_memory()`.
+        Note that maximum is only updated when PETSc objects are destroyed, which may be delayed
+        due to garbage collection.
 
     Returns
     -------
     float
-        The max memory usage in gigabytes
+        The memory usage in gigabytes
     '''
     from . import config
     config._initialize()
     from ._backend import bpetsc
-    return bpetsc.get_max_memory_usage(which=which)/1E9
+
+    if max_usage:
+        local_usage = bpetsc.get_max_memory_usage()/1E9
+    else:
+        local_usage = bpetsc.get_cur_memory_usage()/1E9
+
+    comm = MPI_COMM_WORLD()
+    if group_by == 'rank' or comm.size == 1:
+        return local_usage
+
+    import mpi4py
+    comm = comm.tompi4py()
+
+    if group_by == 'node':
+        split_comm = comm.Split_type(mpi4py.MPI.COMM_TYPE_SHARED)
+    elif group_by == 'all':
+        split_comm = comm
+    else:
+        raise ValueError(f"group_by must be 'rank', 'node', or 'all'; got '{group_by}'")
+
+    return split_comm.allreduce(local_usage)
+
+
+def get_max_memory_usage(which='all'):
+    '''
+    [deprecated]
+    '''
+    if which != 'all':
+        raise ValueError('values of "which" other than "all" no longer supported')
+
+    warnings.warn(
+        "get_max_memory_usage() is deprecated; use get_memory_usage(max_usage=True) instead",
+        DeprecationWarning,
+        stacklevel=2
+    )
+
+    return get_memory_usage(group_by='rank', max_usage=True)
 
 
 def get_cur_memory_usage(which='all'):
     '''
-    Get the current memory usage (resident set size) in gigabytes.
-
-    Parameters
-    ----------
-    type : str
-        ``'all'`` to return all memory usage for the process, ``'petsc'`` to return
-        only memory allocated by PETSc.
-
-    Returns
-    -------
-    float
-        The max memory usage in gigabytes
+    [deprecated]
     '''
-    from . import config
-    config._initialize()
-    from ._backend import bpetsc
-    return bpetsc.get_cur_memory_usage(which=which)/1E9
+    if which != 'all':
+        raise ValueError('values of "which" other than "all" no longer supported')
+
+    warnings.warn(
+        "get_cur_memory_usage() is deprecated; use get_memory_usage() instead",
+        DeprecationWarning,
+        stacklevel=2
+    )
+
+    return get_memory_usage(group_by='rank')
 
 
 def complex_enabled():

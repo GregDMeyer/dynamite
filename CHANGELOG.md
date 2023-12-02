@@ -9,9 +9,11 @@
  - `dynamite.tools.MPI_COMM_WORLD()` which returns PETSc's MPI communicator object
  - `Operator.precompute_diagonal` flag allows user to tune whether the matrix diagonal should be precomputed and saved, for shell matrices
  - `State.entanglement_entropy` member function (a more convenient way of using `computations.entanglement_entropy`, which also remains)
+ - `tools.get_memory_usage` which can measure memory usage on a total, per rank, or per node basis
 
 ### Removed
  - `--track_memory` flag to `benchmark.py`---now memory usage is always reported by the benchmarking script
+ - `tools.get_max_memory_usage` and `tools.get_cur_memory_usage` in favor of a single function `tools.get_memory_usage`
 
 ### Changed
  - `Operator.msc_size` renamed to `Operator.nterms`, and now invokes a call to `Operator.reduce_msc()`
