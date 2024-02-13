@@ -132,14 +132,10 @@ def msc_sum(iterable):
     np.ndarray
         The sum as an MSC matrix
     '''
-    iterable = iter(iterable)
-    # if iterable has zero items, return zero
-    try:
-        first = next(iterable)
-    except StopIteration:
-        return np.ndarray(0, dtype = msc_dtype)
-
-    return np.hstack([first]+list(iterable))
+    term_lst = list(iterable)
+    if not term_lst:
+        return np.ndarray(0, dtype=msc_dtype)
+    return np.hstack(term_lst)
 
 def msc_product(iterable):
     '''

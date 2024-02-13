@@ -38,7 +38,7 @@ def _assert_int_like(x):
         if int(x) != x or x < 0:
             raise ValueError()
     except:
-        msg = f'Value must be a nonnegative integer (got "{x}")'
+        msg = f'Value must be a nonnegative integer (got "{repr(x)}")'
         raise ValueError(msg) from None
 
 

@@ -964,5 +964,78 @@ class FromBytes(ut.TestCase):
             op = Operator.from_bytes(t['serial'])
             self.assertTrue(np.array_equal(op.msc, t['MSC']))
 
+
+class Repr(ut.TestCase):
+    '''
+    Test that the representation printed in the interactive shell is accurate.
+    Ideally it matches the input, in cases where that is possible.
+    '''
+
+    def test_paulis(self):
+        test_cases = [
+            'sigmax(0)',
+            'sigmay(0)',
+            'sigmaz(0)',
+            'sigma_plus(0)',
+            'sigma_minus(0)',
+            'sigmax(2)',
+            'sigmay(2)',
+            'sigmaz(2)',
+            'sigma_plus(2)',
+            'sigma_minus(2)',
+            'identity()',
+            'zero()'
+        ]
+        for case in test_cases:
+            self.assertEqual(case, repr(eval(case)))
+
+    def test_sums(self):
+        test_cases = [
+            'sigmax(0) + sigmax(1)',
+            'sigmay(0) + sigmax(0)',
+            'sigmaz(1) + sigmax(2)',
+            'sigma_plus(0) + sigma_minus(0)',
+            'index_sum(sigmax(0), size=10)',
+            'index_sum(sigmax(0), size=10, boundary="closed")',
+            'index_sum(sigmax(0), size=10, start=1)',
+        ]
+        for case in test_cases:
+            self.assertEqual(case, repr(eval(case)))
+
+    def test_products(self):
+        test_cases = [
+            'sigmax(0)*sigmax(1)',
+            'sigmay(0)*sigmax(0)',
+            'sigmaz(1)*sigmax(2)',
+            'sigma_plus(0)*sigma_minus(0)',
+            'index_product(sigmax(0), size=10)',
+            'index_product(sigmax(0), size=10, start=1)',
+        ]
+        for case in test_cases:
+            self.assertEqual(case, repr(eval(case)))
+
+    def test_op_sum_product(self):
+        test_cases = [
+            (op_sum(sigmax(i) for i in range(4)),
+             'sigmax(0) + sigmax(1) + sigmax(2) + sigmax(3)'),
+            (op_sum((sigmax(i) for i in range(4)), nshow=1),
+             'sigmax(0) + sigmax(1) + sigmax(2) + sigmax(3)'),
+            (op_product(sigmax(i) for i in range(4)),
+             'sigmax(0)*sigmax(1)*sigmax(2)*sigmax(3)'),
+            (op_product(sigmax(i)+sigmay(i) for i in range(4)),
+             '(sigmax(0) + sigmay(0))*(sigmax(1) + sigmay(1))*(sigmax(2) + sigmay(2))*(sigmax(3) + sigmay(3))')
+        ]
+        for op, result in test_cases:
+            self.assertEqual(repr(op), result)
+
+    def test_misc(self):
+        test_cases = [
+            'sigmaz(0)*(sigmax(0) + sigmay(1))',
+            'index_sum(sigmax(0) + sigmax(1), size=10)'
+        ]
+        for case in test_cases:
+            self.assertEqual(case, repr(eval(case)))
+
+
 if __name__ == '__main__':
     ut.main()
