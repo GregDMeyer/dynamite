@@ -107,9 +107,8 @@ class _Config:
             '-options_left', '0'
         ]
 
-        # prevent PETSc from being sad if we don't use gpu aware mpi
         if not self.initialized and bbuild.have_gpu_shell():
-            slepc_args += ['-use_gpu_aware_mpi', '1'] # we only use one process anyway
+            slepc_args += ['-use_gpu_aware_mpi', '1']
 
         if bbuild.petsc_initialized():
             raise RuntimeError('PETSc has been initialized but dynamite has not. '
@@ -196,6 +195,11 @@ class _Config:
         Whether to run the computations on a GPU. This property is read-only. To use
         GPUs, :meth:`initialize()` must be called with ``gpu=True`` (default when
         built with GPU support).
+
+        .. note::
+
+        dynamite can be run with multiple GPUs! This is an experimental feature: for 
+        best performance, running with multiple GPUs requires CUDA-aware MPI and NVLink.
         """
         return self._gpu
 
