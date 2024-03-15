@@ -72,6 +72,13 @@ from dynamite.operators import sigmax, sigmay, sigmaz, sigma_plus, sigma_minus
 class Fundamental(dtr.DynamiteTestCase):
 
     def setUp(self):
+        config._initialize()
+        from petsc4py import PETSc
+        self.mpi_size = PETSc.COMM_WORLD.size
+        
+        if self.mpi_size > 2:
+            self.skipTest(f'number of ranks exceeds Hilbert space dimension')
+
         self.old_L = config.L
         config._L = None
 
