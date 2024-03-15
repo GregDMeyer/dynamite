@@ -109,7 +109,7 @@ class _Config:
 
         # prevent PETSc from being sad if we don't use gpu aware mpi
         if not self.initialized and bbuild.have_gpu_shell():
-            slepc_args += ['-use_gpu_aware_mpi', '0'] # we only use one process anyway
+            slepc_args += ['-use_gpu_aware_mpi', '1'] # we only use one process anyway
 
         if bbuild.petsc_initialized():
             raise RuntimeError('PETSc has been initialized but dynamite has not. '
