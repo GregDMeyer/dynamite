@@ -1128,12 +1128,11 @@ class Operator:
         except (ValueError, TypeError):
             raise TypeError(f'Cannot scale operator by type {type(x)}')
 
-        # coefficient up to 3 digits of precision, with trailing zeros removed
-        coeff_str = f'{x:.3f}'.rstrip('0').rstrip('.')
+        coeff_str = msc_tools._get_coeff_str(x, parens=True)
 
-        self._string_rep.string = coeff_str + self._string_rep.with_brackets('string')
+        self._string_rep.string = f'{coeff_str}*{self._string_rep.with_brackets("string")}'
         self._string_rep.tex = coeff_str + self._string_rep.with_brackets('tex')
-        self._string_rep.repr_str = str(x) + '*' + self._string_rep.with_brackets('repr')
+        self._string_rep.repr_str = f'{coeff_str}*{self._string_rep.with_brackets("repr")}'
         self._string_rep.brackets = ''
 
     def _num_mul(self, x):
@@ -1321,7 +1320,7 @@ def index_sum(op, size=None, start=0, boundary='open'):
 
     string_rep = _OperatorStringRep()
 
-    string_rep.string = 'index_sum(' + str(op) + ', sites %d - %d' % (start, stop-1)
+    string_rep.string = f'index_sum({op}, sites {start}-{stop-1}'
     string_rep.repr_str = f'index_sum({repr(op)}'
     if not default_size:
         string_rep.repr_str += f', size={size}'
@@ -1386,7 +1385,7 @@ def index_product(op, size=None, start=0):
     stop = start + size - op.max_spin_idx
 
     string_rep = _OperatorStringRep(
-        string='index_product(' + str(op) + ', sites %d - %d)' % (start, stop-1)
+        string=f'index_product({op}, sites {start}-{stop-1})'
     )
 
     string_rep.repr_str = f'index_product({repr(op)}'

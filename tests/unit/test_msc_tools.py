@@ -716,42 +716,35 @@ class Table(ut.TestCase):
     def test_empty_L5(self):
         L = 5
         msc = []
-        correct = '   coeff. | operator \n' +\
-                  '=====================\n'
-        check = msc_tools.table(msc, L)
-        self.assertEqual(check, correct, msg = '\n' + '\n\n'.join([check, correct]))
-
-    def test_empty_L9(self):
-        L = 9
-        msc = []
-        correct = '   coeff. | operator \n' +\
-                  '======================\n'
-        check = msc_tools.table(msc, L)
-        self.assertEqual(check, correct, msg = '\n' + '\n\n'.join([check, correct]))
-
-    def test_empty_L10(self):
-        L = 10
-        msc = []
-        correct = '   coeff. |  operator  \n' +\
-                  '=======================\n'
+        correct = '  coeff. | operator \n' +\
+                  '====================\n'
         check = msc_tools.table(msc, L)
         self.assertEqual(check, correct, msg = '\n' + '\n\n'.join([check, correct]))
 
     def test_identity(self):
         L = 5
         msc = [(0, 0, 2.3)]
-        correct = '   coeff. | operator \n' +\
-                  '=====================\n' +\
-                  '    2.300 | -----'
+        correct = '  coeff. | operator \n' +\
+                  '====================\n' +\
+                  '   2.300 | -----'
+        check = msc_tools.table(msc, L)
+        self.assertEqual(check, correct, msg = '\n' + '\n\n'.join([check, correct]))
+
+    def test_identity_L10(self):
+        L = 10
+        msc = [(0, 0, 2.3)]
+        correct = '  coeff. |  operator  \n' +\
+                  '======================\n' +\
+                  '   2.300 | ----------'
         check = msc_tools.table(msc, L)
         self.assertEqual(check, correct, msg = '\n' + '\n\n'.join([check, correct]))
 
     def test_sigmax_0(self):
         L = 5
         msc = [(1, 0, 1)]
-        correct = '   coeff. | operator \n' +\
-                  '=====================\n' +\
-                  '    1.000 | X----'
+        correct = '  coeff. | operator \n' +\
+                  '====================\n' +\
+                  '   1.000 | X----'
         check = msc_tools.table(msc, L)
         self.assertEqual(check, correct, msg = '\n' + '\n\n'.join([check, correct]))
 
@@ -759,87 +752,87 @@ class Table(ut.TestCase):
         L = 5
         L = 5
         msc = [(0, 1, 1)]
-        correct = '   coeff. | operator \n' +\
-                  '=====================\n' +\
-                  '    1.000 | Z----'
+        correct = '  coeff. | operator \n' +\
+                  '====================\n' +\
+                  '   1.000 | Z----'
         check = msc_tools.table(msc, L)
         self.assertEqual(check, correct, msg = '\n' + '\n\n'.join([check, correct]))
 
     def test_sigmay_0(self):
         L = 5
         msc = [(1, 1, 1j)]
-        correct = '   coeff. | operator \n' +\
-                  '=====================\n' +\
-                  '    1.000 | Y----'
+        correct = '  coeff. | operator \n' +\
+                  '====================\n' +\
+                  '   1.000 | Y----'
         check = msc_tools.table(msc, L)
         self.assertEqual(check, correct, msg = '\n' + '\n\n'.join([check, correct]))
 
     def test_sigmay_2(self):
         L = 5
         msc = [(4, 4, 1j)]
-        correct = '   coeff. | operator \n' +\
-                  '=====================\n' +\
-                  '    1.000 | --Y--'
+        correct = '  coeff. | operator \n' +\
+                  '====================\n' +\
+                  '   1.000 | --Y--'
         check = msc_tools.table(msc, L)
         self.assertEqual(check, correct, msg = '\n' + '\n\n'.join([check, correct]))
 
     def test_sigmax_0_coeff(self):
         L = 5
         msc = [(1, 0, 3.141592)]
-        correct = '   coeff. | operator \n' +\
-                  '=====================\n' +\
-                  '    3.142 | X----'
+        correct = '  coeff. | operator \n' +\
+                  '====================\n' +\
+                  '   3.142 | X----'
         check = msc_tools.table(msc, L)
         self.assertEqual(check, correct, msg = '\n' + '\n\n'.join([check, correct]))
 
     def test_XX(self):
         L = 5
         msc = [(3, 0, 1)]
-        correct = '   coeff. | operator \n' +\
-                  '=====================\n' +\
-                  '    1.000 | XX---'
+        correct = '  coeff. | operator \n' +\
+                  '====================\n' +\
+                  '   1.000 | XX---'
         check = msc_tools.table(msc, L)
         self.assertEqual(check, correct, msg = '\n' + '\n\n'.join([check, correct]))
 
     def test_ZZ(self):
         L = 5
         msc = [(0, 3, 1)]
-        correct = '   coeff. | operator \n' +\
-                  '=====================\n' +\
-                  '    1.000 | ZZ---'
+        correct = '  coeff. | operator \n' +\
+                  '====================\n' +\
+                  '   1.000 | ZZ---'
         check = msc_tools.table(msc, L)
         self.assertEqual(check, correct, msg = '\n' + '\n\n'.join([check, correct]))
 
     def test_XYZ(self):
         L = 5
         msc = [(3, 6, 0.5j)]
-        correct = '   coeff. | operator \n' +\
-                  '=====================\n' +\
-                  '    0.500 | XYZ--'
+        correct = '  coeff. | operator \n' +\
+                  '====================\n' +\
+                  '   0.500 | XYZ--'
         check = msc_tools.table(msc, L)
         self.assertEqual(check, correct, msg = '\n' + '\n\n'.join([check, correct]))
 
     def test_three(self):
         L = 5
         msc = [(1, 0, 2.3), (3, 1, 2j), (3, 6, 0.5j)]
-        correct = '   coeff. | operator \n' +\
-                  '=====================\n' +\
-                  '    2.300 | X----\n' +\
-                  '    2.000 | YX---\n' +\
-                  '    0.500 | XYZ--'
+        correct = '  coeff. | operator \n' +\
+                  '====================\n' +\
+                  '   2.300 | X----\n' +\
+                  '   2.000 | YX---\n' +\
+                  '   0.500 | XYZ--'
         check = msc_tools.table(msc, L)
         self.assertEqual(check, correct, msg = '\n' + '\n\n'.join([check, correct]))
 
     def test_ZZ_wrap(self):
         L = 5
         msc = [(0, 3, 0.25), (0, 6, 0.25), (0, 12, 0.25), (0, 24, 0.25), (0, 17, 0.25),]
-        correct = '   coeff. | operator \n' +\
-                  '=====================\n' +\
-                  '    0.250 | ZZ---\n' +\
-                  '    0.250 | -ZZ--\n' +\
-                  '    0.250 | --ZZ-\n' +\
-                  '    0.250 | ---ZZ\n' +\
-                  '    0.250 | Z---Z'
+        correct = '  coeff. | operator \n' +\
+                  '====================\n' +\
+                  '   0.250 | ZZ---\n' +\
+                  '   0.250 | -ZZ--\n' +\
+                  '   0.250 | --ZZ-\n' +\
+                  '   0.250 | ---ZZ\n' +\
+                  '   0.250 | Z---Z'
 
         check = msc_tools.table(msc, L)
         self.assertEqual(check, correct, msg = '\n' + '\n\n'.join([check, correct]))
@@ -847,7 +840,7 @@ class Table(ut.TestCase):
     def test_large_coeff(self):
         L = 5
         msc = [(0, 1, 1E+9)]
-        correct = '   coeff. | operator \n' +\
+        correct = '  coeff.  | operator \n' +\
                   '=====================\n' +\
                   ' 1.00e+09 | Z----'
         check = msc_tools.table(msc, L)
@@ -856,11 +849,68 @@ class Table(ut.TestCase):
     def test_small_coeff(self):
         L = 5
         msc = [(0, 1, 1E-9)]
-        correct = '   coeff. | operator \n' +\
+        correct = '  coeff.  | operator \n' +\
                   '=====================\n' +\
                   ' 1.00e-09 | Z----'
         check = msc_tools.table(msc, L)
         self.assertEqual(check, correct, msg = '\n' + '\n\n'.join([check, correct]))
+
+    def test_long_coeff(self):
+        L = 5
+        msc = [(0, 1, 1.23456789)]
+        # we want it to round
+        correct = '  coeff. | operator \n' +\
+                  '====================\n' +\
+                  '   1.235 | Z----'
+        check = msc_tools.table(msc, L)
+        self.assertEqual(check, correct, msg = '\n' + '\n\n'.join([check, correct]))
+
+    def test_zero_coeff(self):
+        L = 5
+        msc = [(0, 1, 0)]
+        # we want it to round
+        correct = '  coeff. | operator \n' +\
+                  '====================\n' +\
+                  '   0.000 | Z----'
+        check = msc_tools.table(msc, L)
+        self.assertEqual(check, correct, msg = '\n' + '\n\n'.join([check, correct]))
+
+    def test_imag_int(self):
+        L = 5
+        msc = [(0, 1, 1j)]
+        correct = '  coeff. | operator \n' +\
+                  '====================\n' +\
+                  '  1.000j | Z----'
+        check = msc_tools.table(msc, L)
+        self.assertEqual(check, correct, msg = '\n' + '\n\n'.join([check, correct]))
+
+    def test_mixed_int(self):
+        L = 5
+        msc = [(0, 1, 1+1j)]
+        correct = '   coeff.   | operator \n' +\
+                  '=======================\n' +\
+                  ' 1.00+1.00j | Z----'
+        check = msc_tools.table(msc, L)
+        self.assertEqual(check, correct, msg = '\n' + '\n\n'.join([check, correct]))
+
+    def test_imag_float(self):
+        L = 5
+        msc = [(0, 1, 1.2501j)]
+        correct = '  coeff. | operator \n' +\
+                  '====================\n' +\
+                  '  1.250j | Z----'
+        check = msc_tools.table(msc, L)
+        self.assertEqual(check, correct, msg = '\n' + '\n\n'.join([check, correct]))
+
+    def test_mixed_float(self):
+        L = 5
+        msc = [(0, 1, 1.231+1.341j)]
+        correct = '   coeff.   | operator \n' +\
+                  '=======================\n' +\
+                  ' 1.23+1.34j | Z----'
+        check = msc_tools.table(msc, L)
+        self.assertEqual(check, correct, msg = '\n' + '\n\n'.join([check, correct]))
+
 
 if __name__ == '__main__':
     ut.main()
