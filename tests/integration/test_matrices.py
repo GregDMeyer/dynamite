@@ -75,7 +75,7 @@ class Fundamental(dtr.DynamiteTestCase):
         config._initialize()
         from petsc4py import PETSc
         self.mpi_size = PETSc.COMM_WORLD.size
-        
+
         if self.mpi_size > 2:
             self.skipTest(f'number of ranks exceeds Hilbert space dimension')
 
