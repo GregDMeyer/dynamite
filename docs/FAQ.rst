@@ -43,8 +43,8 @@ Here are a few ideas to explore for why your computation might be slow or not sc
 
 .. _shell:
 
-**My computation is using too much memory.**
---------------------------------------------
+My computation is using too much memory.
+----------------------------------------
 
 Even in the sparse form that dynamite uses by default, storing an operator's matrix can use large amounts of memory. To alleviate this problem, dynamite can be run with so-called "matrix-free" matrices (known in dynamite and PETSc as "shell" matrices). When this is enabled, matrix elements are computed on the fly instead of being stored explicitly, saving significantly on memory usage and sometimes even speeding things up. When using shell matrices, the memory usage is reduced essentially to the vectors used in the computations.
 
@@ -52,8 +52,8 @@ Shell matrices can be enabled globally by setting ``dynamite.config.shell = True
 
 .. _integer:
 
-**I got an error message about an integer overflow even though I'm running with fewer than 32 spins.**
-------------------------------------------------------------------------------------------------------
+I got an error message about an integer overflow even though I'm running with fewer than 32 spins.
+--------------------------------------------------------------------------------------------------
 
 Even if the state vector length is shorter than :math:`2^{32}`, PETSc may allocate a block of many vectors at once, and the total length of this allocated block is greater than the maximum 32-bit integer. Before switching to 64-bit integers, try passing the ``-bv_type vecs`` flag to SLEPc by putting the following at the beginning of your script:
 
@@ -66,8 +66,8 @@ That way each vector will be allocated individually.
 
 .. _L:
 
-**I am tired of setting the spin chain length L everywhere.**
--------------------------------------------------------------
+I am tired of setting the spin chain length L everywhere.
+---------------------------------------------------------
 
 There is an easy way to globally set a
 default value for ``L``. Before you start building any operators:
@@ -82,15 +82,15 @@ for details.
 
 .. _nondeterm:
 
-**My code is having mysterious problems/giving wrong answers when I run with more than 1 MPI rank.**
--------------------------------------------------------------------------------------------------------
+My code is having mysterious problems/giving wrong answers when I run with more than 1 MPI rank.
+------------------------------------------------------------------------------------------------
 
 There are a number of reasons this could happen, but here is a likely culprit. Each MPI rank runs as an independent Python process, so non-deterministic code can behave differently across the ranks. For example, if you are iterating through an unordered data type like a Python dictionary or set, different ranks may iterate through the values in a different order! As another example, making calls to e.g. ``numpy.random.rand()`` will give different values on each process. If you use this when building your Hamiltonian, you will not have a consistent operator across your different processes! If you need random numbers, make sure to seed them with the same value everywhere.
 
 .. _petsc:
 
-**I want to get under the hood and fiddle with PETSc and SLEPc.**
------------------------------------------------------------------
+I want to get under the hood and fiddle with PETSc and SLEPc.
+-------------------------------------------------------------
 
 The underlying ``petsc4py`` matrix for any operator is accessible with
 :meth:`dynamite.operators.Operator.get_mat`. For states, the ``petsc4py`` vector
