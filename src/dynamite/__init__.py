@@ -107,8 +107,16 @@ class _Config:
             '-options_left', '0'
         ]
 
-        if not self.initialized and bbuild.have_gpu_shell():
-            slepc_args += ['-use_gpu_aware_mpi', '1']
+        # use mpi4py as a slightly crude check for whether we need GPU-aware MPI
+        try:
+            import mpi4py
+        except ImportError:
+            mpi4py = None
+
+        if mpi4py is None and bbuild.have_gpu_shell():
+            # disables annoying error message in the case where we don't have
+            # GPU-aware MPI, but we are only running with one rank so we don't care
+            slepc_args += ['-use_gpu_aware_mpi', '0']
 
         if bbuild.petsc_initialized():
             raise RuntimeError('PETSc has been initialized but dynamite has not. '
@@ -122,10 +130,14 @@ class _Config:
 
         from petsc4py import PETSc
 
-        # disable extra thread-level parallelism that can interfere with MPI
-        # parallelism
         if PETSc.COMM_WORLD.size != 1:
+            # disable extra thread-level parallelism that can interfere with MPI
+            # parallelism
             threadpool_limits(limits=1)
+
+            if mpi4py is None:
+                raise ImportError('could not import mpi4py, which is required when running with '
+                                  'multiple ranks')
 
         if version_check and PETSc.COMM_WORLD.rank == 0:
             check_version()
