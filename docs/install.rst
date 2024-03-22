@@ -4,11 +4,10 @@
 Installing from source
 **********************
 
-..
-   The easiest way to use ``dynamite`` is through the pre-built container images---see :ref:`containers`.
-   If for some reason you can't use the containers, or if you want a site-specific build (for example to optimize message passing performance between nodes on a cluster), you can build from source.
+.. note::
 
-The following instructions allow one to build ``dynamite`` manually from source. Experimental support has also been added to use dynamite from a pre-built Docker container; see :ref:`containers` for instructions.
+   The easiest way to use ``dynamite`` is through the pre-built container images---see :ref:`containers`.
+   If for some reason you can't or do not want to use the containers, or if you want a site-specific build (for example to optimize message passing performance between nodes on a cluster), you can build from source using the following instructions.
 
 Building from source
 ====================

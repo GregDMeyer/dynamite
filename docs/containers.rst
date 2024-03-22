@@ -7,9 +7,6 @@ Running dynamite from a container
 These instructions describe how to run ``dynamite`` from a pre-built container image.
 If you wish to instead install ``dynamite`` directly, see :ref:`installing`.
 
-.. note::
-   Running from containers is currently experimental. Please let us know if you run into any issues or have any suggestions!
-
 On a personal computer, it's easiest to run the container using `podman <https://podman.io/>`_ or `Docker <https://www.docker.com/>`_.
 On a shared computer cluster, one can use `Singularity <https://singularity.hpcng.org/>`_, which should come pre-installed in most HPC settings (see your cluster's documentation).
 
@@ -141,8 +138,10 @@ It may take some tweaking for your specific compute cluster, but the basic steps
 
  1. Login, and allocate a compute node for yourself on the cluster (e.g. with ``salloc`` in SLURM).
  2. In a separate terminal, tunnel port 8887 to your local machine through ssh:
+
     - Run ``ssh -NL 8887:<hostname of compute node from step 1>:8887 <username>@<cluster login url>``
     - The above command should not generate any output
+
  3. On the compute node from Step 1, run ``singularity run docker://gdmeyer/dynamite:latest-jupyter``
  4. Follow the last link in the output (the one with ``127.0.0.1``)
 

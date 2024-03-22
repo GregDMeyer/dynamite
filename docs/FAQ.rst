@@ -134,7 +134,7 @@ directly between GPUs via e.g. NVLink.
 
 If you are running with multiple GPUs, the way to avoid this error is to ensure your MPI implementation
 is GPU-aware---your performance will be quite bad otherwise. If you are compiling OpenMPI yourself, use
-the ``--with-cuda`` flag to ``./configure``; if you are using a compute cluster's build of MPI, talk to
+the ``--with-cuda`` flag to OpenMPI's ``./configure``; if you are using a compute cluster's build of MPI, talk to
 your system administrator.
 
 If you are running with a single GPU, MPI is simply not needed. In that case you can avoid the warning by
