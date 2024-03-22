@@ -195,11 +195,6 @@ class _Config:
         Whether to run the computations on a GPU. This property is read-only. To use
         GPUs, :meth:`initialize()` must be called with ``gpu=True`` (default when
         built with GPU support).
-
-        .. note::
-
-        dynamite can be run with multiple GPUs! This is an experimental feature: for 
-        best performance, running with multiple GPUs requires CUDA-aware MPI and NVLink.
         """
         return self._gpu
 
