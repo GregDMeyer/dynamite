@@ -10,6 +10,7 @@
  - `Operator.precompute_diagonal` flag allows user to tune whether the matrix diagonal should be precomputed and saved, for shell matrices
  - `State.entanglement_entropy` member function (a more convenient way of using `computations.entanglement_entropy`, which also remains)
  - `tools.get_memory_usage` which can measure memory usage on a total, per rank, or per node basis
+ - Multi-GPU parallelism via GPU-aware MPI
 
 ### Removed
  - `--track_memory` flag to `benchmark.py`---now memory usage is always reported by the benchmarking script
