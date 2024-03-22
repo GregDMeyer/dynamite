@@ -45,6 +45,7 @@ A quick explanation of the options:
    If you want to run with multiple processes using MPI, you can simply add ``mpirun -n <np>``
    before ``python`` in the command above. Note that on a cluster, to achieve the best MPI performance
    you should instead build from source (see :ref:`installing`) and use the cluster's native MPI.
+   Building from source is also currently the only way to run on multiple GPUs.
    Also, with Docker you may get errors unless you add the flag ``--cap-add=SYS_PTRACE``.
 
 .. _desktop_script:
@@ -89,9 +90,9 @@ If you are on a node with an Nvidia GPU, running the CUDA-accelerated version of
     # or
     singularity shell --nv docker://gdmeyer/dynamite:latest-cuda  # to start a shell with dynamite installed
 
-The default version is compiled for GPUs with compute capability >= 7.0; there are images on DockerHub compiled
-with other compute capabilities (e.g. ``docker://gdmeyer/dynamite:latest-cuda.cc80`` for compute capability 8.0).
-You can see a list of all available images `on DockerHub <https://hub.docker.com/repository/docker/gdmeyer/dynamite/tags>`_.
+Although dynamite supports multi-GPU computations via CUDA-aware MPI, ensuring compatability between MPI inside and outside the docker
+images is very difficult; therefore, the GPU docker images currently only support computations on a single GPU. To run multi-GPU computations,
+please build from source (see :ref:`installing`).
 
 .. note ::
    dynamite with CUDA requires Nvidia driver >= 450.80.02

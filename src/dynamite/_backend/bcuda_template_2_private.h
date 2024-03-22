@@ -15,7 +15,8 @@ PetscErrorCode C(MatDestroyCtx_GPU,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A);
 PetscErrorCode C(MatMult_GPU,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, Vec x, Vec b);
 
 __global__ void C(device_MatMult,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
-  PetscInt size,
+  PetscInt row_start,
+  PetscInt row_end,
   PetscInt* masks,
   PetscInt* mask_offsets,
   PetscInt* signs,

@@ -7,9 +7,7 @@ dynamite: fast numerics for quantum spin chains
 ===============================================
 
 Welcome to **dynamite**, which provides a simple interface
-to fast evolution of quantum dynamics and eigensolving. Behind the
-scenes, dynamite uses the PETSc/SLEPc implementations of Krylov subspace
-exponentiation and eigensolving.
+to fast parallel evolution of quantum dynamics and eigensolving via Krylov subspace methods.
 
 Quick start
 -----------
