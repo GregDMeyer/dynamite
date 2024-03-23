@@ -257,7 +257,7 @@ def check_version():
     url = 'https://raw.githubusercontent.com/GregDMeyer/dynamite/master/VERSION'
     try:
         with request.urlopen(url, timeout=1) as url_req:
-            release_version = url_req.read().strip()
+            release_version = url_req.read().strip().decode('UTF-8')
     except:
         return
 
