@@ -48,11 +48,11 @@ class EvolveChecker(dtr.DynamiteTestCase):
             self.assertLess(np.abs(1 - bra.norm()), 1E-9)
 
         bra_check = bra.to_numpy()
+        norm = bra.norm()
 
         if ket_np is not None:
             bra_np = linalg.expm_multiply(-1j*t*H_np, ket_np)
             inner_prod = bra_check.dot(bra_np.conj())
-            norm = bra.norm()
             self.assertLess(np.abs(1 - (inner_prod/(norm**2))), 1E-9,
                             msg=f'inner prod:{inner_prod}; norm^2:{norm**2}')
 
