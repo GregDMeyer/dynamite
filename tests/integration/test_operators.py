@@ -190,6 +190,12 @@ class SubspaceConservation(dtr.DynamiteTestCase):
 
 class SaveLoad(dtr.DynamiteTestCase):
 
+    def setUp(self):
+        self.old_L = config.L
+
+    def tearDown(self):
+        config.L = self.old_L
+
     def test_save_load(self):
         for H_name in hamiltonians.get_names(complex_enabled()):
             if 'slow' in self.skip_flags and H_name == 'syk':
@@ -208,6 +214,7 @@ class SaveLoad(dtr.DynamiteTestCase):
 
         have_int64 = msc_dtype['masks'].itemsize == 8
         if have_int64:
+            config._L = None
             self.assertEqual(
                 Operator.from_bytes(test_string),
                 sigmax(33)
