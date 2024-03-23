@@ -62,10 +62,10 @@ def write_build_headers():
         'src/dynamite/_backend/config.pxi'
     )
     with open(header_path, 'w') as f:
-        f.write('DEF USE_CUDA = %d\n' % int(check_cuda()))
-        f.write('DEF DNM_BRANCH = "%s"\n' % branch)
-        f.write('DEF DNM_COMMIT = "%s"\n' % commit)
-        f.write('DEF DNM_VERSION = "%s"\n' % version)
+        f.write('USE_CUDA = %d\n' % int(check_cuda()))
+        f.write('DNM_BRANCH = "%s"\n' % branch)
+        f.write('DNM_COMMIT = "%s"\n' % commit)
+        f.write('DNM_VERSION = "%s"\n' % version)
 
 
 def extensions():

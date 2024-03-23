@@ -30,6 +30,7 @@ cdef extern from "bpetsc_impl.h":
     ctypedef bint PetscBool
 
     int DNM_PETSC_COMPLEX
+    int DNM_PETSC_CUDA
 
     ctypedef enum shell_impl:
         NO_SHELL
@@ -117,7 +118,7 @@ def build_mat(PetscInt [:] masks,
     bsubspace.set_data_pointer(subspaces.right_type, right_subspace['data'], &(subspaces.right_data))
 
     if gpu:
-        IF not USE_CUDA:
+        if not DNM_PETSC_CUDA:
             raise RuntimeError("dynamite was not built with CUDA shell "
                                "functionality (requires nvcc during build).")
 
