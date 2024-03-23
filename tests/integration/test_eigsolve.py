@@ -137,8 +137,8 @@ class Hamiltonians(Checker):
                     self.check_all(H, evals, evecs, tol=1E-12, evec_tol=1E-11)
 
     def test_all_target(self):
-        if config.shell:
-            self.skipTest("solving for target not supported with shell matrices")
+        if config.shell or config.gpu:
+            self.skipTest("solving for target not supported with shell or GPU matrices")
 
         for H_name in hamiltonians.get_names(complex_enabled()):
             with self.subTest(H=H_name):
@@ -163,16 +163,20 @@ class ZeroDiagonal(Checker):
         self.check_all(H, evals, evecs, tol=1E-11, evec_tol=1E-9)
 
     def test_target(self):
-        if config.shell:
-            self.skipTest("solving for target not supported with shell matrices")
-
         # coefficients that aren't commensurate but also not random for
         # repeatability
         H = op_sum(np.sin(i)*sigmax(i) for i in range(config.L))
+
+        if config.shell or config.gpu:
+            with self.assertRaises(RuntimeError):
+                H.eigsolve(target=0)
+            return
+
         for target in [0.011, 0.999]:
             with self.subTest(target=target):
                 evals, evecs = H.eigsolve(nev=5, getvecs=True, tol=1E-12, target=target)
                 self.check_all(H, evals, evecs, tol=1E-11, evec_tol=1E-9)
+
 
 class Subspaces(Checker):
 

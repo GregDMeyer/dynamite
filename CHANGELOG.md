@@ -23,6 +23,7 @@
  - GPU builds now automatically switch to CPU if a GPU is not found (and print a warning)
  - Changed default bind mount location for Docker images to the container user's home directory, `/home/dnm`
  - Renamed some values of `which` argument of `eigsolve()`: `smallest`→`lowest` and `largest`→`highest`
+ - Shift-invert ("target") eigsolving on GPU disabled, as PETSc does not support it well
 
 ### Fixed
  - Explicit subspace sometimes failed conservation check even when operator was actually conserved

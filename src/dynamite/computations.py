@@ -212,7 +212,12 @@ def eigsolve(H, getvecs=False, nev=1, which='lowest', target=None, tol=None, sub
         which = 'target'
 
         if H.shell:
-            raise TypeError('Shift-invert ("target") not supported for shell matrices.')
+            raise RuntimeError('Shift-invert ("target") not supported for shell matrices.')
+
+        if config.gpu:
+            raise RuntimeError('GPU-accelerated shift-invert ("target") eigensolving is not '
+                               'currently well-supported by PETSc, and is thus currently '
+                               'unavailable in dynamite.')
 
         st = eps.getST()
         st.setType(SLEPc.ST.Type.SINVERT)
