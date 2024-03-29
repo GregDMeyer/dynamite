@@ -29,7 +29,7 @@ Below we give (non-exhaustive) lists of the computations and programming pattern
  - Eigensolving for ground states
  - The `SpinConserve` subspace
  - The `XParity` subspace
- - Computing correlation functions
+ - Computing correlation functions (TODO)
 
 ### SYK
 

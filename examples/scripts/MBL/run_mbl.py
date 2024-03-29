@@ -52,7 +52,7 @@ def main():
             min_eval = evals[0]
 
             # now the highest ones
-            evals, evecs = H.eigsolve(nev=args.nev, which='largest', getvecs=True)
+            evals, evecs = H.eigsolve(nev=args.nev, which='highest', getvecs=True)
             print_eig_stats(evals, evecs, h, energy_point=1)
             max_eval = evals[0]
 
@@ -140,7 +140,8 @@ def parse_args():
     parser = ArgumentParser()
 
     parser.add_argument('-L', type=int, required=True, help='spin chain length')
-    parser.add_argument('--seed', type=int,
+    # the weird type here allows passing integers in both decimal and hex
+    parser.add_argument('--seed', type=lambda x: int(x, 0),
                         help='seed for random number generator. if omitted, a random '
                              'seed is chosen by querying system hardware randomness')
     parser.add_argument('--iters', type=int, default=16,

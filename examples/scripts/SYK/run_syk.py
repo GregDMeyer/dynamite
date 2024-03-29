@@ -254,7 +254,8 @@ def parse_args():
     parser.add_argument('--state-iters', default=1, type=int,
                         help='number of random states per Hamiltonian')
 
-    parser.add_argument('-s', '--seed', type=int,
+    # the weird type here allows passing integers in both decimal and hex
+    parser.add_argument('-s', '--seed', type=lambda x: int(x, 0),
                         help='seed for random number generator. if omitted, a random '
                              'seed is chosen by querying system hardware randomness')
 

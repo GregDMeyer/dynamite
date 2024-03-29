@@ -9,12 +9,11 @@ from dynamite import config
 from dynamite.operators import sigmax, sigmay, sigmaz, index_sum, index_product, op_sum
 from dynamite.states import State
 from dynamite.computations import entanglement_entropy
-from dynamite.tools import mpi_print
+from dynamite.tools import mpi_print, MPI_COMM_WORLD
 
 
 # TODO: what if it is killed while checkpointing?
 # (seems unlikely but could happen...)
-# TODO: add shell flag
 
 
 def main():
@@ -27,6 +26,7 @@ def main():
     mpi_print(file=stderr)  # an extra newline
 
     config.L = args.L
+    config.shell = args.shell
 
     if args.checkpoint_every != 0:
         cycle_start, state = load_checkpoint(args.checkpoint_path)
@@ -63,13 +63,15 @@ def main():
         print_stats(state, cycle*args.T, tmp, Deff, Sz_ops)
 
         if args.checkpoint_every != 0 and cycle % args.checkpoint_every == 0:
-            # remove previous checkpoint
-            if cycle > args.checkpoint_every:
-                prev_cycle = cycle-args.checkpoint_every
-                to_remove = glob(join(args.checkpoint_path, f'floquet_cycle_{prev_cycle}*'))
-                for fname in to_remove:
-                    remove(fname)
             state.save(join(args.checkpoint_path, f'floquet_cycle_{cycle}'))
+
+            # remove previous checkpoint, now that we have the new one
+            if MPI_COMM_WORLD().rank == 0:
+                if cycle > args.checkpoint_every:
+                    prev_cycle = cycle-args.checkpoint_every
+                    to_remove = glob(join(args.checkpoint_path, f'floquet_cycle_{prev_cycle}*'))
+                    for fname in to_remove:
+                        remove(fname)
 
 
 def build_hamiltonian(alpha, Jz, Jx, h):
@@ -171,7 +173,7 @@ def parse_args():
     parser.add_argument('-T', type=float, default=0.12,
                         help='Floquet period')
 
-    parser.add_argument('--initial-state-dwalls', default=1,
+    parser.add_argument('--initial-state-dwalls', type=int, default=1,
                         help='Number of domain walls to include in initial product state')
 
     parser.add_argument('--n-cycles', type=int, default=int(1e4),
@@ -183,6 +185,8 @@ def parse_args():
     parser.add_argument('--checkpoint-every', default=0, type=int,
                         help='how frequently to save checkpoints, in number of cycles. '
                              'if this option is omitted, checkpoints will not be saved.')
+
+    parser.add_argument('--shell', action='store_true', help='use matrix-free computation')
 
     args = parser.parse_args()
 

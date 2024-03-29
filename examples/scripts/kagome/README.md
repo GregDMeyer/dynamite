@@ -6,7 +6,7 @@
  - Eigensolving for ground states
  - The `SpinConserve` subspace
  - The `XParity` subspace
- - Computing correlation functions
+ - Computing correlation functions (TODO)
 
 ## Overview
 
