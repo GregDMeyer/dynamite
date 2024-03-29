@@ -1,3 +1,5 @@
+# syntax=docker.io/docker/dockerfile:1.7-labs
+# ^ for --exclude flag to COPY. can remove if it gets mainlined
 
 ARG PLATFORM=cpu
 ARG BUILD_TYPE=opt  # 'opt' or 'debug'
@@ -134,7 +136,7 @@ RUN pip3 install --no-cache-dir $SLEPC_DIR/src/binding/slepc4py
 RUN mkdir /home/dnm/dynamite
 WORKDIR /home/dnm/dynamite
 
-COPY --chown=dnm:dnm . .
+COPY --chown=dnm:dnm --exclude=benchmarking/ --exclude=examples/ . .
 
 RUN pip3 install -v ./
 
