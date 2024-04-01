@@ -31,6 +31,7 @@
  - Work around broken `petsc4py` and `slepc4py` builds with `pip>=23.1` (see [PETSc issue](https://gitlab.com/petsc/petsc/-/issues/1369))
  - `Operator.__str__` and `Operator.table()` were formatted poorly for operators with complex coefficients
  - various issues in `dynamite.extras`
+ - Performance was bad on Ampere (e.g. A100) GPUs unless a particular SLEPc flag was set. The flag is now automatically set.
 
 ## 0.3.1 - 2023-03-07
 

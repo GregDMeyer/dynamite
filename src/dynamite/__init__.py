@@ -93,6 +93,20 @@ class _Config:
                                    'dynamite/petsc was not configured with '
                                    'GPU functionality')
 
+            # there is a bug (see here: https://gitlab.com/slepc/slepc/-/issues/72)
+            # that causes performance to be terrible on Ampere GPUs with BVMAT,
+            # when using complex numbers.
+            # therefore for GPUs with compute capability 8 or greater we use BVVECS,
+            # which is slightly less performant in other ways but doesn't have that bug.
+            if bbuild.complex_enabled():
+                gpu_compute_capabilities = subprocess.check_output(
+                    ['nvidia-smi', '--query-gpu=compute_cap', '--format=csv,noheader'],
+                    encoding='UTF-8'
+                )
+                max_cc = max(int(s.split('.')[0]) for s in gpu_compute_capabilities.strip().split('\n'))
+                if max_cc >= 8 and '-bv_type' not in slepc_args:
+                    slepc_args += ['-bv_type', 'vecs']
+
             slepc_args += [
                 '-vec_type', 'cuda',
                 '-mat_type', 'aijcusparse',
