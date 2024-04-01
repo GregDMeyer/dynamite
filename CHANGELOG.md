@@ -1,7 +1,7 @@
 
 # Changelog
 
-## 0.3.2 - IN PROGRESS
+## 0.4.0 - 2024-04-01
 
 ### Added
  - Detailed example scripts (in `examples/scripts`)
