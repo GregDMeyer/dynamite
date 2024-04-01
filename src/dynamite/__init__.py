@@ -1,5 +1,7 @@
 
 from os import environ
+from sys import stderr
+import subprocess
 import slepc4py
 from threadpoolctl import threadpool_limits
 from . import validate
@@ -59,13 +61,51 @@ class _Config:
             slepc_args = []
 
         if gpu is None:
-            gpu = bbuild.have_gpu_shell()
+            if bbuild.have_gpu_shell():
+                # check for a working GPU
+                try:
+                    gpu_check = subprocess.run(
+                        ['nvidia-smi'],
+                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+                    )
+                except FileNotFoundError:
+                    # nvidia-smi was not found
+                    gpu_check = False
+
+                gpu = gpu_check and gpu_check.returncode == 0
+                if not gpu:
+                    print(
+                        'WARNING: dynamite was built for GPU usage but failed to find either '
+                        'the nvidia-smi command or the GPU itself. Switching to CPU.\n'
+                        'To force dynamite to attempt to use GPU, use '
+                        'dynamite.config.initialize(gpu=True)\n'
+                        'To disable this warning, use '
+                        'dynamite.config.initialize(gpu=False)',
+                        file=stderr
+                    )
+
+            else:
+                gpu = False
 
         if gpu:
             if not bbuild.have_gpu_shell():
                 raise RuntimeError('Cannot initialize for GPU; this build of '
                                    'dynamite/petsc was not configured with '
                                    'GPU functionality')
+
+            # there is a bug (see here: https://gitlab.com/slepc/slepc/-/issues/72)
+            # that causes performance to be terrible on Ampere GPUs with BVMAT,
+            # when using complex numbers.
+            # therefore for GPUs with compute capability 8 or greater we use BVVECS,
+            # which is slightly less performant in other ways but doesn't have that bug.
+            if bbuild.complex_enabled():
+                gpu_compute_capabilities = subprocess.check_output(
+                    ['nvidia-smi', '--query-gpu=compute_cap', '--format=csv,noheader'],
+                    encoding='UTF-8'
+                )
+                max_cc = max(int(s.split('.')[0]) for s in gpu_compute_capabilities.strip().split('\n'))
+                if max_cc >= 8 and '-bv_type' not in slepc_args:
+                    slepc_args += ['-bv_type', 'vecs']
 
             slepc_args += [
                 '-vec_type', 'cuda',
@@ -81,9 +121,16 @@ class _Config:
             '-options_left', '0'
         ]
 
-        # prevent PETSc from being sad if we don't use gpu aware mpi
-        if not self.initialized and bbuild.have_gpu_shell():
-            slepc_args += ['-use_gpu_aware_mpi', '0'] # we only use one process anyway
+        # use mpi4py as a slightly crude check for whether we need GPU-aware MPI
+        try:
+            import mpi4py
+        except ImportError:
+            mpi4py = None
+
+        if mpi4py is None and bbuild.have_gpu_shell():
+            # disables annoying error message in the case where we don't have
+            # GPU-aware MPI, but we are only running with one rank so we don't care
+            slepc_args += ['-use_gpu_aware_mpi', '0']
 
         if bbuild.petsc_initialized():
             raise RuntimeError('PETSc has been initialized but dynamite has not. '
@@ -97,10 +144,14 @@ class _Config:
 
         from petsc4py import PETSc
 
-        # disable extra thread-level parallelism that can interfere with MPI
-        # parallelism
         if PETSc.COMM_WORLD.size != 1:
+            # disable extra thread-level parallelism that can interfere with MPI
+            # parallelism
             threadpool_limits(limits=1)
+
+            if mpi4py is None:
+                raise ImportError('could not import mpi4py, which is required when running with '
+                                  'multiple ranks')
 
         if version_check and PETSc.COMM_WORLD.rank == 0:
             check_version()
@@ -184,13 +235,13 @@ def check_version():
     from urllib import request
     import json
     from os import remove
-    from os.path import isfile
+    from os.path import isfile, expanduser
     from time import time
     from sys import stderr
 
     # only check once a day for a new version so that we don't DOS GitHub
     # we save a file with the time of the last check in it
-    filename = '.dynamite'
+    filename = expanduser('~/.dynamite')
     if isfile(filename):
         with open(filename) as f:
             last_check = float(f.read().strip())
@@ -210,24 +261,20 @@ def check_version():
                 f.write(str(time()))
         remove(filename+'_lock')
 
-    # another process is doing this at the same time,
-    # or we don't have write permission here
-    except (FileExistsError, PermissionError, OSError):
-        return
-
-    # finally do the check
-
-    url = 'https://api.github.com/repos/GregDMeyer/dynamite/releases/latest'
-    try:
-        with request.urlopen(url, timeout=1) as url_req:
-            data = json.load(url_req)
-
     # in general, catching all exceptions is a bad idea. but here, no matter
     # what happens we just want to give up on the check
     except:
         return
 
-    release_version = data["tag_name"][1:]  # tag_name starts with 'v'
+    # finally do the check
+
+    url = 'https://raw.githubusercontent.com/GregDMeyer/dynamite/master/VERSION'
+    try:
+        with request.urlopen(url, timeout=1) as url_req:
+            release_version = url_req.read().strip().decode('UTF-8')
+    except:
+        return
+
     if release_version != bbuild.get_build_version():
         print('A new version of dynamite has been released!', file=stderr)
 

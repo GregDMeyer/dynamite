@@ -12,6 +12,7 @@ from dynamite.msc_tools import msc_dtype
 from dynamite.subspaces import Full, Parity, SpinConserve, Auto, XParity
 from dynamite.operators import index_sum, sigmax, sigmay, sigmaz
 from dynamite.operators import Operator
+from dynamite.states import State, UninitializedError
 
 import hamiltonians
 
@@ -113,15 +114,16 @@ class SubspaceConservation(dtr.DynamiteTestCase):
 
     def test_auto(self):
         for k in (config.L//2, config.L//4):
-            for H_name in hamiltonians.get_names(complex_enabled()):
-                if H_name == 'syk' and self.skip_flags['small_only']:
-                    continue
-                H = getattr(hamiltonians, H_name)()
-                subspace = Auto(H, 'U'*k + 'D'*(config.L-k))
-                with self.subTest(H=H_name, L=config.L, k=k):
-                    self.assertTrue(
-                        H.conserves(subspace)
-                    )
+            for sort in (True, False):
+                for H_name in hamiltonians.get_names(complex_enabled()):
+                    if H_name == 'syk' and self.skip_flags['small_only']:
+                        continue
+                    H = getattr(hamiltonians, H_name)()
+                    subspace = Auto(H, 'U'*k + 'D'*(config.L-k), sort=sort)
+                    with self.subTest(H=H_name, L=config.L, k=k, sort=sort):
+                        self.assertTrue(
+                            H.conserves(subspace)
+                        )
 
     def test_change_parity(self):
         """
@@ -188,6 +190,12 @@ class SubspaceConservation(dtr.DynamiteTestCase):
 
 class SaveLoad(dtr.DynamiteTestCase):
 
+    def setUp(self):
+        self.old_L = config.L
+
+    def tearDown(self):
+        config.L = self.old_L
+
     def test_save_load(self):
         for H_name in hamiltonians.get_names(complex_enabled()):
             if 'slow' in self.skip_flags and H_name == 'syk':
@@ -206,6 +214,7 @@ class SaveLoad(dtr.DynamiteTestCase):
 
         have_int64 = msc_dtype['masks'].itemsize == 8
         if have_int64:
+            config._L = None
             self.assertEqual(
                 Operator.from_bytes(test_string),
                 sigmax(33)
@@ -256,6 +265,39 @@ class MSCConsistency(dtr.DynamiteTestCase):
 
         with self.assertRaises(RuntimeError):
             op.build_mat()
+
+
+class Expectation(dtr.DynamiteTestCase):
+    @classmethod
+    def expectation_correct(cls, H, state):
+        tmp = H*state
+        return state.dot(tmp).real
+
+    def test_simple(self):
+        for H_name in hamiltonians.get_names(complex_enabled()):
+            with self.subTest(H=H_name):
+                H = getattr(hamiltonians, H_name)()
+                state = State(state='random')
+                correct = self.expectation_correct(H, state)
+
+                with self.subTest(with_tmp=False):
+                    self.assertLess(
+                        abs(H.expectation(state) - correct),
+                        1E-15
+                    )
+
+                with self.subTest(with_tmp=True):
+                    tmp = State()
+                    self.assertLess(
+                        abs(H.expectation(state, tmp_state=tmp) - correct),
+                        1E-15
+                    )
+
+    def test_uninitialized_fail(self):
+        with self.assertRaises(UninitializedError):
+            H = hamiltonians.ising()
+            state = State()
+            H.expectation(state)
 
 
 class Exceptions(dtr.DynamiteTestCase):

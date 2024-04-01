@@ -2,10 +2,7 @@
 #include <cuda_runtime.h>
 #include <thrust/device_ptr.h>
 #include <petscmat.h>
-#include "bcuda_template.h"
-
-#define GPU_BLOCK_SIZE 128
-#define GPU_BLOCK_NUM 128
+#include "bcuda_template_2.h"
 
 PetscErrorCode C(BuildContext_CUDA,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
   const msc_t *msc,
@@ -18,7 +15,8 @@ PetscErrorCode C(MatDestroyCtx_GPU,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A);
 PetscErrorCode C(MatMult_GPU,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, Vec x, Vec b);
 
 __global__ void C(device_MatMult,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
-  PetscInt size,
+  PetscInt row_start,
+  PetscInt row_end,
   PetscInt* masks,
   PetscInt* mask_offsets,
   PetscInt* signs,
@@ -26,6 +24,7 @@ __global__ void C(device_MatMult,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
   PetscInt nmasks,
   C(data,LEFT_SUBSPACE) *left_subspace_data,
   C(data,RIGHT_SUBSPACE) *right_subspace_data,
+  PetscReal* diag,
   const PetscScalar* xarray,
   PetscScalar* barray);
 

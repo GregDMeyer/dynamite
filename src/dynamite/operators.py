@@ -7,13 +7,15 @@ from itertools import chain
 from zlib import crc32
 import re
 from string import ascii_lowercase
+import warnings
 import numpy as np
 
 from . import config, validate, msc_tools
 from .computations import evolve, eigsolve
 from .subspaces import Full, Explicit, XParity
 from .states import State
-from .tools import complex_enabled
+from .tools import complex_enabled, MPI_COMM_WORLD
+
 
 class Operator:
     """
@@ -23,13 +25,17 @@ class Operator:
     other functions in this module.
     """
 
-    def __init__(self):
+    def __init__(self, msc=None, string_rep=None):
         self._max_spin_idx = None
         self._mats = {}
-        self._msc = None
         self._is_reduced = False
         self._shell = config.shell
+        self._precompute_diagonal = True
         self._allow_projection = False
+        self._msc = None
+
+        if msc is not None:
+            self.msc = msc
 
         if config.subspace is not None:
             self._subspaces = [(config.subspace, config.subspace)]
@@ -39,7 +45,9 @@ class Operator:
         if config.L is not None:
             self.L = config.L
 
-        self._string_rep = _OperatorStringRep()
+        if string_rep is None:
+            string_rep = _OperatorStringRep()
+        self._string_rep = string_rep
 
     def copy(self):
         """
@@ -66,52 +74,9 @@ class Operator:
         return rtn
 
     ### computations
-
-    def evolve(self, state, t, **kwargs):
-        r"""
-        Time-evolve a state, using the operator as the Hamiltonian.
-
-        This method wraps :meth:`dynamite.computations.evolve` (see that documentation
-        for a full description of the method's functionality).
-
-        Parameters
-        ----------
-        state : dynamite.states.State
-            The initial state.
-
-        t : float
-            The time :math:`t` for which to evolve the state (can be negative or complex).
-
-        **kwargs :
-            Any further keyword arguments are passed to the underlying call to
-            :meth:`dynamite.computations.evolve`. See that documentation for a
-            detailed description of possible arguments.
-
-        Returns
-        -------
-        dynamite.states.State
-            The result vector :math:`\Psi_f`.
-        """
-        return evolve(self, state, t, **kwargs)
-
-    def eigsolve(self, **kwargs):
-        """
-        Find eigenvalues (and eigenvectors if requested) of the Hamiltonian. This class
-        method is a wrapper on :meth:`dynamite.computations.eigsolve`. Any keyword
-        arguments are passed to that function; see its documentation for details.
-
-        By default, finds one (or possibly a few) eigenvalues with the smallest real
-        values (i.e. the ground state).
-
-        .. note:: The spin chain length ``L`` must be set before calling ``eigsolve``.
-
-        Returns
-        -------
-        numpy.array or tuple(numpy.array, list(dynamite.states.State))
-            Either a 1D numpy array of eigenvalues, or a pair containing that array
-            and a list of the corresponding eigenvectors.
-        """
-        return eigsolve(self, **kwargs)
+    # directly uses the definitions from computations.py
+    evolve = evolve
+    eigsolve = eigsolve
 
     ### properties
 
@@ -205,11 +170,26 @@ class Operator:
         return msc_tools.nnz(self.msc)
 
     @property
+    def nterms(self):
+        """
+        The number of terms in the operator, when written as a sum of products of Paulis.
+        Note that Operator.reduce_msc() is called when accessing this property, which cleans
+        up and sorts the internal representation used by dynamite for the operator.
+        """
+        self.reduce_msc()
+        return len(self.msc)
+
+    @property
     def msc_size(self):
         """
-        The number of elements in the MSC representation of the matrix.
+        (deprecated)
         """
-        return len(self.msc)
+        warnings.warn(
+            'Operator.msc_size is deprecated, use Operator.nterms instead',
+            DeprecationWarning,
+            stacklevel=2
+        )
+        return self.nterms
 
     @property
     def density(self):
@@ -261,6 +241,33 @@ class Operator:
         if value != self._shell:
             self.destroy_mat()
         self._shell = value
+
+    @property
+    def precompute_diagonal(self):
+        """
+        Whether shell matrices should precompute and store the matrix diagonal.
+        Usually should only be turned off if a matrix will be "single-use" (destroyed
+        after a single multiplication).
+
+        .. note::
+            Changing this value after the matrix has been built will invoke a call
+            to :meth:`Operator.destroy_mat`.
+        """
+        if not self.shell:
+            raise ValueError("precompute_diagonal only applies when shell=True")
+        return self._precompute_diagonal
+
+    @precompute_diagonal.setter
+    def precompute_diagonal(self, value):
+        value = bool(value)
+
+        if not self.shell:
+            raise ValueError("precompute_diagonal only applies when shell=True")
+
+        if value != self.precompute_diagonal:
+            self.destroy_mat()
+
+        self._precompute_diagonal = value
 
     @property
     def left_subspace(self):
@@ -434,10 +441,7 @@ class Operator:
         return self._string_rep.string
 
     def __repr__(self):
-        rtn = f'<Operator on {self.get_length()} spins: '
-        rtn += str(self)
-        rtn += '>'
-        return rtn
+        return self._string_rep.repr_str
 
     # for jupyter notebooks
     def _repr_latex_(self):
@@ -489,12 +493,14 @@ class Operator:
         Operator
             The operator.
         """
-        o = Operator()
-        msc = msc_tools.deserialize(data)
-        o.msc = msc
-        o._string_rep.string = '[operator from bytes]'
-        o._string_rep.tex = r'\left[\text{operator from bytes}\right]'
-        return o
+        return Operator(
+            msc=msc_tools.deserialize(data),
+            string_rep=_OperatorStringRep(
+                string='[operator from bytes]',
+                tex=r'\left[\text{operator from bytes}\right]',
+                repr_str='<Operator from bytes>'
+            )
+        )
 
     def save(self, filename):
         """
@@ -507,13 +513,12 @@ class Operator:
         filename : str
             The path to the file to save the operator in.
         """
-        config._initialize()
-        from petsc4py import PETSc
-        if PETSc.COMM_WORLD.rank == 0:
+        comm = MPI_COMM_WORLD()
+        if comm.rank == 0:
             with open(filename, mode='wb') as f:
                 f.write(self.serialize())
 
-        PETSc.COMM_WORLD.barrier()
+        comm.barrier()
 
     @classmethod
     def load(cls, filename):
@@ -619,18 +624,22 @@ class Operator:
             gpu=config.gpu,
         )
 
+        if (self.shell and self.precompute_diagonal
+                and subspaces[0] == subspaces[1] and masks[0] == 0):
+            bpetsc.precompute_diagonal(mat)
+
         self._mats[subspaces] = mat
 
     @classmethod
     def _check_consistent_msc(cls, msc):
-        config._initialize()
-        from petsc4py import PETSc
+        comm = MPI_COMM_WORLD()
 
         # msc cannot be inconsistent with only 1 rank
-        if PETSc.COMM_WORLD.size == 1:
+        if comm.size == 1:
             return
 
-        comm = PETSc.COMM_WORLD.tompi4py()
+        # otherwise we need the full machinery of mpi4py
+        comm = comm.tompi4py()
 
         checksum = crc32(msc.data)
         all_checksums = comm.allgather(checksum)
@@ -706,9 +715,7 @@ class Operator:
             The expected memory usage, in gigabytes
         '''
         if mpi_size is None:
-            config._initialize()
-            from petsc4py import PETSc
-            mpi_size = PETSc.COMM_WORLD.size
+            mpi_size = MPI_COMM_WORLD().size
 
         if self.shell:
             usage_bytes = self.msc.nbytes
@@ -764,6 +771,29 @@ class Operator:
         bra = State(subspace=self.left_subspace)
         ket = State(subspace=self.right_subspace)
         return (bra, ket)
+
+    def expectation(self, state, tmp_state=None):
+        '''
+        Convenience function to compute the expectation value with respect
+        to a given state.
+
+        Parameters
+        ----------
+        state : dynamite.states.State
+            The state for which to compute the expectation value
+
+        tmp_state : dynamite.states.State, optional
+            A "scratch space" state to use during the computation. Must be in the correct
+            subspace. A state vector is allocated internally if one is not provided.
+        '''
+        if tmp_state is None:
+            tmp_state = self.dot(state)
+        else:
+            self.dot(state, result=tmp_state)
+
+        # operators in dynamite are always Hermitian, so we can just
+        # return the real part only
+        return state.dot(tmp_state).real
 
     ### mask, sign, coefficient representation of operators
 
@@ -967,6 +997,7 @@ class Operator:
         rtn.msc = msc_tools.msc_sum([self.msc, o.msc])
         rtn._string_rep.string = str(self) + ' + ' + str(o)
         rtn._string_rep.tex = self._string_rep.tex + ' + ' + o._string_rep.tex
+        rtn._string_rep.repr_str = repr(self) + ' + ' + repr(o)
         rtn._string_rep.brackets = '()'
         return rtn
 
@@ -981,6 +1012,9 @@ class Operator:
 
         rtn._string_rep.tex = self._string_rep.with_brackets('tex')
         rtn._string_rep.tex += o._string_rep.with_brackets('tex')
+
+        rtn._string_rep.repr_str = self._string_rep.with_brackets('repr') + '*'
+        rtn._string_rep.repr_str += o._string_rep.with_brackets('repr')
 
         rtn._string_rep.brackets = ''
 
@@ -1086,16 +1120,19 @@ class Operator:
         x : numeric type
             The coefficient to scale by
         '''
+        if x == 1:
+            return
+
         try:
             self.msc['coeffs'] *= x
         except (ValueError, TypeError):
             raise TypeError(f'Cannot scale operator by type {type(x)}')
 
-        # coefficient up to 3 digits of precision, with trailing zeros removed
-        coeff_str = f'{x:.3f}'.rstrip('0').rstrip('.')
+        coeff_str = msc_tools._get_coeff_str(x, parens=True)
 
-        self._string_rep.string = coeff_str + self._string_rep.with_brackets('string')
+        self._string_rep.string = f'{coeff_str}*{self._string_rep.with_brackets("string")}'
         self._string_rep.tex = coeff_str + self._string_rep.with_brackets('tex')
+        self._string_rep.repr_str = f'{coeff_str}*{self._string_rep.with_brackets("repr")}'
         self._string_rep.brackets = ''
 
     def _num_mul(self, x):
@@ -1104,125 +1141,31 @@ class Operator:
         return rtn
 
 
-class _OperatorStringRep:
-    '''
-    This class builds and manages the string and LaTeX representations of an
-    operator, to implement the __str__, __repr__, and _repr_latex methods
-    of the Operator class.
-    '''
-
-    def __init__(self, string=None, tex=None, brackets=None):
-        if string is None:
-            string = '[operator]'
-
-        if tex is None:
-            tex = r'\[\text{operator}\]'
-
-        if brackets is None:
-            brackets = ''
-
-        self._string = string
-        self._tex = tex
-        self._brackets = brackets
-
-    def copy(self):
-        return _OperatorStringRep(self.string, self.tex, self.brackets)
-
-    @property
-    def string(self):
-        '''
-        The text string that will be returned when ``str(obj)`` is called.
-        '''
-        return self._string
-
-    @string.setter
-    def string(self, value):
-        self._string = value
-
-    @property
-    def tex(self):
-        '''
-        A LaTeX expression corresponding to the object. Can be set to any
-        valid TeX math expression.
-        '''
-        return self._tex
-
-    @tex.setter
-    def tex(self, value):
-        self._tex = value
-
-    @property
-    def brackets(self):
-        '''
-        Which kind of brackets to surround the expression with. Options are
-        ``'()'``, ``'[]'``, or ``''``, where the empty string means no
-        brackets.
-        '''
-        return self._brackets
-
-    @brackets.setter
-    def brackets(self, value):
-        if value not in ['()', '[]', '']:
-            raise ValueError("Brackets must be one of '()', '[]', or ''")
-        self._brackets = value
-
-    def with_brackets(self, which):
-        '''
-        Return a string or tex representation of the object, surrounded by
-        brackets if necessary. Useful for building larger expressions.
-
-        Parameters
-        ----------
-
-        which : str
-            Whether to return a normal string or tex. Options are ``'string'``
-            or ``'tex'``.
-        '''
-        if which == 'tex':
-            base = self.tex
-            brackets = [
-                x+y for x, y in zip([r'\left', r'\right'], self.brackets)
-            ]
-        elif which == 'string':
-            base = self.string
-            brackets = self.brackets
-        else:
-            raise ValueError("which must be either 'string' or 'tex'.")
-
-        if not self.brackets:
-            return base
-
-        return base.join(brackets)
-
-    def __repr__(self):
-        rtn = f"_OperatorStringRep('{self.string}', '{self.tex}', "
-        rtn += f"'{self.brackets}')"
-        return rtn
-
-    def get_latex(self):
-        '''
-        Return a clean LaTeX representation (with all replacements performed).
-        '''
-        return self.tex.replace('{IDX', '{')
-
-
 def load_from_file(filename):
     '''
     DEPRECATED: use dynamite.operators.Operator.load
     '''
-    raise DeprecationWarning("operators.load_from_file is deprecated; "
-                             "use operators.Operator.load")
+    warnings.warn(
+        "operators.load_from_file is deprecated; use operators.Operator.load",
+        DeprecationWarning,
+        stacklevel=2
+    )
+    return Operator.load(filename)
 
 
 def from_bytes(data):
     """
     DEPRECATED: use dynamite.operators.Operator.from_bytes
     """
-    raise DeprecationWarning("operators.from_bytes is deprecated; "
-                             "use operators.Operator.from_bytes")
+    warnings.warn(
+        "operators.from_bytes is deprecated; use operators.Operator.from_bytes",
+        DeprecationWarning,
+        stacklevel=2
+    )
+    return Operator.from_bytes(data)
 
 
-def op_sum(terms, nshow = 3):
+def op_sum(terms, nshow=3):
     r"""
     A sum of several operators. This object can be used in a couple ways.
     All of the following return the exact same object,
@@ -1244,33 +1187,35 @@ def op_sum(terms, nshow = 3):
         an ellipsis.
     """
 
-    o = Operator()
     msc_terms = []
     strings = []
     texs = []
+    repr_strs = []
 
-    iterterms = iter(terms)
-
-    done = False
-    for n,t in enumerate(iterterms):
+    add_ellipses = False
+    for n,t in enumerate(terms):
         msc_terms.append(t.msc)
-        strings.append(t._string_rep.string)
-        texs.append(t._string_rep.tex)
-        if n >= nshow:
-            break
-    else:
-        done = True
+        repr_strs.append(t._string_rep.repr_str)
+        if n < nshow:
+            strings.append(t._string_rep.string)
+            texs.append(t._string_rep.tex)
+        else:
+            add_ellipses = True
 
-    if not done:
-        strings[-1] = '...'
-        texs[-1] = r'\cdots'
-        msc_terms.append(msc_tools.msc_sum(t.msc for t in iterterms))
+    if add_ellipses:
+        strings.append('...')
+        texs.append(r'\cdots')
 
-    o.msc = msc_tools.msc_sum(msc_terms)
-    o._string_rep.string = ' + '.join(strings)
-    o._string_rep.tex = ' + '.join(texs)
-    o._string_rep.brackets = '()'
-    return o
+    return Operator(
+        msc=msc_tools.msc_sum(msc_terms),
+        string_rep=_OperatorStringRep(
+            string=' + '.join(strings),
+            tex=' + '.join(texs),
+            repr_str=' + '.join(repr_strs),
+            brackets='()'
+        )
+    )
+
 
 def op_product(terms):
     """
@@ -1295,23 +1240,30 @@ def op_product(terms):
     msc_terms = []
     strings = []
     texs = []
+    repr_strs = []
     for t in terms:
         msc_terms.append(t.msc)
         strings.append(t._string_rep.with_brackets('string'))
         texs.append(t._string_rep.with_brackets('tex'))
+        repr_strs.append(t._string_rep.with_brackets('repr'))
 
     if msc_terms:
-        o = Operator()
-        o.msc = msc_tools.msc_product(msc_terms)
-        o._string_rep.string = '*'.join(strings)
-        o._string_rep.tex = ''.join(texs)
-        o._string_rep.brackets = ''
+        rtn = Operator(
+            msc=msc_tools.msc_product(msc_terms),
+            string_rep=_OperatorStringRep(
+                string='*'.join(strings),
+                tex=''.join(texs),
+                repr_str='*'.join(repr_strs),
+                brackets = ''
+            )
+        )
     else:
-        o = identity()
+        rtn = identity()
 
-    return o
+    return rtn
 
-def index_sum(op, size = None, start = 0, boundary = 'open'):
+
+def index_sum(op, size=None, start=0, boundary='open'):
     """
     Duplicate the operator onto adjacent sites in the spin chain, and sum the resulting
     operators.
@@ -1337,13 +1289,15 @@ def index_sum(op, size = None, start = 0, boundary = 'open'):
         on more than one site, this determines whether the last few terms of the sum should
         wrap around to the beginning of the spin chain.
     """
-
     if size is None:
         if op.L is None:
             raise ValueError('Must specify index_sum size with either the "size" argument '
                              'or by setting Operator.L (possibly through config.L).')
         else:
+            default_size = True
             size = op.L
+    else:
+        default_size = False
 
     size = validate.L(size)
 
@@ -1364,14 +1318,20 @@ def index_sum(op, size = None, start = 0, boundary = 'open'):
     else:
         raise ValueError("invalid value for argument 'boundary' (can be 'open' or 'closed')")
 
-    rtn = Operator()
-    rtn.msc = msc_tools.msc_sum(op.get_shifted_msc(i, wrap_idx) for i in range(start, stop))
+    string_rep = _OperatorStringRep()
 
-    rtn._string_rep.string = 'index_sum(' + str(op) + ', sites %d - %d' % (start, stop-1)
+    string_rep.string = f'index_sum({op}, sites {start}-{stop-1}'
+    string_rep.repr_str = f'index_sum({repr(op)}'
+    if not default_size:
+        string_rep.repr_str += f', size={size}'
+    if start != 0:
+        string_rep.repr_str += f', start={start}'
     if boundary == 'closed':
-        rtn._string_rep.string += ', wrapped)'
-    else:
-        rtn._string_rep.string += ')'
+        string_rep.string += ', wrapped'
+        string_rep.repr_str += f', boundary="closed"'
+
+    string_rep.string += ')'
+    string_rep.repr_str += ')'
 
     # add i to the indices for TeX representation
     sub_tex = op._string_rep.with_brackets('tex')
@@ -1379,12 +1339,16 @@ def index_sum(op, size = None, start = 0, boundary = 'open'):
     sub_tex = sub_tex.replace('{IDX', '{IDX'+idx+'+')
     sub_tex = sub_tex.replace('{IDX'+idx+'+0', '{IDX'+idx)
 
-    rtn._string_rep.tex = r'\sum_{'+idx+'=%d}^{%d}' % (start, stop-1) + sub_tex
-    rtn._string_rep.brackets = '[]'
+    string_rep.tex = r'\sum\limits_{'+idx+'=%d}^{%d}' % (start, stop-1) + sub_tex
+    string_rep.brackets = '[]'
 
-    return rtn
+    return Operator(
+        msc=msc_tools.msc_sum(op.get_shifted_msc(i, wrap_idx) for i in range(start, stop)),
+        string_rep=string_rep
+    )
 
-def index_product(op, size = None, start = 0):
+
+def index_product(op, size=None, start=0):
     """
     Duplicate the operator onto adjacent sites in the spin chain, and multiply the
     resulting operators together.
@@ -1408,7 +1372,10 @@ def index_product(op, size = None, start = 0):
             raise ValueError('Must specify index_sum size with either the "size" argument '
                              'or by setting Operator.L (possibly through config.L).')
         else:
+            default_size = True
             size = op.L
+    else:
+        default_size = False
 
     if size == 0:
         return identity()
@@ -1417,21 +1384,30 @@ def index_product(op, size = None, start = 0):
 
     stop = start + size - op.max_spin_idx
 
-    rtn = Operator()
-    rtn.msc = msc_tools.msc_product(op.get_shifted_msc(i, wrap_idx = None) for i in range(start, stop))
+    string_rep = _OperatorStringRep(
+        string=f'index_product({op}, sites {start}-{stop-1})'
+    )
 
-    rtn._string_rep.string = 'index_product(' + str(op) + ', sites %d - %d)' % (start, stop-1)
+    string_rep.repr_str = f'index_product({repr(op)}'
+    if not default_size:
+        string_rep.repr_str += f', size={size}'
+    if start != 0:
+        string_rep.repr_str += f', start={start}'
+    string_rep.repr_str += ')'
 
     # add i to the indices for TeX representation
     sub_tex = op._string_rep.with_brackets('tex')
     idx = _get_next_index(sub_tex)
     sub_tex = sub_tex.replace('{IDX', '{IDX'+idx+'+')
     sub_tex = sub_tex.replace('{IDX'+idx+'+0', '{IDX'+idx)
-    rtn._string_rep.tex = r'\prod_{'+idx+'=%d}^{%d}' % (start, stop-1)
-    rtn._string_rep.tex += sub_tex
-    rtn._string_rep.brackets = '[]'
+    string_rep.tex = r'\prod\limits_{'+idx+'=%d}^{%d}' % (start, stop-1)
+    string_rep.tex += sub_tex
+    string_rep.brackets = '[]'
 
-    return rtn
+    return Operator(
+        msc=msc_tools.msc_product(op.get_shifted_msc(i, wrap_idx=None) for i in range(start, stop)),
+        string_rep=string_rep
+    )
 
 
 def _get_next_index(tex_str):
@@ -1453,11 +1429,15 @@ def sigmax(i=0):
     """
     i = validate.spin_index(i)
 
-    o = Operator()
-    o.msc = [(1<<i, 0, 1)]
-    o._string_rep.tex = r'\sigma^x_{IDX'+str(i)+'}'
-    o._string_rep.string = 'σx'+str(i).join('[]')
-    return o
+    return Operator(
+        msc=[(1<<i, 0, 1)],
+        string_rep=_OperatorStringRep(
+            tex=r'\sigma^x_{IDX'+str(i)+'}',
+            string='σx'+str(i).join('[]'),
+            repr_str=f'sigmax({i})'
+        )
+    )
+
 
 def sigmay(i=0):
     r"""
@@ -1465,11 +1445,15 @@ def sigmay(i=0):
     """
     i = validate.spin_index(i)
 
-    o = Operator()
-    o.msc = [(1<<i, 1<<i, 1j)]
-    o._string_rep.tex = r'\sigma^y_{IDX'+str(i)+'}'
-    o._string_rep.string = 'σy'+str(i).join('[]')
-    return o
+    return Operator(
+        msc=[(1<<i, 1<<i, 1j)],
+        string_rep=_OperatorStringRep(
+            tex=r'\sigma^y_{IDX'+str(i)+'}',
+            string='σy'+str(i).join('[]'),
+            repr_str=f'sigmay({i})'
+        )
+    )
+
 
 def sigmaz(i=0):
     r"""
@@ -1477,11 +1461,15 @@ def sigmaz(i=0):
     """
     i = validate.spin_index(i)
 
-    o = Operator()
-    o.msc = [(0, 1<<i, 1)]
-    o._string_rep.tex = r'\sigma^z_{IDX'+str(i)+'}'
-    o._string_rep.string = 'σz'+str(i).join('[]')
-    return o
+    return Operator(
+        msc=[(0, 1<<i, 1)],
+        string_rep=_OperatorStringRep(
+            tex=r'\sigma^z_{IDX'+str(i)+'}',
+            string='σz'+str(i).join('[]'),
+            repr_str=f'sigmaz({i})'
+        )
+    )
+
 
 def sigma_plus(i=0):
     r"""
@@ -1494,10 +1482,14 @@ def sigma_plus(i=0):
     """
     i = validate.spin_index(i)
 
-    o = sigmax(i) + 1j*sigmay(i)
-    o._string_rep.tex = r'\sigma^+_{IDX'+str(i)+'}'
-    o._string_rep.string = 'σ+'+str(i).join('[]')
-    return o
+    rtn = sigmax(i) + 1j*sigmay(i)
+    rtn._string_rep.tex = r'\sigma^+_{IDX'+str(i)+'}'
+    rtn._string_rep.string = 'σ+'+str(i).join('[]')
+    rtn._string_rep.repr_str = f'sigma_plus({i})'
+    rtn._string_rep.brackets = ''
+
+    return rtn
+
 
 def sigma_minus(i=0):
     r"""
@@ -1510,27 +1502,158 @@ def sigma_minus(i=0):
     """
     i = validate.spin_index(i)
 
-    o = sigmax(i) - 1j*sigmay(i)
-    o._string_rep.tex = r'\sigma^-_{IDX'+str(i)+'}'
-    o._string_rep.string = 'σ-'+str(i).join('[]')
-    return o
+    rtn = sigmax(i) - 1j*sigmay(i)
+    rtn._string_rep.tex = r'\sigma^-_{IDX'+str(i)+'}'
+    rtn._string_rep.string = 'σ-'+str(i).join('[]')
+    rtn._string_rep.repr_str = f'sigma_minus({i})'
+    rtn._string_rep.brackets = ''
+
+    return rtn
+
 
 def identity():
     """
     The identity operator.
     """
-    o = Operator()
-    o.msc = [(0, 0, 1)]
-    o._string_rep.tex = '𝟙'
-    o._string_rep.string = '1'
-    return o
+    return Operator(
+        msc=[(0, 0, 1)],
+        string_rep=_OperatorStringRep(
+            tex='𝟙',
+            string='1',
+            repr_str='identity()'
+        )
+    )
+
 
 def zero():
     """
     The zero operator---equivalent to a matrix of all zeros.
     """
-    o = Operator()
-    o.msc = []
-    o._string_rep.tex = '0'
-    o._string_rep.string = '0'
-    return o
+    return Operator(
+        msc=[],
+        string_rep=_OperatorStringRep(
+            tex='0',
+            string='0',
+            repr_str='zero()'
+        )
+    )
+
+
+class _OperatorStringRep:
+    '''
+    This class builds and manages the string and LaTeX representations of an
+    operator, to implement the __str__, __repr__, and _repr_latex methods
+    of the Operator class.
+    '''
+
+    def __init__(self, string=None, tex=None, repr_str=None, brackets=None):
+        if string is None:
+            string = '[operator]'
+
+        if tex is None:
+            tex = r'\[\text{operator}\]'
+
+        if repr_str is None:
+            repr_str = 'Operator()'
+
+        if brackets is None:
+            brackets = ''
+
+        self._string = string
+        self._tex = tex
+        self._repr_str = repr_str
+        self._brackets = brackets
+
+    def copy(self):
+        return _OperatorStringRep(self.string, self.tex, self.repr_str, self.brackets)
+
+    @property
+    def string(self):
+        '''
+        The text string that will be returned when ``str(obj)`` is called.
+        '''
+        return self._string
+
+    @string.setter
+    def string(self, value):
+        self._string = value
+
+    @property
+    def tex(self):
+        '''
+        A LaTeX expression corresponding to the object. Can be set to any
+        valid TeX math expression.
+        '''
+        return self._tex
+
+    @tex.setter
+    def tex(self, value):
+        self._tex = value
+
+    @property
+    def repr_str(self):
+        '''
+        The text string that will be returned when ``repr(obj)`` is called.
+        '''
+        return self._repr_str
+
+    @repr_str.setter
+    def repr_str(self, value):
+        self._repr_str = value
+
+    @property
+    def brackets(self):
+        '''
+        Which kind of brackets to surround the expression with. Options are
+        ``'()'``, ``'[]'``, or ``''``, where the empty string means no
+        brackets.
+        '''
+        return self._brackets
+
+    @brackets.setter
+    def brackets(self, value):
+        if value not in ['()', '[]', '']:
+            raise ValueError("Brackets must be one of '()', '[]', or ''")
+        self._brackets = value
+
+    def with_brackets(self, which):
+        '''
+        Return a string or tex representation of the object, surrounded by
+        brackets if necessary. Useful for building larger expressions.
+
+        Parameters
+        ----------
+
+        which : str
+            Whether to return a normal string or tex. Options are ``'string'``,
+            ``'tex'`` or ``'repr'``.
+        '''
+        if which == 'tex':
+            base = self.tex
+            brackets = [
+                x+y for x, y in zip([r'\left', r'\right'], self.brackets)
+            ]
+        elif which == 'string':
+            base = self.string
+            brackets = self.brackets
+        elif which == 'repr':
+            base = self.repr_str
+            brackets = '()'
+        else:
+            raise ValueError("which must be 'string', 'tex', or 'repr'.")
+
+        if not self.brackets:
+            return base
+
+        return base.join(brackets)
+
+    def __repr__(self):
+        rtn = f"_OperatorStringRep('{self.string}', '{self.tex}', '{self.repr_str}', "
+        rtn += f"'{self.brackets}')"
+        return rtn
+
+    def get_latex(self):
+        '''
+        Return a clean LaTeX representation (with all replacements performed).
+        '''
+        return self.tex.replace('{IDX', '{')

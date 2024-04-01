@@ -121,7 +121,7 @@ PetscErrorCode CopySubspaceData_CUDA_Explicit(data_Explicit** out_p, const data_
   PetscCallCUDA(cudaMemcpy(cpu_data.state_map, in->state_map,
     sizeof(PetscInt)*in->dim, cudaMemcpyHostToDevice));
 
-  if (in->rmap_indices != NULL) {
+  if (in->rmap_indices != PETSC_NULLPTR) {
     PetscCallCUDA(cudaMalloc(&(cpu_data.rmap_indices), sizeof(PetscInt)*in->dim));
     PetscCallCUDA(cudaMemcpy(cpu_data.rmap_indices, in->rmap_indices,
                              sizeof(PetscInt)*in->dim, cudaMemcpyHostToDevice));
@@ -143,7 +143,7 @@ PetscErrorCode DestroySubspaceData_CUDA_Explicit(data_Explicit* data) {
   PetscCallCUDA(cudaMemcpy(&cpu_data, data, sizeof(data_Explicit), cudaMemcpyDeviceToHost));
 
   PetscCallCUDA(cudaFree(cpu_data.state_map));
-  if (cpu_data.rmap_indices != NULL) {
+  if (cpu_data.rmap_indices != PETSC_NULLPTR) {
     PetscCallCUDA(cudaFree(cpu_data.rmap_indices));
   }
   PetscCallCUDA(cudaFree(cpu_data.rmap_states));
@@ -160,7 +160,7 @@ __device__ PetscInt S2I_CUDA_Explicit(PetscInt state, const data_Explicit* data)
   while (left <= right) {
     mid = left + (right-left)/2;
     if (data->rmap_states[mid] == state) {
-      if (data->rmap_indices != NULL) {
+      if (data->rmap_indices != PETSC_NULLPTR) {
         return data->rmap_indices[mid];
       } else {
         return mid;
@@ -220,74 +220,90 @@ __device__ static __inline__ void add_imag(PetscScalar *x, PetscReal c) {
 #define SpinConserve_SP 2
 #define Explicit_SP 3
 
+#define SUBSPACE Full
+  #include "bcuda_template_1.cu"
+#undef SUBSPACE
+
+#define SUBSPACE Parity
+  #include "bcuda_template_1.cu"
+#undef SUBSPACE
+
+#define SUBSPACE SpinConserve
+  #include "bcuda_template_1.cu"
+#undef SUBSPACE
+
+#define SUBSPACE Explicit
+  #include "bcuda_template_1.cu"
+#undef SUBSPACE
+
 #define LEFT_SUBSPACE Full
   #define RIGHT_SUBSPACE Full
-    #include "bcuda_template.cu"
+    #include "bcuda_template_2.cu"
   #undef RIGHT_SUBSPACE
 
   #define RIGHT_SUBSPACE Parity
-    #include "bcuda_template.cu"
+    #include "bcuda_template_2.cu"
   #undef RIGHT_SUBSPACE
 
   #define RIGHT_SUBSPACE SpinConserve
-    #include "bcuda_template.cu"
+    #include "bcuda_template_2.cu"
   #undef RIGHT_SUBSPACE
 
   #define RIGHT_SUBSPACE Explicit
-    #include "bcuda_template.cu"
+    #include "bcuda_template_2.cu"
   #undef RIGHT_SUBSPACE
 #undef LEFT_SUBSPACE
 
 #define LEFT_SUBSPACE Parity
   #define RIGHT_SUBSPACE Full
-    #include "bcuda_template.cu"
+    #include "bcuda_template_2.cu"
   #undef RIGHT_SUBSPACE
 
   #define RIGHT_SUBSPACE Parity
-    #include "bcuda_template.cu"
+    #include "bcuda_template_2.cu"
   #undef RIGHT_SUBSPACE
 
   #define RIGHT_SUBSPACE SpinConserve
-    #include "bcuda_template.cu"
+    #include "bcuda_template_2.cu"
   #undef RIGHT_SUBSPACE
 
   #define RIGHT_SUBSPACE Explicit
-    #include "bcuda_template.cu"
+    #include "bcuda_template_2.cu"
   #undef RIGHT_SUBSPACE
 #undef LEFT_SUBSPACE
 
 #define LEFT_SUBSPACE SpinConserve
   #define RIGHT_SUBSPACE Full
-    #include "bcuda_template.cu"
+    #include "bcuda_template_2.cu"
   #undef RIGHT_SUBSPACE
 
   #define RIGHT_SUBSPACE Parity
-    #include "bcuda_template.cu"
+    #include "bcuda_template_2.cu"
   #undef RIGHT_SUBSPACE
 
   #define RIGHT_SUBSPACE SpinConserve
-    #include "bcuda_template.cu"
+    #include "bcuda_template_2.cu"
   #undef RIGHT_SUBSPACE
 
   #define RIGHT_SUBSPACE Explicit
-    #include "bcuda_template.cu"
+    #include "bcuda_template_2.cu"
   #undef RIGHT_SUBSPACE
 #undef LEFT_SUBSPACE
 
 #define LEFT_SUBSPACE Explicit
   #define RIGHT_SUBSPACE Full
-    #include "bcuda_template.cu"
+    #include "bcuda_template_2.cu"
   #undef RIGHT_SUBSPACE
 
   #define RIGHT_SUBSPACE Parity
-    #include "bcuda_template.cu"
+    #include "bcuda_template_2.cu"
   #undef RIGHT_SUBSPACE
 
   #define RIGHT_SUBSPACE SpinConserve
-    #include "bcuda_template.cu"
+    #include "bcuda_template_2.cu"
   #undef RIGHT_SUBSPACE
 
   #define RIGHT_SUBSPACE Explicit
-    #include "bcuda_template.cu"
+    #include "bcuda_template_2.cu"
   #undef RIGHT_SUBSPACE
 #undef LEFT_SUBSPACE

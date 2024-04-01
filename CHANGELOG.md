@@ -1,6 +1,38 @@
 
 # Changelog
 
+## 0.3.2 - IN PROGRESS
+
+### Added
+ - Detailed example scripts (in `examples/scripts`)
+ - `Operator.expectation()`, convenience function to compute the expectation value of the operator with respect to a state
+ - `dynamite.tools.MPI_COMM_WORLD()` which returns PETSc's MPI communicator object
+ - `Operator.precompute_diagonal` flag allows user to tune whether the matrix diagonal should be precomputed and saved, for shell matrices
+ - `State.entanglement_entropy` member function (a more convenient way of using `computations.entanglement_entropy`, which also remains)
+ - `tools.get_memory_usage` which can measure memory usage on a total, per rank, or per node basis
+ - Multi-GPU parallelism via GPU-aware MPI
+
+### Removed
+ - `--track_memory` flag to `benchmark.py`---now memory usage is always reported by the benchmarking script
+ - `tools.get_max_memory_usage` and `tools.get_cur_memory_usage` in favor of a single function `tools.get_memory_usage`
+
+### Changed
+ - `Operator.msc_size` renamed to `Operator.nterms`, and now invokes a call to `Operator.reduce_msc()`
+ - shell matrix-vector multiplications are now considerably faster
+ - Improved automatic version check; no longer leaves `.dynamite` files in working directory
+ - GPU builds now automatically switch to CPU if a GPU is not found (and print a warning)
+ - Changed default bind mount location for Docker images to the container user's home directory, `/home/dnm`
+ - Renamed some values of `which` argument of `eigsolve()`: `smallest`→`lowest` and `largest`→`highest`
+ - Shift-invert ("target") eigsolving on GPU disabled, as PETSc does not support it well
+
+### Fixed
+ - Explicit subspace sometimes failed conservation check even when operator was actually conserved
+ - Build was broken with Cython 3
+ - Work around broken `petsc4py` and `slepc4py` builds with `pip>=23.1` (see [PETSc issue](https://gitlab.com/petsc/petsc/-/issues/1369))
+ - `Operator.__str__` and `Operator.table()` were formatted poorly for operators with complex coefficients
+ - various issues in `dynamite.extras`
+ - Performance was bad on Ampere (e.g. A100) GPUs unless a particular SLEPc flag was set. The flag is now automatically set.
+
 ## 0.3.1 - 2023-03-07
 
 ### Fixed

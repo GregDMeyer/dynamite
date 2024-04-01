@@ -132,14 +132,10 @@ def msc_sum(iterable):
     np.ndarray
         The sum as an MSC matrix
     '''
-    iterable = iter(iterable)
-    # if iterable has zero items, return zero
-    try:
-        first = next(iterable)
-    except StopIteration:
-        return np.ndarray(0, dtype = msc_dtype)
-
-    return np.hstack([first]+list(iterable))
+    term_lst = list(iterable)
+    if not term_lst:
+        return np.ndarray(0, dtype=msc_dtype)
+    return np.hstack(term_lst)
 
 def msc_product(iterable):
     '''
@@ -404,35 +400,68 @@ def table(msc, L):
     non-Hermitian matrices.
     '''
 
-    rtn = '   coeff. | {pad}operator{pad} \n' +\
-          '====================={epad}\n'
-
-    npad = max(L - 8, 0)
-    rtn = rtn.format(pad = ' '*(npad//2), epad = '='*npad)
-
-    terms = []
+    coeff_strs = []
+    pauli_strs = []
     for m, s, c in msc:
 
-        if 1E-2 < abs(c) < 1E2:
-            term = ' {:8.3f} '
-        else:
-            term = ' {:.2e} '
-
-        term += '| '
-
+        pauli_str = ''
         for i in range(L):
             maskbit = (m >> i) & 1
             signbit = (s >> i) & 1
 
-            term += [['-', 'Z'],
-                     ['X', 'Y']][maskbit][signbit]
+            pauli_str += [['-', 'Z'],
+                          ['X', 'Y']][maskbit][signbit]
 
             if maskbit and signbit:
                 c *= -1j
 
-        term = term.format(c.real)
-        terms.append(term)
+        coeff_strs.append(_get_coeff_str(c, trunc=True))
+        pauli_strs.append(pauli_str)
 
-    rtn += '\n'.join(terms)
+    coeff_just_len = max(7, max((len(s) for s in coeff_strs), default=0))
+
+    rtn = f' {"coeff.".center(coeff_just_len)}'
+    rtn += ' | '
+
+    npad_operator = max(L - 8, 0)//2
+    text_pad = ' '*npad_operator
+    rtn += f'{text_pad}operator{text_pad} \n'
+    rtn += '='*(len(rtn)-1)
+    rtn += '\n'
+
+    rtn += '\n'.join(f' {cstr.rjust(coeff_just_len)} | {pstr}' for cstr, pstr in zip(coeff_strs, pauli_strs))
+
+    return rtn
+
+
+def _get_coeff_str(x, trunc=False, parens=False):
+    if trunc:
+        both_parts = x.real != 0 and x.imag != 0
+        if both_parts:
+            if 1E-2 <= abs(x) <= 1E2 or x == 0:
+                rtn = f'{x:.2f}'
+            else:
+                rtn = f'{x:.2e}'
+
+        else:
+            big = not (1E-2 <= abs(x) <= 1E2) and not x == 0
+            if x.imag:
+                if big:
+                    rtn = f'{x.imag:.2e}j'
+                else:
+                    rtn = f'{x.imag:.3f}j'
+            else:
+                if big:
+                    rtn = f'{x.real:.2e}'
+                else:
+                    rtn = f'{x.real:.3f}'
+
+        if parens and (both_parts or 'e' in rtn):
+            rtn = f'({rtn})'
+
+    else:
+        rtn = str(x)
+        if not parens and '(' in rtn:
+            rtn = rtn[1:-1]
 
     return rtn

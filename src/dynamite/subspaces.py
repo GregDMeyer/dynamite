@@ -216,9 +216,9 @@ class _ProductStateSubspace(Subspace):
 class Full(_ProductStateSubspace):
 
     _enum = bsubspace.SubspaceType.FULL
-    _c_get_dimension = bsubspace.get_dimension_Full
-    _c_idx_to_state = bsubspace.idx_to_state_Full
-    _c_state_to_idx = bsubspace.state_to_idx_Full
+    _c_get_dimension = staticmethod(bsubspace.get_dimension_Full)
+    _c_idx_to_state = staticmethod(bsubspace.idx_to_state_Full)
+    _c_state_to_idx = staticmethod(bsubspace.state_to_idx_Full)
 
     def __init__(self, L=None):
         super().__init__(L)
@@ -260,9 +260,9 @@ class Parity(_ProductStateSubspace):
     '''
 
     _enum = bsubspace.SubspaceType.PARITY
-    _c_get_dimension = bsubspace.get_dimension_Parity
-    _c_idx_to_state = bsubspace.idx_to_state_Parity
-    _c_state_to_idx = bsubspace.state_to_idx_Parity
+    _c_get_dimension = staticmethod(bsubspace.get_dimension_Parity)
+    _c_idx_to_state = staticmethod(bsubspace.idx_to_state_Parity)
+    _c_state_to_idx = staticmethod(bsubspace.state_to_idx_Parity)
 
     def __init__(self, space, L=None):
         super().__init__(L)
@@ -319,9 +319,9 @@ class SpinConserve(_ProductStateSubspace):
     '''
 
     _enum = bsubspace.SubspaceType.SPIN_CONSERVE
-    _c_get_dimension = bsubspace.get_dimension_SpinConserve
-    _c_idx_to_state = bsubspace.idx_to_state_SpinConserve
-    _c_state_to_idx = bsubspace.state_to_idx_SpinConserve
+    _c_get_dimension = staticmethod(bsubspace.get_dimension_SpinConserve)
+    _c_idx_to_state = staticmethod(bsubspace.idx_to_state_SpinConserve)
+    _c_state_to_idx = staticmethod(bsubspace.state_to_idx_SpinConserve)
 
     def __init__(self, L, k, spinflip=None):
         super().__init__(L=L)
@@ -388,9 +388,9 @@ class Explicit(_ProductStateSubspace):
     '''
 
     _enum = bsubspace.SubspaceType.EXPLICIT
-    _c_get_dimension = bsubspace.get_dimension_Explicit
-    _c_idx_to_state = bsubspace.idx_to_state_Explicit
-    _c_state_to_idx = bsubspace.state_to_idx_Explicit
+    _c_get_dimension = staticmethod(bsubspace.get_dimension_Explicit)
+    _c_idx_to_state = staticmethod(bsubspace.idx_to_state_Explicit)
+    _c_state_to_idx = staticmethod(bsubspace.state_to_idx_Explicit)
 
     def __init__(self, state_list, L=None):
         self.state_map = np.asarray(state_list, dtype=bsubspace.dnm_int_t)
@@ -407,6 +407,12 @@ class Explicit(_ProductStateSubspace):
         # ensure all states are unique
         if np.any(self.rmap_states[1:] == self.rmap_states[:-1]):
             raise ValueError('values in state_list must be unique')
+
+        # need to keep a handle on the contiguous versions of these,
+        # so they don't get garbage collected
+        self.state_map = np.ascontiguousarray(self.state_map)
+        self.rmap_indices = np.ascontiguousarray(self.rmap_indices)
+        self.rmap_states = np.ascontiguousarray(self.rmap_states)
 
         super().__init__(L=L)
 
@@ -451,9 +457,9 @@ class Explicit(_ProductStateSubspace):
 
         return bsubspace.CExplicit(
             self.L,
-            np.ascontiguousarray(self.state_map),
-            np.ascontiguousarray(self.rmap_indices),
-            np.ascontiguousarray(self.rmap_states)
+            self.state_map,
+            self.rmap_indices,
+            self.rmap_states
         )
 
 
@@ -513,6 +519,9 @@ class Auto(Explicit):
 
         if sort:
             state_map.sort()
+        else:
+            # reverse Cuthill-McKee ordering needs... reverse!
+            state_map = state_map[::-1]
 
         Explicit.__init__(self, state_map, L=H.L)
 

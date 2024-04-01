@@ -212,7 +212,7 @@ cdef extern int __builtin_parityl(unsigned long x)
 def compute_rcm(PetscInt [:] masks, PetscInt [:] signs, np.complex128_t [:] coeffs,
                 PetscInt [:] state_map, PetscInt start, PetscInt L):
 
-    cdef PetscInt full_dim = 2**L
+    cdef PetscInt full_dim = pow(2, L)
     cdef PetscInt nnz = len(np.unique(masks))
     cdef PetscInt map_idx, i, msc_idx, cur_mask, edge, sign, state
     cdef PetscInt nterms, max_states

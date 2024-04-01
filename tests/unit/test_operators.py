@@ -553,7 +553,7 @@ class SumofProducts(ut.TestCase):
         op = index_sum(index_product(sigmax(), size=3), size=8)
         self.assertEqual(
             op._repr_latex_(),
-            r'$\sum_{j=0}^{5}\left[\prod_{i=0}^{2}\sigma^x_{j+i}\right]$'
+            r'$\sum\limits_{j=0}^{5}\left[\prod\limits_{i=0}^{2}\sigma^x_{j+i}\right]$'
         )
 
 
@@ -883,6 +883,15 @@ class Properties(ut.TestCase):
         with self.assertRaises(ValueError):
             o._string_rep.brackets = '<>'
 
+    def test_precompute_diagonal_fail(self):
+        # this should only work when shell=True
+        o = sigmaz()
+        with self.assertRaises(ValueError):
+            o.precompute_diagonal
+
+        with self.assertRaises(ValueError):
+            o.precompute_diagonal = True
+
 
 class MSC(ut.TestCase):
     '''
@@ -954,6 +963,205 @@ class FromBytes(ut.TestCase):
         for t in test_cases:
             op = Operator.from_bytes(t['serial'])
             self.assertTrue(np.array_equal(op.msc, t['MSC']))
+
+
+class Repr(ut.TestCase):
+    '''
+    Test that the representation printed in the interactive shell is accurate.
+    Ideally it matches the input, in cases where that is possible.
+    '''
+
+    def test_paulis(self):
+        test_cases = [
+            'sigmax(0)',
+            'sigmay(0)',
+            'sigmaz(0)',
+            'sigma_plus(0)',
+            'sigma_minus(0)',
+            'sigmax(2)',
+            'sigmay(2)',
+            'sigmaz(2)',
+            'sigma_plus(2)',
+            'sigma_minus(2)',
+            'identity()',
+            'zero()'
+        ]
+        for case in test_cases:
+            self.assertEqual(case, repr(eval(case)))
+
+    def test_sums(self):
+        test_cases = [
+            'sigmax(0) + sigmax(1)',
+            'sigmay(0) + sigmax(0)',
+            'sigmaz(1) + sigmax(2)',
+            'sigma_plus(0) + sigma_minus(0)',
+            'index_sum(sigmax(0), size=10)',
+            'index_sum(sigmax(0), size=10, boundary="closed")',
+            'index_sum(sigmax(0), size=10, start=1)',
+        ]
+        for case in test_cases:
+            self.assertEqual(case, repr(eval(case)))
+
+    def test_products(self):
+        test_cases = [
+            'sigmax(0)*sigmax(1)',
+            'sigmay(0)*sigmax(0)',
+            'sigmaz(1)*sigmax(2)',
+            'sigma_plus(0)*sigma_minus(0)',
+            'index_product(sigmax(0), size=10)',
+            'index_product(sigmax(0), size=10, start=1)',
+        ]
+        for case in test_cases:
+            self.assertEqual(case, repr(eval(case)))
+
+    def test_op_sum_product(self):
+        test_cases = [
+            (op_sum(sigmax(i) for i in range(4)),
+             'sigmax(0) + sigmax(1) + sigmax(2) + sigmax(3)'),
+            (op_sum((sigmax(i) for i in range(4)), nshow=1),
+             'sigmax(0) + sigmax(1) + sigmax(2) + sigmax(3)'),
+            (op_product(sigmax(i) for i in range(4)),
+             'sigmax(0)*sigmax(1)*sigmax(2)*sigmax(3)'),
+            (op_product(sigmax(i)+sigmay(i) for i in range(4)),
+             '(sigmax(0) + sigmay(0))*(sigmax(1) + sigmay(1))*(sigmax(2) + sigmay(2))*(sigmax(3) + sigmay(3))')
+        ]
+        for op, result in test_cases:
+            self.assertEqual(repr(op), result)
+
+    def test_misc(self):
+        test_cases = [
+            'sigmaz(0)*(sigmax(0) + sigmay(1))',
+            'index_sum(sigmax(0) + sigmax(1), size=10)'
+        ]
+        for case in test_cases:
+            self.assertEqual(case, repr(eval(case)))
+
+    def test_constants(self):
+        test_cases = [
+            '1.234*sigmaz(0)',
+            '1.234j*sigmaz(0)',
+            '1j*sigmaz(0)',
+            '(1+1j)*sigmaz(0)',
+            '(1.123+1.234j)*sigmaz(0)',
+        ]
+        for case in test_cases:
+            self.assertEqual(case, repr(eval(case)))
+
+
+class Str(ut.TestCase):
+    '''
+    Test the result of calling str() on operators.
+    '''
+
+    def test_paulis(self):
+        test_cases = [
+            (sigmax(), 'σx[0]'),
+            (sigmay(), 'σy[0]'),
+            (sigmaz(), 'σz[0]'),
+            (sigma_plus(), 'σ+[0]'),
+            (sigma_minus(), 'σ-[0]'),
+            (sigmax(2), 'σx[2]'),
+            (sigmay(2), 'σy[2]'),
+            (sigmaz(2), 'σz[2]'),
+            (sigma_plus(2), 'σ+[2]'),
+            (sigma_minus(2), 'σ-[2]'),
+            (identity(), '1'),
+            (zero(), '0'),
+        ]
+        for op, str_val in test_cases:
+            self.assertEqual(str(op), str_val)
+
+    def test_sums(self):
+        test_cases = [
+            (sigmax(0) + sigmax(1), 'σx[0] + σx[1]'),
+            (sigmay(0) + sigmax(0), 'σy[0] + σx[0]'),
+            (sigmaz(1) + sigmax(2), 'σz[1] + σx[2]'),
+            (sigma_plus(0) + sigma_minus(0), 'σ+[0] + σ-[0]'),
+            (
+                index_sum(sigmax(0), size=10),
+                'index_sum(σx[0], sites 0-9)'
+            ),
+            (
+                index_sum(sigmax(0), size=10, boundary="closed"),
+                'index_sum(σx[0], sites 0-9, wrapped)'
+            ),
+            (
+                index_sum(sigmax(0), size=10, start=1),
+                'index_sum(σx[0], sites 1-10)'
+            ),
+        ]
+        for op, str_val in test_cases:
+            self.assertEqual(str(op), str_val)
+
+    def test_products(self):
+        test_cases = [
+            (sigmax(0)*sigmax(1), 'σx[0]*σx[1]'),
+            (sigmay(0)*sigmax(0), 'σy[0]*σx[0]'),
+            (sigmaz(1)*sigmax(2), 'σz[1]*σx[2]'),
+            (sigma_plus(0)*sigma_minus(0), 'σ+[0]*σ-[0]'),
+            (
+                index_product(sigmax(0), size=10),
+                'index_product(σx[0], sites 0-9)'
+            ),
+            (
+                index_product(sigmax(0), size=10, start=1),
+                'index_product(σx[0], sites 1-10)'
+            ),
+        ]
+        for op, str_val in test_cases:
+            self.assertEqual(str(op), str_val)
+
+    def test_op_sum_product(self):
+        test_cases = [
+            (
+                op_sum(sigmax(i) for i in range(4)),
+                'σx[0] + σx[1] + σx[2] + ...'
+            ),
+            (
+                op_sum((sigmax(i) for i in range(4)), nshow=1),
+                'σx[0] + ...'
+            ),
+            (
+                op_product(sigmax(i) for i in range(4)),
+                'σx[0]*σx[1]*σx[2]*σx[3]'
+            ),
+            (
+                op_product(sigmax(i)+sigmay(i) for i in range(4)),
+                '(σx[0] + σy[0])*(σx[1] + σy[1])*(σx[2] + σy[2])*(σx[3] + σy[3])'
+            )
+        ]
+        for op, str_val in test_cases:
+            self.assertEqual(str(op), str_val)
+
+    def test_misc(self):
+        test_cases = [
+            (
+                sigmaz(0)*(sigmax(0) + sigmay(1)),
+                'σz[0]*(σx[0] + σy[1])'
+            ),
+            (
+                index_sum(sigmax(0) + sigmax(1), size=10),
+                'index_sum(σx[0] + σx[1], sites 0-8)'
+            ),
+        ]
+        for op, str_val in test_cases:
+            self.assertEqual(str(op), str_val)
+
+    def test_constants(self):
+        test_cases = [
+            (1*sigmaz(0), 'σz[0]'),
+            (2*sigmaz(0), '2*σz[0]'),
+            (1.234*sigmaz(0), '1.234*σz[0]'),
+            (1.23456*sigmaz(0), '1.23456*σz[0]'),
+            (1.234j*sigmaz(0), '1.234j*σz[0]'),
+            (1j*sigmaz(0), '1j*σz[0]'),
+            ((1+1j)*sigmaz(0), '(1+1j)*σz[0]'),
+            ((1.123+1.234j)*sigmaz(0), '(1.123+1.234j)*σz[0]')
+        ]
+        for op, str_val in test_cases:
+            with self.subTest(op=op, correct=str_val):
+                self.assertEqual(str(op), str_val)
+
 
 if __name__ == '__main__':
     ut.main()

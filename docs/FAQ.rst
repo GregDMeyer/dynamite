@@ -9,19 +9,24 @@ FAQ
 - :ref:`L`
 - :ref:`nondeterm`
 - :ref:`petsc`
+- :ref:`gpu-aware-mpi`
 
 .. _parallel:
 
 How do I run my code in parallel?
 ---------------------------------
 
-One of dynamite's most important features is its ability to scale across many processors using MPI (or even GPUs!). For example, running with four MPI ranks (processes) is as easy as the following:
+One of dynamite's most important features is its ability to scale across multiple processors using MPI (or even multiple GPUs!). For example, running with four MPI ranks (processes) is as easy as the following:
 
 .. code:: bash
 
     mpirun -n 4 python3 solve_all_the_things.py
 
-Note that this should come at the end of the ``docker run...`` command if you are using the container images to run dynamite. See :ref:`containers` for details (and for information about how to run on GPUs).
+Note that using MPI with containers can require special steps; see :ref:`containers` for details.
+
+To accelerate dynamite's computations using a GPU, the simplest way is to use one of the GPU-accelerated Docker images (again, see :ref:`containers` for details).
+To parallelize across multiple GPUs requires building dynamite from source (see :ref:`installing`); dynamite should then be run with a number of MPI ranks equal to the number of available GPUs.
+Achieving good performance with multiple GPUs requires a GPU-aware MPI library.
 
 .. _ranks:
 
@@ -43,8 +48,8 @@ Here are a few ideas to explore for why your computation might be slow or not sc
 
 .. _shell:
 
-**My computation is using too much memory.**
---------------------------------------------
+My computation is using too much memory.
+----------------------------------------
 
 Even in the sparse form that dynamite uses by default, storing an operator's matrix can use large amounts of memory. To alleviate this problem, dynamite can be run with so-called "matrix-free" matrices (known in dynamite and PETSc as "shell" matrices). When this is enabled, matrix elements are computed on the fly instead of being stored explicitly, saving significantly on memory usage and sometimes even speeding things up. When using shell matrices, the memory usage is reduced essentially to the vectors used in the computations.
 
@@ -52,8 +57,8 @@ Shell matrices can be enabled globally by setting ``dynamite.config.shell = True
 
 .. _integer:
 
-**I got an error message about an integer overflow even though I'm running with fewer than 32 spins.**
-------------------------------------------------------------------------------------------------------
+I got an error message about an integer overflow even though I'm running with fewer than 32 spins.
+--------------------------------------------------------------------------------------------------
 
 Even if the state vector length is shorter than :math:`2^{32}`, PETSc may allocate a block of many vectors at once, and the total length of this allocated block is greater than the maximum 32-bit integer. Before switching to 64-bit integers, try passing the ``-bv_type vecs`` flag to SLEPc by putting the following at the beginning of your script:
 
@@ -66,8 +71,8 @@ That way each vector will be allocated individually.
 
 .. _L:
 
-**I am tired of setting the spin chain length L everywhere.**
--------------------------------------------------------------
+I am tired of setting the spin chain length L everywhere.
+---------------------------------------------------------
 
 There is an easy way to globally set a
 default value for ``L``. Before you start building any operators:
@@ -82,15 +87,15 @@ for details.
 
 .. _nondeterm:
 
-**My code is having mysterious problems/giving wrong answers when I run with more than 1 MPI rank.**
--------------------------------------------------------------------------------------------------------
+My code is having mysterious problems/giving wrong answers when I run with more than 1 MPI rank.
+------------------------------------------------------------------------------------------------
 
 There are a number of reasons this could happen, but here is a likely culprit. Each MPI rank runs as an independent Python process, so non-deterministic code can behave differently across the ranks. For example, if you are iterating through an unordered data type like a Python dictionary or set, different ranks may iterate through the values in a different order! As another example, making calls to e.g. ``numpy.random.rand()`` will give different values on each process. If you use this when building your Hamiltonian, you will not have a consistent operator across your different processes! If you need random numbers, make sure to seed them with the same value everywhere.
 
 .. _petsc:
 
-**I want to get under the hood and fiddle with PETSc and SLEPc.**
------------------------------------------------------------------
+I want to get under the hood and fiddle with PETSc and SLEPc.
+-------------------------------------------------------------
 
 The underlying ``petsc4py`` matrix for any operator is accessible with
 :meth:`dynamite.operators.Operator.get_mat`. For states, the ``petsc4py`` vector
@@ -116,3 +121,22 @@ one would do
 
 (although this particular case is built-in to dynamite, and can be accomplished via the ``ncv`` keyword
 argument to :meth:`dynamite.computations.evolve`).
+
+.. _gpu-aware-mpi:
+
+I am getting a warning from PETSc about not having GPU-aware MPI.
+-----------------------------------------------------------------
+
+dynamite is designed to be able to run parallelized across multiple GPUs. For this to be performant,
+it is crucial that the MPI implementation being used is GPU-aware, meaning that instead of transferring
+data to the CPU, then to another processor via MPI, then to that processor's GPU, it can transfer data
+directly between GPUs via e.g. NVLink.
+
+If you are running with multiple GPUs, the way to avoid this error is to ensure your MPI implementation
+is GPU-aware---your performance will be quite bad otherwise. If you are compiling OpenMPI yourself, use
+the ``--with-cuda`` flag to OpenMPI's ``./configure``; if you are using a compute cluster's build of MPI, talk to
+your system administrator.
+
+If you are running with a single GPU, MPI is simply not needed. In that case you can avoid the warning by
+removing ``mpi4py`` from your Python environment, in which case dynamite will automatically disable
+the warning, or by setting an environment variable as described in the PETSc error message.

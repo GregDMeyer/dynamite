@@ -4,6 +4,9 @@
  */
 
 #include "bpetsc_template_1.h"
+#if PETSC_HAVE_CUDA
+#include "bcuda_template_1.h"
+#endif
 
 /*
  * this function is actually the same for all subspaces but
@@ -159,4 +162,64 @@ PetscErrorCode C(rdm,SUBSPACE)(
   }
 
   return 0;
+}
+
+#undef  __FUNCT__
+#define __FUNCT__ "PrecomputeDiagonal_CPU"
+PetscErrorCode C(PrecomputeDiagonal_CPU,SUBSPACE)(Mat A){
+  PetscInt row_start, row_end, row_idx, term_idx;
+  PetscInt sign, state;
+  PetscReal value;
+
+  shell_context *ctx;
+  PetscCall(MatShellGetContext(A, &ctx));
+
+  if (ctx->masks[0] != 0) {
+    /* there is no diagonal! leave diag as PETSC_NULLPTR */
+    return 0;
+  }
+
+  PetscCall(MatGetOwnershipRange(A, &row_start, &row_end));
+
+  PetscCall(PetscMalloc1(row_end-row_start, &(ctx->diag)));
+
+  for (row_idx=row_start; row_idx<row_end; ++row_idx) {
+    if (row_idx==row_start) {
+      state = C(I2S,SUBSPACE)(row_idx, ctx->right_subspace_data);
+    } else {
+      state = C(NextState,SUBSPACE)(state, row_idx, ctx->right_subspace_data);
+    }
+
+    value = 0;
+    for (term_idx=0; term_idx<ctx->mask_offsets[1]; ++term_idx) {
+      sign = 1 - 2*(builtin_parity(state & ctx->signs[term_idx]));
+      value += sign * ctx->real_coeffs[term_idx];
+    }
+    ctx->diag[row_idx-row_start] = value;
+  }
+
+  return 0;
+}
+
+#undef  __FUNCT__
+#define __FUNCT__ "PrecomputeDiagonal"
+PetscErrorCode C(PrecomputeDiagonal,SUBSPACE)(Mat A)
+{
+  PetscErrorCode ierr;
+  shell_context *ctx;
+  PetscCall(MatShellGetContext(A, &ctx));
+
+  if (!(ctx->gpu)) {
+    ierr = C(PrecomputeDiagonal_CPU,SUBSPACE)(A);
+  }
+#if PETSC_HAVE_CUDA
+  else {
+    ierr = C(PrecomputeDiagonal_GPU,SUBSPACE)(A);
+  }
+#else
+  else {
+    SETERRQ(PETSC_COMM_SELF, PETSC_ERR_ARG_UNKNOWN_TYPE, "GPU not enabled for this build");
+  }
+#endif
+  return ierr;
 }

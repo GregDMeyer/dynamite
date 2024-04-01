@@ -11,7 +11,7 @@ import unittest as ut
 from dynamite import config
 from dynamite.subspaces import Parity, Auto, SpinConserve, XParity
 from dynamite.states import State
-from dynamite.computations import reduced_density_matrix, entanglement_entropy, renyi_entropy
+from dynamite.computations import reduced_density_matrix, renyi_entropy
 from dynamite.tools import complex_enabled
 
 class Explicit(dtr.DynamiteTestCase):
@@ -38,7 +38,7 @@ class Explicit(dtr.DynamiteTestCase):
         config._initialize()
         from petsc4py import PETSc
 
-        check = entanglement_entropy(state, keep)
+        check = state.entanglement_entropy(keep)
 
         renyi_check = []
         renyi_powers = [0, 1]

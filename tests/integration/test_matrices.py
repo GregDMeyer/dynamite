@@ -10,7 +10,7 @@ import dynamite_test_runner as dtr
 
 from dynamite import config
 from dynamite.states import State
-from dynamite.tools import complex_enabled, get_cur_memory_usage
+from dynamite.tools import complex_enabled, get_memory_usage
 from dynamite.operators import identity, sigmax, sigmay, index_sum
 from dynamite.msc_tools import msc_dtype, dnm_int_t
 from dynamite.subspaces import Auto, SpinConserve, XParity
@@ -72,6 +72,13 @@ from dynamite.operators import sigmax, sigmay, sigmaz, sigma_plus, sigma_minus
 class Fundamental(dtr.DynamiteTestCase):
 
     def setUp(self):
+        config._initialize()
+        from petsc4py import PETSc
+        self.mpi_size = PETSc.COMM_WORLD.size
+
+        if self.mpi_size > 2:
+            self.skipTest(f'number of ranks exceeds Hilbert space dimension')
+
         self.old_L = config.L
         config._L = None
 
@@ -232,25 +239,22 @@ class MemoryUsage(dtr.DynamiteTestCase):
         from petsc4py import PETSc
         self.mpi_size = PETSc.COMM_WORLD.size
 
-    def test_diagonal(self):
-        H = index_sum(sigmaz())
-        mem_pre = get_cur_memory_usage(which='petsc')
+    def check_memory(self, H):
+        mem_pre = get_memory_usage()
         H.build_mat()
-        mem_post = get_cur_memory_usage(which='petsc')
-        self.assertGreater(
-                1E-5 + 1.3*H.estimate_memory()/self.mpi_size,
-                mem_post-mem_pre
+        mem_post = get_memory_usage()
+
+        # allow some small overhead per rank
+        self.assertLess(
+                abs(mem_post-mem_pre - H.estimate_memory()),
+                0.05*self.mpi_size
         )
 
+    def test_diagonal(self):
+        self.check_memory(index_sum(sigmaz()))
+
     def test_XX(self):
-        H = index_sum(sigmax(0)+sigmax(1))
-        mem_pre = get_cur_memory_usage(which='petsc')
-        H.build_mat()
-        mem_post = get_cur_memory_usage(which='petsc')
-        self.assertGreater(
-                1E-5 + 1.3*H.estimate_memory()/self.mpi_size,
-                mem_post-mem_pre
-        )
+        self.check_memory(index_sum(sigmax(0)+sigmax(1)))
 
     def test_XXYY_auto(self):
         for sort in (False, True):
@@ -258,13 +262,7 @@ class MemoryUsage(dtr.DynamiteTestCase):
                 H = index_sum(sigmax(0)*sigmax(1) + sigmay(0)*sigmay(1))
                 half = config.L//2
                 H.subspace = Auto(H, 'U'*half + 'D'*(config.L-half), sort=sort)
-                mem_pre = get_cur_memory_usage(which='petsc')
-                H.build_mat()
-                mem_post = get_cur_memory_usage(which='petsc')
-                self.assertGreater(
-                    1E-5 + 1.3*H.estimate_memory()/self.mpi_size,
-                    mem_post-mem_pre
-                )
+                self.check_memory(H)
 
 
 if __name__ == '__main__':

@@ -7,9 +7,6 @@ Running dynamite from a container
 These instructions describe how to run ``dynamite`` from a pre-built container image.
 If you wish to instead install ``dynamite`` directly, see :ref:`installing`.
 
-.. note::
-   Running from containers is currently experimental. Please let us know if you run into any issues or have any suggestions!
-
 On a personal computer, it's easiest to run the container using `podman <https://podman.io/>`_ or `Docker <https://www.docker.com/>`_.
 On a shared computer cluster, one can use `Singularity <https://singularity.hpcng.org/>`_, which should come pre-installed in most HPC settings (see your cluster's documentation).
 
@@ -24,16 +21,18 @@ With Docker or podman installed (see :ref:`setup` below), run
 
 .. code:: bash
 
-    docker run --rm -it -w /home/dnm/work -v $PWD:/home/dnm/work gdmeyer/dynamite python your_script.py
+    docker run --rm -it -v $PWD:/home/dnm gdmeyer/dynamite python your_script.py
     # or replace 'docker' with 'podman' if you are using that
     # for podman you may need to add "docker.io/" in front of "gdmeyer" in the command
 
 A quick explanation of the options:
 
  - ``--rm -it``: run interactively, and automatically remove the container when finished
- - ``-w /home/dnm/work -v $PWD:/home/dnm/work``: mount the current working directory into the
+ - ``-v $PWD:/home/dnm``: mount the current working directory into the
    container---this lets dynamite see your script! If you need to give dynamite access to
-   another directory, be sure to add another ``-v`` command.
+   another directory, be sure to add another ``-v`` command. (However note that if you are
+   not on Linux, there is a CPU cost every time a mounted file is modified, either
+   by the host or container---so mounting e.g. your entire home directory is in general a bad idea).
 
 .. note::
    On Windows, you need to replace ``$PWD`` with ``%cd%`` (or whatever Windows path you want to mount
@@ -43,6 +42,7 @@ A quick explanation of the options:
    If you want to run with multiple processes using MPI, you can simply add ``mpirun -n <np>``
    before ``python`` in the command above. Note that on a cluster, to achieve the best MPI performance
    you should instead build from source (see :ref:`installing`) and use the cluster's native MPI.
+   Building from source is also currently the only way to run on multiple GPUs.
    Also, with Docker you may get errors unless you add the flag ``--cap-add=SYS_PTRACE``.
 
 .. _desktop_script:
@@ -55,7 +55,7 @@ However, if you prefer to use the GUI, that works fine too.
 The only thing you must do from the command line is pull the image: ``docker pull gdmeyer/dynamite:latest``.
 
 Now in the "Images" tab, hover over the dynamite image you just pulled, and hit "Run".
-Expand the "Optional Settings" menu, and under "Volumes", mount a directory on your computer ("Host Path") onto ``/home/dnm/work`` in the container ("Container Path").
+Expand the "Optional Settings" menu, and under "Volumes", mount a directory on your computer ("Host Path") onto ``/home/dnm`` in the container ("Container Path").
 You can also give the container a name if you want (otherwise Docker will pick a random name for you).
 Then hit "Run"!
 
@@ -87,9 +87,9 @@ If you are on a node with an Nvidia GPU, running the CUDA-accelerated version of
     # or
     singularity shell --nv docker://gdmeyer/dynamite:latest-cuda  # to start a shell with dynamite installed
 
-The default version is compiled for GPUs with compute capability >= 7.0; there are images on DockerHub compiled
-with other compute capabilities (e.g. ``docker://gdmeyer/dynamite:latest-cuda.cc80`` for compute capability 8.0).
-You can see a list of all available images `on DockerHub <https://hub.docker.com/repository/docker/gdmeyer/dynamite/tags>`_.
+Although dynamite supports multi-GPU computations via CUDA-aware MPI, ensuring compatability between MPI inside and outside the docker
+images is very difficult; therefore, the GPU docker images currently only support computations on a single GPU. To run multi-GPU computations,
+please build from source (see :ref:`installing`).
 
 .. note ::
    dynamite with CUDA requires Nvidia driver >= 450.80.02
@@ -114,11 +114,10 @@ Command line
 
 .. code:: bash
 
-    docker run --rm -p 8887:8887 -w /home/dnm/work -v $PWD:/home/dnm/work gdmeyer/dynamite:latest-jupyter
+    docker run --rm -p 8887:8887 -v $PWD:/home/dnm gdmeyer/dynamite:latest-jupyter
     # or replace 'docker' with 'podman'
 
 Then follow the last link that you see (it should start with ``http://127.0.0.1:8887``).
-Your files will be in the ``work`` directory visible in JupyterLab.
 
 Docker Desktop
 --------------
@@ -139,8 +138,10 @@ It may take some tweaking for your specific compute cluster, but the basic steps
 
  1. Login, and allocate a compute node for yourself on the cluster (e.g. with ``salloc`` in SLURM).
  2. In a separate terminal, tunnel port 8887 to your local machine through ssh:
+
     - Run ``ssh -NL 8887:<hostname of compute node from step 1>:8887 <username>@<cluster login url>``
     - The above command should not generate any output
+
  3. On the compute node from Step 1, run ``singularity run docker://gdmeyer/dynamite:latest-jupyter``
  4. Follow the last link in the output (the one with ``127.0.0.1``)
 
@@ -198,20 +199,20 @@ Installing other packages in your container
 ===========================================
 
 If you want to install other Python packages or other software to use alongside dynamite, it is possible to do this with Docker.
-However, it's a little annoying; if the extra software is for analysis or similar we recommend saving the output of your dynamite computation to a file in your mounted directory (e.g. ``/home/dnm/work``) and then performing the analysis after-the-fact.
+However, it's a little annoying; if the extra software is for analysis or similar we recommend saving the output of your dynamite computation to a file in your mounted directory (e.g. ``/home/dnm``) and then performing the analysis after-the-fact.
 
 A quick explainer of what's happening here: when you run dynamite using the commands in the `Quick Usage Guide`_ section above, Docker creates a "container" on top of the dynamite image.
 With the ``--rm`` flag as described above, this container is simply removed when the program run inside docker exits.
 However, by removing the ``--rm`` flag (and perhaps adding a ``--name``), we can keep the container around, make changes, add things, etc.
 
-So, to make a persistent container, which mounts the current directory at ``/home/dnm/work``, run dynamite like this:
+So, to make a persistent container, which mounts the current directory at the container user's home directory ``/home/dnm``, run dynamite like this:
 
 .. code:: bash
 
-    docker run --name my_dnm_container -it -v $PWD:/home/dnm/work gdmeyer/dynamite bash
+    docker run --name my_dnm_container -it -v $PWD:/home/dnm gdmeyer/dynamite bash
 
 This will give you a bash shell, where you can run ``pip install <whatever>`` or anything else you would like.
-Note that the directory mount (the ``-v`` option) is a part of the container, so when you run the commands below the same directory will always be mounted at ``/home/dnm/work``.
+Note that the directory mount (the ``-v`` option) is a part of the container, so when you run the commands below the same directory will always be mounted at ``/home/dnm``.
 
 After you exit the bash shell above, the next time you want to use the same container, run
 

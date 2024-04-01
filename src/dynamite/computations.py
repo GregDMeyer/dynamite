@@ -1,10 +1,11 @@
 
+import warnings
+import numpy as np
+
 from . import config
-from .states import State
 from .tools import complex_enabled
 from .msc_tools import dnm_int_t
 
-import numpy as np
 
 def evolve(H, state, t, result=None, tol=None, ncv=None, algo=None, max_its=None):
     r"""
@@ -72,6 +73,7 @@ def evolve(H, state, t, result=None, tol=None, ncv=None, algo=None, max_its=None
                          'subspaces.')
 
     if result is None:
+        from .states import State  # avoids circular import
         result = State(L=H.L, subspace=state.subspace)
     elif state.subspace != result.subspace:
         raise ValueError('input and result states are on different subspaces.')
@@ -123,11 +125,11 @@ def evolve(H, state, t, result=None, tol=None, ncv=None, algo=None, max_its=None
 
     return result
 
-def eigsolve(H, getvecs=False, nev=1, which='smallest', target=None, tol=None, subspace=None, max_its=None):
+def eigsolve(H, getvecs=False, nev=1, which='lowest', target=None, tol=None, subspace=None, max_its=None):
     r"""
     Solve for a subset of the eigenpairs of the Hamiltonian.
 
-    By default, solves for the eigenvalue with the smallest (most
+    By default, solves for the eigenvalue with the lowest (most
     negative) real part, e.g. the ground state. Which eigenvalues
     are sought and how many can be adjusted with the options.
 
@@ -157,9 +159,9 @@ def eigsolve(H, getvecs=False, nev=1, which='smallest', target=None, tol=None, s
     which : str
         Which eigenvalues to seek. Options are\:
 
-        - ``"smallest"``, to find the eigenvalues with smallest real part (i.e. most negative)
+        - ``"lowest"``, to find the eigenvalues with lowest (most negative) real part
 
-        - ``"largest"``, to find the eigenvalues with largest real part (i.e. most positive)
+        - ``"highest"``, to find the eigenvalues with highest (most positive) real part
 
         - ``"exterior"``, to find eigenvalues largest in absolute magnitude
 
@@ -210,7 +212,12 @@ def eigsolve(H, getvecs=False, nev=1, which='smallest', target=None, tol=None, s
         which = 'target'
 
         if H.shell:
-            raise TypeError('Shift-invert ("target") not supported for shell matrices.')
+            raise RuntimeError('Shift-invert ("target") not supported for shell matrices.')
+
+        if config.gpu:
+            raise RuntimeError('GPU-accelerated shift-invert ("target") eigensolving is not '
+                               'currently well-supported by PETSc, and is thus currently '
+                               'unavailable in dynamite.')
 
         st = eps.getST()
         st.setType(SLEPc.ST.Type.SINVERT)
@@ -224,11 +231,23 @@ def eigsolve(H, getvecs=False, nev=1, which='smallest', target=None, tol=None, s
 
     eps.setDimensions(nev)
 
+    if which in ['smallest', 'largest']:
+        warnings.warn(
+            'values "smallest" and "largest" for eigsolve parameter "which" '
+            'are deprecated, and have been replaced by "lowest" and "highest" respectively.',
+            DeprecationWarning,
+            stacklevel=2
+        )
+        which = {
+            'smallest': 'lowest',
+            'largest': 'highest'
+        }[which]
+
     eps.setWhichEigenpairs({
-        'smallest':SLEPc.EPS.Which.SMALLEST_REAL,
-        'largest':SLEPc.EPS.Which.LARGEST_REAL,
-        'exterior':SLEPc.EPS.Which.LARGEST_MAGNITUDE,
-        'target':SLEPc.EPS.Which.TARGET_MAGNITUDE,
+        'lowest': SLEPc.EPS.Which.SMALLEST_REAL,
+        'highest': SLEPc.EPS.Which.LARGEST_REAL,
+        'exterior': SLEPc.EPS.Which.LARGEST_MAGNITUDE,
+        'target': SLEPc.EPS.Which.TARGET_MAGNITUDE,
         }[which])
 
     eps.setTolerances(tol=tol, max_it=max_its)
@@ -261,6 +280,7 @@ def eigsolve(H, getvecs=False, nev=1, which='smallest', target=None, tol=None, s
     for i in range(nconv):
         evals[i] = eps.getEigenpair(i, None).real
         if getvecs:
+            from .states import State  # avoids circular import
             v = State(L=H.L, subspace=H.subspace)
             eps.getEigenpair(i, v.vec)
             v.set_initialized()
@@ -344,7 +364,7 @@ def entanglement_entropy(state, keep):
         A dynamite State object.
 
     keep : array-like
-        A list of spin indices to keep. See :meth:`reduced_density_matrix` for
+        A list of spin indices to keep. See :meth:`dynamite.computations.reduced_density_matrix` for
         details.
 
     Returns

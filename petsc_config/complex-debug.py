@@ -10,6 +10,10 @@ You may want to pipe to "less"; it is a big help page ;)
 
 configure_options = [
 
+    # don't try to configure CUDA here
+    '--with-cuda=0',
+    '--with-cudac=0',
+
     # use native complex numbers for scalars. currently required for dynamite.
     '--with-scalar-type=complex',
 

@@ -6,7 +6,7 @@
 
 #include "bpetsc_template_2.h"
 #if PETSC_HAVE_CUDA
-#include "bcuda_template.h"
+#include "bcuda_template_2.h"
 #endif
 
 #undef  __FUNCT__
@@ -24,18 +24,30 @@ PetscErrorCode C(BuildMat,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
     ierr = C(BuildPetsc,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
       msc, left_subspace_data, right_subspace_data, xparity, A);
   }
-  else if (shell == CPU_SHELL) {
-    ierr = C(BuildCPUShell,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
-      msc, left_subspace_data, right_subspace_data, xparity, A);
-  }
-#if PETSC_HAVE_CUDA
-  else if (shell == GPU_SHELL) {
-    ierr = C(BuildGPUShell,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
-      msc, left_subspace_data, right_subspace_data, xparity, A);
-  }
-#endif
   else {
-    SETERRQ(PETSC_COMM_SELF, PETSC_ERR_ARG_UNKNOWN_TYPE, "Invalid shell implementation type.");
+    if (shell == CPU_SHELL) {
+      ierr = C(BuildCPUShell,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
+        msc, left_subspace_data, right_subspace_data, xparity, A);
+    }
+#if PETSC_HAVE_CUDA
+    else if (shell == GPU_SHELL) {
+      ierr = C(BuildGPUShell,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
+        msc, left_subspace_data, right_subspace_data, xparity, A);
+    }
+#endif
+    else {
+      SETERRQ(PETSC_COMM_SELF, PETSC_ERR_ARG_UNKNOWN_TYPE, "Invalid shell implementation type.");
+    }
+
+    /* set some data that is shared by CPU and GPU shell implementations */
+    shell_context *ctx;
+    PetscCall(MatShellGetContext(*A, &ctx));
+
+    ctx->nmasks = msc->nmasks;
+    ctx->nrm = -1;
+    ctx->diag = PETSC_NULLPTR;  // diag is allocated later, if filled
+    ctx->left_subspace_type = C(LEFT_SUBSPACE,ENUM);
+    ctx->right_subspace_type = C(RIGHT_SUBSPACE,ENUM);
   }
   return ierr;
 }
@@ -98,7 +110,7 @@ PetscErrorCode C(BuildPetsc,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
   /* compute matrix elements */
   PetscCall(MatSetOption(*A, MAT_NO_OFF_PROC_ENTRIES, PETSC_TRUE));
   PetscCall(MatGetOwnershipRange(*A, &row_start, &row_end));
-  PetscCall(MatGetOwnershipRangeColumn(*A, &col_start, NULL));
+  PetscCall(MatGetOwnershipRangeColumn(*A, &col_start, PETSC_NULLPTR));
 
   for (row_idx = row_start; row_idx < row_end; ++row_idx) {
 
@@ -226,6 +238,7 @@ PetscErrorCode C(BuildCPUShell,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
     msc, left_subspace_data, right_subspace_data, &ctx));
 
   PetscCall(MatCreateShell(PETSC_COMM_WORLD, m, n, M, N, ctx, A));
+
   PetscCall(MatShellSetOperation(*A, MATOP_MULT,
 				 (void(*)(void))C(MatMult_CPU,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))));
   PetscCall(MatShellSetOperation(*A, MATOP_NORM,
@@ -247,6 +260,8 @@ PetscErrorCode C(BuildContext_CPU,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
   const C(data,RIGHT_SUBSPACE)* right_subspace_data,
   shell_context **ctx_p)
 {
+  /* NOTE: some data shared by GPU and CPU implementations is set in BuildMat */
+
   shell_context *ctx;
   PetscInt nterms, i;
   PetscReal real_part;
@@ -254,8 +269,7 @@ PetscErrorCode C(BuildContext_CPU,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
   PetscCall(PetscMalloc1(1, ctx_p));
   ctx = (*ctx_p);
 
-  ctx->nmasks = msc->nmasks;
-  ctx->nrm = -1;
+  ctx->gpu = PETSC_FALSE;
   nterms = msc->mask_offsets[msc->nmasks];
 
   /* we need to keep track of this stuff on our own. the numpy array might get garbage collected */
@@ -297,6 +311,10 @@ PetscErrorCode C(MatDestroyCtx_CPU,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A)
   PetscCall(PetscFree(ctx->mask_offsets));
   PetscCall(PetscFree(ctx->signs));
   PetscCall(PetscFree(ctx->real_coeffs));
+
+  if (ctx->diag) {
+    PetscCall(PetscFree(ctx->diag));
+  }
 
   PetscCall(C(DestroySubspaceData,LEFT_SUBSPACE)(ctx->left_subspace_data));
   PetscCall(C(DestroySubspaceData,RIGHT_SUBSPACE)(ctx->right_subspace_data));
@@ -360,7 +378,16 @@ PetscErrorCode C(MatMult_CPU_General,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, Vec
         ket = C(NextState,LEFT_SUBSPACE)(ket, row_idx, ctx->left_subspace_data);
       }
 
-      for (mask_idx = 0; mask_idx < ctx->nmasks; mask_idx++) {
+      // handle the diagonal separately first, if we have it cached
+      if (ctx->diag) {
+        b_array[row_idx-row_start] += ctx->diag[row_idx-row_start] * local_x_array[row_idx-row_start];
+        mask_idx = 1;  // skip it below!
+      } else {
+        mask_idx = 0;
+      }
+
+      for (; mask_idx < ctx->nmasks; mask_idx++) {
+
         bra = ket ^ ctx->masks[mask_idx];
 
         col_idx = C(S2I,RIGHT_SUBSPACE)(bra, ctx->right_subspace_data);
@@ -404,22 +431,30 @@ PetscErrorCode C(MatMult_CPU_General,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, Vec
       }
 
       for (mask_idx=0; mask_idx<ctx->nmasks; mask_idx++) {
-	bra = ket ^ ctx->masks[mask_idx];
 
-  	row_idx = C(S2I,LEFT_SUBSPACE)(bra, ctx->left_subspace_data);
+        // handle the diagonal separately first, if we have it cached
+        if (mask_idx == 0 && ctx->diag) {
+          row_idx = col_idx;
+          value = ctx->diag[col_idx-col_start];
+        } else {
+          bra = ket ^ ctx->masks[mask_idx];
 
-	if (row_idx == -1) continue;
+          row_idx = C(S2I,LEFT_SUBSPACE)(bra, ctx->left_subspace_data);
 
-	/* sum all terms for this matrix element */
-	value = 0;
-	for (term_idx=ctx->mask_offsets[mask_idx]; term_idx<ctx->mask_offsets[mask_idx+1]; ++term_idx) {
-	  sign = 1 - 2*(builtin_parity(ket&ctx->signs[term_idx]));
-	  if (TERM_REAL(ctx->masks[mask_idx], ctx->signs[term_idx])) {
-	    value += sign * ctx->real_coeffs[term_idx];
-	  } else {
-	    value += I * sign * ctx->real_coeffs[term_idx];
-	  }
-	}
+          if (row_idx == -1) continue;
+
+          /* sum all terms for this matrix element */
+          value = 0;
+          for (term_idx=ctx->mask_offsets[mask_idx]; term_idx<ctx->mask_offsets[mask_idx+1]; ++term_idx) {
+            sign = 1 - 2*(builtin_parity(ket&ctx->signs[term_idx]));
+            if (TERM_REAL(ctx->masks[mask_idx], ctx->signs[term_idx])) {
+              value += sign * ctx->real_coeffs[term_idx];
+            } else {
+              value += I * sign * ctx->real_coeffs[term_idx];
+            }
+          }
+        }
+
 	if (cache_idx >= VECSET_CACHE_SIZE) {
 	  SETERRQ(MPI_COMM_SELF, PETSC_ERR_MEMC, "cache out of bounds, value %" PetscInt_FMT, cache_idx);
 	}
@@ -664,7 +699,7 @@ void C(compute_mask_starts,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(
     // in parity case, we drop the last bit of the mask (by calling S2I on it)
     while (
         mask_idx < nmasks &&
-        C(S2I_nocheck,LEFT_SUBSPACE)(masks[mask_idx], NULL) < (proc_idx << n_local_spins)
+        C(S2I_nocheck,LEFT_SUBSPACE)(masks[mask_idx], PETSC_NULLPTR) < (proc_idx << n_local_spins)
       ) {
       ++mask_idx;
     }
@@ -758,7 +793,7 @@ PetscErrorCode C(MatMult_CPU_Fast,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, Vec x,
     if (mask_starts[proc_idx] == ctx->nmasks) break;
 
     /* the first index of the target */
-    m = C(S2I_nocheck,LEFT_SUBSPACE)(ctx->masks[mask_starts[proc_idx]], NULL);
+    m = C(S2I_nocheck,LEFT_SUBSPACE)(ctx->masks[mask_starts[proc_idx]], PETSC_NULLPTR);
     proc_start_idx = proc_mask & (proc_me ^ m);
 
     for (block_start_idx = proc_start_idx;
@@ -772,7 +807,17 @@ PetscErrorCode C(MatMult_CPU_Fast,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, Vec x,
         row_idx[cache_idx] = block_start_idx+cache_idx;
       }
 
-      for (mask_idx = mask_starts[proc_idx]; mask_idx < mask_starts[proc_idx+1]; ++mask_idx) {
+      // handle the diagonal separately first, if we have it cached
+      if (proc_idx==0 && ctx->diag) {
+        for (cache_idx=0; cache_idx < VECSET_CACHE_SIZE; ++cache_idx) {
+          values[cache_idx] = ctx->diag[(block_start_idx-x_start)+cache_idx] * x_array[(block_start_idx-x_start)+cache_idx];
+        }
+        mask_idx = 1;  // skip it below!
+      } else {
+        mask_idx = mask_starts[proc_idx];
+      }
+
+      for (; mask_idx < mask_starts[proc_idx+1]; ++mask_idx) {
 
         #if (C(LEFT_SUBSPACE,SP) == Parity_SP)
         /* skip terms that don't preserve parity */
@@ -783,7 +828,7 @@ PetscErrorCode C(MatMult_CPU_Fast,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, Vec x,
 
         m = C(S2I_nocheck,LEFT_SUBSPACE)(
           ctx->masks[mask_idx],
-          NULL
+          PETSC_NULLPTR
         );
 
         for (
@@ -793,7 +838,7 @@ PetscErrorCode C(MatMult_CPU_Fast,C(LEFT_SUBSPACE,RIGHT_SUBSPACE))(Mat A, Vec x,
 
           s = C(S2I_nocheck,LEFT_SUBSPACE)(
             ctx->signs[term_idx],
-            NULL
+            PETSC_NULLPTR
           );
 
           ms_parity = builtin_parity(ctx->masks[mask_idx] & ctx->signs[term_idx]);

@@ -2,8 +2,6 @@
 docker/
 docs/
 .gitignore
-LICENSE.txt
-README.md
 
 # other files that might be generated
 build/

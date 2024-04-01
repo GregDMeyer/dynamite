@@ -1,7 +1,8 @@
 
 from .operators import sigmax, sigmay, sigmaz, index_product
 
-def commutator(o1, o2):
+
+def commutator(op1, op2):
     """
     The commutator :math:`[O_1,O_2]`.
 
@@ -10,11 +11,13 @@ def commutator(o1, o2):
     dynamite.operators.Operator
         The commutator
     """
-    rtn = o1*o2 - o2*o1
-    rtn._string_rep.string = '[%s, %s]' % (o1.string, o2.string)
-    rtn._string_rep.tex = r'\left[ %s, %s \right]' % (o1.tex, o2.tex)
+    rtn = op1*op2 - op2*op1
+    rtn._string_rep.string = f'[{op1}, {op2}]'
+    rtn._string_rep.tex = r'\left[ %s, %s \right]' % (op1._string_rep.tex, op2._string_rep.tex)
+    rtn._string_rep.repr_str = f'commutator({repr(op1)}, {repr(op2)})'
     rtn._string_rep.brackets = ''
     return rtn
+
 
 def majorana(idx):
     r"""
@@ -50,6 +53,7 @@ def majorana(idx):
 
     rtn._string_rep.string = 'χ[%d]' % idx
     rtn._string_rep.tex = r'\chi_{IDX%d}' % idx
+    rtn._string_rep.repr_str = f'majorana({idx})'
     rtn._string_rep.brackets = ''
 
     return rtn

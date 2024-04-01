@@ -1,17 +1,20 @@
+# syntax=docker.io/docker/dockerfile:1.7-labs
+# ^ for --exclude flag to COPY. can remove if it gets mainlined
 
 ARG PLATFORM=cpu
 ARG BUILD_TYPE=opt  # 'opt' or 'debug'
-ARG PETSC_VERSION=3.18.4
-ARG SLEPC_VERSION=3.18.2
-ARG CUDA_VERSION=11.8.0
+ARG PETSC_VERSION=3.20.5
+ARG SLEPC_VERSION=3.20.2
+ARG CUDA_VERSION=12.3.2
 ARG CUDA_UBUNTU_VERSION=22.04
 ARG CPU_PYTHON_VERSION=3.11
+ARG SCALAR_TYPE=complex
 
 
 FROM python:${CPU_PYTHON_VERSION} AS base-cpu
 
 # install dependencies
-ONBUILD RUN apt-get update && \
+RUN apt-get update && \
     \
     DEBIAN_FRONTEND="noninteractive" \
     apt-get install -y --no-install-recommends \
@@ -19,7 +22,6 @@ ONBUILD RUN apt-get update && \
     cmake \
     mpi-default-dev \
     libopenblas-dev \
-    libmumps-dev \
     git \
     && \
     apt-get clean && \
@@ -28,14 +30,15 @@ ONBUILD RUN apt-get update && \
 ARG BUILD_TYPE
 ENV PETSC_ARCH=complex-$BUILD_TYPE
 
+ARG SCALAR_TYPE
 ARG PETSC_CONFIG_FLAGS
-ENV PETSC_CONFIG_FLAGS="$PETSC_CONFIG_FLAGS --download-mumps=0 --with-mumps=1"
+ENV PETSC_CONFIG_FLAGS="$PETSC_CONFIG_FLAGS --download-mumps=1 --with-scalar-type=$SCALAR_TYPE"
 
 
 FROM nvidia/cuda:${CUDA_VERSION}-devel-ubuntu${CUDA_UBUNTU_VERSION} AS base-gpu
 
 # install dependencies
-ONBUILD RUN apt-get update && \
+RUN apt-get update && \
     \
     DEBIAN_FRONTEND="noninteractive" \
     apt-get install -y --no-install-recommends \
@@ -54,8 +57,10 @@ ONBUILD RUN apt-get update && \
 ARG BUILD_TYPE
 ENV PETSC_ARCH=cuda-$BUILD_TYPE
 
+ARG CUDA_ARCH=all
+ARG SCALAR_TYPE
 ARG PETSC_CONFIG_FLAGS
-ENV PETSC_CONFIG_FLAGS="$PETSC_CONFIG_FLAGS --with-mpi=0"
+ENV PETSC_CONFIG_FLAGS="$PETSC_CONFIG_FLAGS --with-mpi=0 --with-cuda-arch=$CUDA_ARCH --with-scalar-type=$SCALAR_TYPE"
 
 
 FROM base-${PLATFORM} as build
@@ -71,7 +76,7 @@ USER dnm
 # activate venv
 ENV VIRTUAL_ENV=/venv
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
-RUN pip3 install --no-cache-dir --upgrade pip
+RUN pip3 install --no-cache-dir --upgrade pip~=23.0.1 wheel
 
 
 from build as petsc
@@ -82,7 +87,7 @@ ARG BUILD_TYPE
 # install PETSc
 USER root
 WORKDIR /opt
-RUN curl --no-progress-meter https://ftp.mcs.anl.gov/pub/petsc/release-snapshots/petsc-$PETSC_VERSION.tar.gz | tar xzf -
+RUN curl --no-progress-meter https://web.cels.anl.gov/projects/petsc/download/release-snapshots/petsc-$PETSC_VERSION.tar.gz | tar xzf -
 RUN mv petsc-$PETSC_VERSION petsc
 RUN chown -R dnm:dnm petsc
 USER dnm
@@ -90,8 +95,7 @@ USER dnm
 WORKDIR /opt/petsc
 ENV PETSC_DIR=/opt/petsc
 COPY --chown=dnm:dnm petsc_config/$PETSC_ARCH.py .
-ARG CUDA_ARCH=70
-RUN DNM_CUDA_ARCH=$CUDA_ARCH ./$PETSC_ARCH.py ${PETSC_CONFIG_FLAGS} && \
+RUN ./$PETSC_ARCH.py ${PETSC_CONFIG_FLAGS} && \
     make all
 
 
@@ -121,6 +125,7 @@ RUN ./configure && make
 
 from petsc as dynamite-build
 
+RUN pip3 install --no-cache-dir numpy
 RUN pip3 install --no-cache-dir $PETSC_DIR/src/binding/petsc4py
 
 COPY --from=slepc /opt/slepc /opt/slepc
@@ -131,7 +136,7 @@ RUN pip3 install --no-cache-dir $SLEPC_DIR/src/binding/slepc4py
 RUN mkdir /home/dnm/dynamite
 WORKDIR /home/dnm/dynamite
 
-COPY --chown=dnm:dnm . .
+COPY --chown=dnm:dnm --exclude=benchmarking/ --exclude=examples/ . .
 
 RUN pip3 install -v ./
 
@@ -144,7 +149,6 @@ ONBUILD RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     mpi-default-bin \
     libopenblas0 \
-    libmumps-5.3 \
     && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
@@ -156,7 +160,7 @@ ENV OMP_NUM_THREADS=1
 
 FROM nvidia/cuda:${CUDA_VERSION}-runtime-ubuntu${CUDA_UBUNTU_VERSION} AS release-base-gpu
 
-ONBUILD RUN apt-get update && \
+RUN apt-get update && \
     \
     DEBIAN_FRONTEND="noninteractive" \
     apt-get install -y --no-install-recommends \
@@ -200,8 +204,8 @@ COPY --chown=dnm:dnm examples /home/dnm/examples
 ENV DNM_DOCKER=1
 
 # make work directory for mounting local files
+# (now deprecated but we leave it for backwards compatibility)
 RUN mkdir -p /home/dnm/work  # for permissions
-VOLUME /home/dnm/work
 WORKDIR /home/dnm
 
 

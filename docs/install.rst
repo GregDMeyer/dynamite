@@ -4,11 +4,10 @@
 Installing from source
 **********************
 
-..
-   The easiest way to use ``dynamite`` is through the pre-built container images---see :ref:`containers`.
-   If for some reason you can't use the containers, or if you want a site-specific build (for example to optimize message passing performance between nodes on a cluster), you can build from source.
+.. note::
 
-The following instructions allow one to build ``dynamite`` manually from source. Experimental support has also been added to use dynamite from a pre-built Docker container; see :ref:`containers` for instructions.
+   The easiest way to use ``dynamite`` is through the pre-built container images---see :ref:`containers`.
+   If for some reason you can't or do not want to use the containers, or if you want a site-specific build (for example to optimize message passing performance between nodes on a cluster), you can build from source using the following instructions.
 
 Building from source
 ====================
@@ -36,7 +35,7 @@ following. There is a configuration script that comes with dynamite which should
 
 .. code:: bash
 
-    git clone --depth 1 --branch v3.18.4 https://gitlab.com/petsc/petsc.git petsc
+    git clone --depth 1 --branch v3.20.5 https://gitlab.com/petsc/petsc.git petsc
     cd petsc
     python <dynamite directory>/petsc_config/complex-opt.py
 
@@ -61,7 +60,7 @@ Now download and install SLEPc:
 
 .. code:: bash
 
-    git clone --depth 1 --branch v3.18.2 https://gitlab.com/slepc/slepc.git slepc
+    git clone --depth 1 --branch v3.20.2 https://gitlab.com/slepc/slepc.git slepc
     cd slepc
     ./configure
 
@@ -71,6 +70,11 @@ paste that, and run it. It should look like:
 
 Building dynamite
 -----------------
+
+.. note::
+   Due to `an issue <https://gitlab.com/petsc/petsc/-/issues/1369>`_ in PETSc/SLEPc, ``dynamite``
+   will only build successfully with ``pip < 23.1``. To ensure a successful build we recommend
+   running ``pip install pip~=23.0.1`` before running the below commands.
 
 Make sure ``PETSC_DIR`` and ``PETSC_ARCH`` environment variables are still set
 from the above exports (or re-set them). You should also set ``SLEPC_DIR``:
@@ -89,9 +93,7 @@ Now, you can install everything by simply running
     cd dynamite
     pip install ./
 
-Now you should be all set to use dynamite! If you want to work on the dynamite
-source code, or just easily pull updates from GitHub, you might want to do
-``pip install -e ./`` to keep the source files in-place.
+Now you should be all set to use dynamite!
 
 .. note::
 
