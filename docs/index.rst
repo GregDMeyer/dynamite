@@ -3,8 +3,8 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-dynamite: fast numerics for quantum spin chains
-===============================================
+dynamite: fast numerics for quantum many-body spin systems
+==========================================================
 
 Welcome to **dynamite**, which provides a simple interface
 to fast parallel evolution of quantum dynamics and eigensolving via Krylov subspace methods.
