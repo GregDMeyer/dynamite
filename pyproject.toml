@@ -15,7 +15,7 @@ classifiers = [
 dynamic = ["version"]
 
 dependencies = [
-    "numpy",
+    "numpy ~= 1.26",
     "scipy",
     "threadpoolctl",
     "petsc4py == 3.20.5",
@@ -27,7 +27,7 @@ requires = [
     "setuptools",
     "wheel",
     "cython",
-    "numpy"
+    "numpy ~= 1.26"
 ]
 build-backend = "setuptools.build_meta"
 
