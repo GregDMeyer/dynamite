@@ -35,7 +35,7 @@ following. There is a configuration script that comes with dynamite which should
 
 .. code:: bash
 
-    git clone --depth 1 --branch v3.20.5 https://gitlab.com/petsc/petsc.git petsc
+    git clone --depth 1 --branch v3.25.4 https://gitlab.com/petsc/petsc.git petsc
     cd petsc
     python <dynamite directory>/petsc_config/complex-opt.py
 
@@ -60,7 +60,7 @@ Now download and install SLEPc:
 
 .. code:: bash
 
-    git clone --depth 1 --branch v3.20.2 https://gitlab.com/slepc/slepc.git slepc
+    git clone --depth 1 --branch v3.25.1 https://gitlab.com/slepc/slepc.git slepc
     cd slepc
     ./configure
 
