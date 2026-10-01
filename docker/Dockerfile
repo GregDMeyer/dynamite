@@ -3,11 +3,11 @@
 
 ARG PLATFORM=cpu
 ARG BUILD_TYPE=opt  # 'opt' or 'debug'
-ARG PETSC_VERSION=3.25.4
-ARG SLEPC_VERSION=3.25.1
-ARG CUDA_VERSION=13.3.1
-ARG CUDA_UBUNTU_VERSION=26.04
-ARG CPU_PYTHON_VERSION=3.14
+ARG PETSC_VERSION=3.25.6
+ARG SLEPC_VERSION=3.25.2
+ARG CUDA_VERSION=12.9.2
+ARG CUDA_UBUNTU_VERSION=24.04
+ARG CPU_PYTHON_VERSION=3.13
 ARG SCALAR_TYPE=complex
 
 
@@ -50,6 +50,7 @@ RUN apt-get update && \
     ca-certificates \
     libopenblas-dev \
     git \
+    g++ \
     && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
