@@ -116,7 +116,7 @@ class Subspace:
         def rtn_fn(self, val, *args, **kwargs):
             single_value = not hasattr(val, "__len__")
             val = np.ascontiguousarray(
-                np.array(val, copy=False, dtype=bsubspace.dnm_int_t).reshape((-1,))
+                np.asarray(val, dtype=bsubspace.dnm_int_t).reshape((-1,))
             )
 
             rtn = fn(self, val, *args, **kwargs)

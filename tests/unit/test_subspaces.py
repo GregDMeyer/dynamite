@@ -418,7 +418,7 @@ class TestXParity(ut.TestCase):
     @classmethod
     def msc_from_array(cls, ary):
         msc = [(int(m, 2), int(s, 2), c) for m, s, c in ary]
-        return np.array(msc, copy=False, dtype=msc_dtype)
+        return np.asarray(msc, dtype=msc_dtype)
 
     def check_reduce_msc_equal(self, initial, correct, sector, L, conserves):
         sp = object.__new__(XParity)
