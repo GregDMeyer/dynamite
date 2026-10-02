@@ -77,7 +77,7 @@ USER dnm
 # activate venv
 ENV VIRTUAL_ENV=/venv
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
-RUN pip3 install --no-cache-dir --upgrade pip~=23.0.1 wheel
+RUN pip3 install --no-cache-dir --upgrade pip setuptools wheel
 
 
 from build as petsc
