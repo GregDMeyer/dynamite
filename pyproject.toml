@@ -2,8 +2,8 @@
 name = "dynamite"
 description = "Fast numerics for large quantum spin chains."
 authors = [
-    {name = "Greg Kahanamoku-Meyer"},
-    {email = "gkm@berkeley.edu"}
+    {name = "Greg Meyer"},
+    {email = "contact@gmeyer.net"}
 ]
 requires-python = ">=3.8"
 readme = "README.md"
