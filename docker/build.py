@@ -38,7 +38,7 @@ def parse_args(argv=None):
     parser.add_argument("--debug", action='store_true',
                         help='Build in debug mode instead of release mode.')
 
-    parser.add_argument("--cuda-arch", default='60,61,70,75,80,86',
+    parser.add_argument("--cuda-arch", default='75,80,86,89,90,100,103,120',
                         help='CUDA compute capability (or comma-separated list of several).')
 
     parser.add_argument("--int-sizes", type=lambda x: [int(v) for v in x.split(',')],
