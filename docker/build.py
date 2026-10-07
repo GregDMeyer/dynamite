@@ -142,7 +142,7 @@ def main():
                     tags = [tag+'-jupyter' for tag in tags]
 
                 for tag in tags:
-                    cmd += ["-t", f"gdmeyer/dynamite:{tag}"]
+                    cmd += ["-t", f"docker.io/gdmeyer/dynamite:{tag}"]
 
                 cmd += ["."]
 
