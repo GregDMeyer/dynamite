@@ -43,9 +43,14 @@ Note that you may want to adjust some of the build options. Just take a look at
 the script and modify as desired. There are also a couple other scripts in that
 directory for debug builds (if you will be modifying dynamite) and GPU support.
 
+.. note::
+   If you are compiling with GPU support and CUDA 13, it currently seems to be necessary to add the ``--with-cuda-dialect=17`` flag to the ``cuda-opt.py`` script to get Thrust to compile.
+
 If all goes well, ``configure`` will tell you to run a ``make`` command. Copy
 the command and run it. It should look like:
 ``make PETSC_DIR=<your_petsc_directory> PETSC_ARCH=complex-opt all``
+
+Note that you do not need to run ``make install``; leaving the compiled library where it was built is fine.
 
 Building SLEPc
 --------------
@@ -70,11 +75,6 @@ paste that, and run it. It should look like:
 
 Building dynamite
 -----------------
-
-.. note::
-   Due to `an issue <https://gitlab.com/petsc/petsc/-/issues/1369>`_ in PETSc/SLEPc, ``dynamite``
-   will only build successfully with ``pip < 23.1``. To ensure a successful build we recommend
-   running ``pip install pip~=23.0.1`` before running the below commands.
 
 Make sure ``PETSC_DIR`` and ``PETSC_ARCH`` environment variables are still set
 from the above exports (or re-set them). You should also set ``SLEPC_DIR``:
