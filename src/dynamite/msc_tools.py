@@ -46,7 +46,7 @@ def msc_to_numpy(msc, dims, idx_to_state=None, state_to_idx=None, sparse=True):
     scipy.spmatrix or np.ndarray (dtype = np.complex128)
         The matrix
     '''
-    msc = np.array(msc, copy = False, dtype = msc_dtype)
+    msc = np.asarray(msc, dtype=msc_dtype)
     data = np.ndarray(msc.size * np.min(dims), dtype = np.complex128)
     # data[:] = -1 # for testing if we have correctly sized buffers
     row_idxs = np.ndarray(data.size, dtype = dnm_int_t)

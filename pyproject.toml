@@ -2,8 +2,8 @@
 name = "dynamite"
 description = "Fast numerics for large quantum spin chains."
 authors = [
-    {name = "Greg Kahanamoku-Meyer"},
-    {email = "gkm@berkeley.edu"}
+    {name = "Greg Meyer"},
+    {email = "contact@gmeyer.net"}
 ]
 requires-python = ">=3.8"
 readme = "README.md"
@@ -15,11 +15,11 @@ classifiers = [
 dynamic = ["version"]
 
 dependencies = [
-    "numpy ~= 1.26",
+    "numpy",
     "scipy",
     "threadpoolctl",
-    "petsc4py == 3.20.5",
-    "slepc4py == 3.20.2",
+    "petsc4py == 3.25.6",
+    "slepc4py == 3.25.2",
 ]
 
 [build-system]
@@ -27,7 +27,7 @@ requires = [
     "setuptools",
     "wheel",
     "cython",
-    "numpy ~= 1.26"
+    "numpy"
 ]
 build-backend = "setuptools.build_meta"
 

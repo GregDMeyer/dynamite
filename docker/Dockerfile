@@ -3,11 +3,11 @@
 
 ARG PLATFORM=cpu
 ARG BUILD_TYPE=opt  # 'opt' or 'debug'
-ARG PETSC_VERSION=3.20.5
-ARG SLEPC_VERSION=3.20.2
-ARG CUDA_VERSION=12.3.2
-ARG CUDA_UBUNTU_VERSION=22.04
-ARG CPU_PYTHON_VERSION=3.11
+ARG PETSC_VERSION=3.25.6
+ARG SLEPC_VERSION=3.25.2
+ARG CUDA_VERSION=12.9.2
+ARG CUDA_UBUNTU_VERSION=24.04
+ARG CPU_PYTHON_VERSION=3.13
 ARG SCALAR_TYPE=complex
 
 
@@ -35,7 +35,7 @@ ARG PETSC_CONFIG_FLAGS
 ENV PETSC_CONFIG_FLAGS="$PETSC_CONFIG_FLAGS --download-mumps=1 --with-scalar-type=$SCALAR_TYPE"
 
 
-FROM nvidia/cuda:${CUDA_VERSION}-devel-ubuntu${CUDA_UBUNTU_VERSION} AS base-gpu
+FROM docker.io/nvidia/cuda:${CUDA_VERSION}-devel-ubuntu${CUDA_UBUNTU_VERSION} AS base-gpu
 
 # install dependencies
 RUN apt-get update && \
@@ -76,7 +76,7 @@ USER dnm
 # activate venv
 ENV VIRTUAL_ENV=/venv
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
-RUN pip3 install --no-cache-dir --upgrade pip~=23.0.1 wheel
+RUN pip3 install --no-cache-dir --upgrade pip setuptools wheel
 
 
 from build as petsc
@@ -143,7 +143,7 @@ RUN pip3 install -v ./
 
 FROM python:${CPU_PYTHON_VERSION}-slim as release-base-cpu
 
-ONBUILD RUN apt-get update && \
+RUN apt-get update && \
     \
     DEBIAN_FRONTEND="noninteractive" \
     apt-get install -y --no-install-recommends \
@@ -158,7 +158,7 @@ ENV PETSC_ARCH=complex-$BUILD_TYPE
 ENV OMP_NUM_THREADS=1
 
 
-FROM nvidia/cuda:${CUDA_VERSION}-runtime-ubuntu${CUDA_UBUNTU_VERSION} AS release-base-gpu
+FROM docker.io/nvidia/cuda:${CUDA_VERSION}-runtime-ubuntu${CUDA_UBUNTU_VERSION} AS release-base-gpu
 
 RUN apt-get update && \
     \
@@ -178,7 +178,7 @@ ENV OMP_NUM_THREADS=1
 
 FROM release-base-${PLATFORM} as release
 
-LABEL org.opencontainers.image.authors="Greg Kahanamoku-Meyer <gregory.meyer@gmail.com>"
+LABEL org.opencontainers.image.authors="Greg Meyer <contact@gmeyer.net>"
 
 # get petsc and slepc libraries
 COPY --from=petsc /opt/petsc/$PETSC_ARCH/lib /opt/petsc/$PETSC_ARCH/lib
@@ -211,7 +211,7 @@ WORKDIR /home/dnm
 
 FROM release AS jupyter
 
-LABEL org.opencontainers.image.authors="Greg Kahanamoku-Meyer <gregory.meyer@gmail.com>"
+LABEL org.opencontainers.image.authors="Greg Meyer <contact@gmeyer.net>"
 
 # install jupyter
 RUN pip3 install --no-cache-dir jupyterlab matplotlib

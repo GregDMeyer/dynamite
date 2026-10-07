@@ -1,6 +1,16 @@
 
 # Changelog
 
+## 0.4.1 - 2026-10-07
+
+### Changed
+ - Update version of dependencies (e.g. PETSc, SLEPc, numpy)
+ - Update GPU builds for compatibility with new GPU hardware
+ - Use `podman`, not `docker`, for container build tooling
+
+### Removed
+ - dynamite no longer automatically checks for new versions on startup
+
 ## 0.4.0 - 2024-04-01
 
 ### Added

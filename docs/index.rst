@@ -24,18 +24,23 @@ Start the tutorial by launching the notebook ``0-Welcome.ipynb`` in the left pan
 
 You may also be interested in looking at dynamite's `example scripts <https://github.com/GregDMeyer/dynamite/tree/master/examples/scripts>`_.
 
-.. note::
-    dynamite is in beta! You may find bugs. When you do,
-    please submit them on the `GitHub Issues <https://github.com/GregDMeyer/dynamite/issues>`_
-    page! Additionally, you may want to check you are getting correct answers by
-    comparing a small system to output from a different method.
+Reference
+---------
 
-How to cite
------------
+To learn more about how dynamite works under the hood, and to see performance data, you may be interested to read `Chapter 2 of Greg's PhD thesis <https://gmeyer.net/dissertation/Ch2.html>`_.
 
-Currently, the best way to cite dynamite is by citing the
-`Zenodo repository <https://doi.org/10.5281/zenodo.3606825>`_.
-A manuscript is coming soon!
+If you use dynamite in a publication, please cite it using the following BibTeX:
+
+.. code-block:: bibtex
+
+   @phdthesis{kahanamoku-meyer_exploring_2023,
+       title = {Exploring the {{Limits}} of {{Classical Simulation}}: {{From Computational Many-Body Dynamics}} to {{Quantum Advantage}}},
+       author = {{Kahanamoku-Meyer}, Gregory Donald},
+       year = 2023,
+       school = {University of California, Berkeley},
+       isbn = {979-8-3803-6742-4},
+       url = {https://escholarship.org/uc/item/6gb6v2j3}
+   }
 
 Publications using dynamite
 ---------------------------

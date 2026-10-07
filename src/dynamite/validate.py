@@ -50,7 +50,7 @@ def subspace(s):
 
 
 def msc(x):
-    x = np.array(x, copy=False, dtype=msc_dtype)
+    x = np.asarray(x, dtype=msc_dtype)
     return x
 
 

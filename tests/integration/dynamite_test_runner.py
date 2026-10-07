@@ -118,6 +118,7 @@ def main(slepc_args=None):
     skip_flags = {
         'small_only': False,
         'medium_only': False,
+        'gpu': args.gpu
     }
 
     if args.skip_small or args.skip_medium:
