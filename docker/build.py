@@ -117,7 +117,7 @@ def main():
                     tags = [tag+'-cuda' for tag in tags]
 
                 cmd = [
-                    "docker", "build",
+                    "podman", "build",
                     "--build-arg", f"PLATFORM={platform}",
                     "-f", "docker/Dockerfile",
                     "--target", target
